@@ -1,9 +1,8 @@
 import Foundation
-import CoreData
 import SwiftUI
 
-// MARK: - Data Models
-struct SalvadanaiModel: Identifiable {
+// MARK: - Data Models (con Codable per serializzazione)
+struct SalvadanaiModel: Identifiable, Codable {
     let id = UUID()
     var name: String
     var type: String // "objective", "glass", "infinite"
@@ -12,15 +11,15 @@ struct SalvadanaiModel: Identifiable {
     var targetDate: Date?
     var monthlyRefill: Double
     var color: String
-    var accountName: String // Conto associato al salvadanaio
+    var accountName: String
     var createdAt: Date
-    var isInfinite: Bool // Nuovo: indica se è un obiettivo infinito
+    var isInfinite: Bool
 }
 
-struct TransactionModel: Identifiable {
+struct TransactionModel: Identifiable, Codable {
     let id = UUID()
     var amount: Double
-    var descr: String  // Cambiato da description a descr
+    var descr: String
     var category: String
     var type: String // "expense", "income", "salary"
     var date: Date
@@ -28,20 +27,30 @@ struct TransactionModel: Identifiable {
     var salvadanaiName: String?
 }
 
-struct AccountModel: Identifiable {
+struct AccountModel: Identifiable, Codable {
     let id = UUID()
     var name: String
     var balance: Double
     var createdAt: Date
 }
 
-// MARK: - Data Manager (versione con categorie personalizzabili)
+// MARK: - Data Manager con persistenza
 class DataManager: ObservableObject {
-    @Published var salvadanai: [SalvadanaiModel] = []
-    @Published var transactions: [TransactionModel] = []
-    @Published var accounts: [AccountModel] = []
-    @Published var customExpenseCategories: [String] = [] // Nuove categorie spese personalizzate
-    @Published var customIncomeCategories: [String] = []  // Nuove categorie entrate personalizzate
+    @Published var salvadanai: [SalvadanaiModel] = [] {
+        didSet { saveSalvadanai() }
+    }
+    @Published var transactions: [TransactionModel] = [] {
+        didSet { saveTransactions() }
+    }
+    @Published var accounts: [AccountModel] = [] {
+        didSet { saveAccounts() }
+    }
+    @Published var customExpenseCategories: [String] = [] {
+        didSet { saveCategories() }
+    }
+    @Published var customIncomeCategories: [String] = [] {
+        didSet { saveCategories() }
+    }
     
     // Computed Properties
     var totalBalance: Double {
@@ -87,9 +96,76 @@ class DataManager: ObservableObject {
         "pink", "red", "yellow", "indigo"
     ]
     
+    // Chiavi per UserDefaults
+    private let salvadanaiKey = "SavedSalvadanai"
+    private let transactionsKey = "SavedTransactions"
+    private let accountsKey = "SavedAccounts"
+    private let customExpenseCategoriesKey = "CustomExpenseCategories"
+    private let customIncomeCategoriesKey = "CustomIncomeCategories"
+    
     init() {
-        // App inizia vuota
-        loadStoredCategories() // Carica categorie salvate
+        loadAllData()
+    }
+    
+    // MARK: - Persistence Methods
+    private func loadAllData() {
+        loadSalvadanai()
+        loadTransactions()
+        loadAccounts()
+        loadStoredCategories()
+    }
+    
+    // MARK: - Salvadanai Persistence
+    private func saveSalvadanai() {
+        if let encoded = try? JSONEncoder().encode(salvadanai) {
+            UserDefaults.standard.set(encoded, forKey: salvadanaiKey)
+        }
+    }
+    
+    private func loadSalvadanai() {
+        if let data = UserDefaults.standard.data(forKey: salvadanaiKey),
+           let decoded = try? JSONDecoder().decode([SalvadanaiModel].self, from: data) {
+            salvadanai = decoded
+        }
+    }
+    
+    // MARK: - Transactions Persistence
+    private func saveTransactions() {
+        if let encoded = try? JSONEncoder().encode(transactions) {
+            UserDefaults.standard.set(encoded, forKey: transactionsKey)
+        }
+    }
+    
+    private func loadTransactions() {
+        if let data = UserDefaults.standard.data(forKey: transactionsKey),
+           let decoded = try? JSONDecoder().decode([TransactionModel].self, from: data) {
+            transactions = decoded
+        }
+    }
+    
+    // MARK: - Accounts Persistence
+    private func saveAccounts() {
+        if let encoded = try? JSONEncoder().encode(accounts) {
+            UserDefaults.standard.set(encoded, forKey: accountsKey)
+        }
+    }
+    
+    private func loadAccounts() {
+        if let data = UserDefaults.standard.data(forKey: accountsKey),
+           let decoded = try? JSONDecoder().decode([AccountModel].self, from: data) {
+            accounts = decoded
+        }
+    }
+    
+    // MARK: - Categories Persistence
+    private func saveCategories() {
+        UserDefaults.standard.set(customExpenseCategories, forKey: customExpenseCategoriesKey)
+        UserDefaults.standard.set(customIncomeCategories, forKey: customIncomeCategoriesKey)
+    }
+    
+    private func loadStoredCategories() {
+        customExpenseCategories = UserDefaults.standard.stringArray(forKey: customExpenseCategoriesKey) ?? []
+        customIncomeCategories = UserDefaults.standard.stringArray(forKey: customIncomeCategoriesKey) ?? []
     }
     
     // MARK: - Categories Management
@@ -99,7 +175,7 @@ class DataManager: ObservableObject {
         guard !expenseCategories.contains(trimmedCategory) else { return }
         
         customExpenseCategories.append(trimmedCategory)
-        saveCategories()
+        // saveCategories() chiamato automaticamente da didSet
     }
     
     func addIncomeCategory(_ category: String) {
@@ -108,35 +184,20 @@ class DataManager: ObservableObject {
         guard !incomeCategories.contains(trimmedCategory) else { return }
         
         customIncomeCategories.append(trimmedCategory)
-        saveCategories()
+        // saveCategories() chiamato automaticamente da didSet
     }
     
     func deleteExpenseCategory(_ category: String) {
-        // Può eliminare solo categorie personalizzate, non quelle predefinite
         guard !defaultExpenseCategories.contains(category) else { return }
         customExpenseCategories.removeAll { $0 == category }
-        saveCategories()
+        // saveCategories() chiamato automaticamente da didSet
     }
     
     func deleteIncomeCategory(_ category: String) {
-        // Può eliminare solo categorie personalizzate, non quelle predefinite
         guard !defaultIncomeCategories.contains(category) else { return }
         customIncomeCategories.removeAll { $0 == category }
-        saveCategories()
+        // saveCategories() chiamato automaticamente da didSet
     }
-    
-    // MARK: - Categories Persistence
-    private func saveCategories() {
-        UserDefaults.standard.set(customExpenseCategories, forKey: "CustomExpenseCategories")
-        UserDefaults.standard.set(customIncomeCategories, forKey: "CustomIncomeCategories")
-    }
-    
-    private func loadStoredCategories() {
-        customExpenseCategories = UserDefaults.standard.stringArray(forKey: "CustomExpenseCategories") ?? []
-        customIncomeCategories = UserDefaults.standard.stringArray(forKey: "CustomIncomeCategories") ?? []
-    }
-    
-    // MARK: - Existing methods remain the same...
     
     // MARK: - Salvadanai Methods
     func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0, isInfinite: Bool = false) {
@@ -155,7 +216,6 @@ class DataManager: ObservableObject {
         salvadanai.append(newSalvadanaio)
         
         // Se c'è un saldo iniziale, sottrailo dal conto selezionato
-        // MA NON creare una transazione perché sarebbe un doppio conteggio
         if initialAmount > 0 {
             updateAccountBalance(accountName: accountName, amount: -initialAmount)
         }
@@ -229,7 +289,6 @@ class DataManager: ObservableObject {
     private func updateSalvadanaiBalance(name: String, amount: Double) {
         if let index = salvadanai.firstIndex(where: { $0.name == name }) {
             salvadanai[index].currentAmount += amount
-            // Rimossa la protezione che impediva di andare sotto zero
         }
     }
     
@@ -286,78 +345,6 @@ class DataManager: ObservableObject {
                     updateAccountBalance(accountName: salvadanai[index].accountName, amount: -amountToAdd)
                 }
             }
-        }
-    }
-}
-
-// MARK: - Color Extension
-extension Color {
-    init(_ colorName: String) {
-        switch colorName {
-        case "blue": self = .blue
-        case "green": self = .green
-        case "orange": self = .orange
-        case "purple": self = .purple
-        case "pink": self = .pink
-        case "red": self = .red
-        case "yellow": self = .yellow
-        case "indigo": self = .indigo
-        default: self = .blue
-        }
-    }
-}
-
-// MARK: - Animation Helper
-struct MoneyFlowAnimation: View {
-    @State private var isAnimating = false
-    let fromAccount: String
-    let toSalvadanaio: String
-    let amount: Double
-    
-    var body: some View {
-        ZStack {
-            // Background
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 40) {
-                Text("Smistamento in corso...")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                
-                // Animazione soldi
-                HStack(spacing: 20) {
-                    ForEach(0..<5, id: \.self) { index in
-                        Image(systemName: "banknote.fill")
-                            .font(.title)
-                            .foregroundColor(.green)
-                            .scaleEffect(isAnimating ? 1.2 : 0.8)
-                            .opacity(isAnimating ? 1.0 : 0.3)
-                            .animation(
-                                .easeInOut(duration: 0.6)
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.1),
-                                value: isAnimating
-                            )
-                    }
-                }
-                
-                VStack(spacing: 8) {
-                    Text("€\(String(format: "%.2f", amount))")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("da \(fromAccount) → \(toSalvadanaio)")
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            }
-            .padding()
-        }
-        .onAppear {
-            isAnimating = true
         }
     }
 }

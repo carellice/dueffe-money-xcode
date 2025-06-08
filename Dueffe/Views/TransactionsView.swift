@@ -680,7 +680,7 @@ struct CustomDistributionRow: View {
     }
 }
 
-// MARK: - Salary Distribution View
+// MARK: - Salary Distribution View (correzione toolbar)
 struct SalaryDistributionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -797,14 +797,15 @@ struct SalaryDistributionView: View {
             }
             .navigationTitle("Distribuzione")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(false)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     Button("Annulla") {
                         dismiss()
                     }
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("Distribuisci") {
                         withAnimation {
                             showingAnimation = true
@@ -1822,5 +1823,60 @@ struct QuickCategoryAddView: View {
         }
         
         dismiss()
+    }
+}
+
+// MARK: - Money Flow Animation (sposta questa struct in TransactionsView.swift)
+struct MoneyFlowAnimation: View {
+    @State private var isAnimating = false
+    let fromAccount: String
+    let toSalvadanaio: String
+    let amount: Double
+    
+    var body: some View {
+        ZStack {
+            // Background
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Text("Smistamento in corso...")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                // Animazione soldi
+                HStack(spacing: 20) {
+                    ForEach(0..<5, id: \.self) { index in
+                        Image(systemName: "banknote.fill")
+                            .font(.title)
+                            .foregroundColor(.green)
+                            .scaleEffect(isAnimating ? 1.2 : 0.8)
+                            .opacity(isAnimating ? 1.0 : 0.3)
+                            .animation(
+                                .easeInOut(duration: 0.6)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.1),
+                                value: isAnimating
+                            )
+                    }
+                }
+                
+                VStack(spacing: 8) {
+                    Text("€\(String(format: "%.2f", amount))")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Text("da \(fromAccount) → \(toSalvadanaio)")
+                        .font(.headline)
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+            .padding()
+        }
+        .onAppear {
+            isAnimating = true
+        }
     }
 }
