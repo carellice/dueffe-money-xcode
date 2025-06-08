@@ -225,20 +225,21 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Salvadanaio Home Card (versione aggiornata)
+// MARK: - Salvadanaio Home Card (versione con supporto infinito)
 struct SalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
     
     var progress: Double {
-        if salvadanaio.type == "objective" {
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
             guard salvadanaio.targetAmount > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
             return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
-        } else {
+        } else if salvadanaio.type == "glass" {
             guard salvadanaio.monthlyRefill > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
             return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
         }
+        return 0 // Per obiettivi infiniti non mostriamo progress
     }
     
     var body: some View {
@@ -259,6 +260,10 @@ struct SalvadanaiHomeCard: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundColor(.red)
+                } else if salvadanaio.type == "objective" && salvadanaio.isInfinite {
+                    Image(systemName: "infinity")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 } else {
                     Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
                         .font(.caption)
@@ -277,6 +282,10 @@ struct SalvadanaiHomeCard: View {
                         .font(.caption)
                         .foregroundColor(.red)
                         .fontWeight(.medium)
+                } else if salvadanaio.type == "objective" && salvadanaio.isInfinite {
+                    Text("Obiettivo infinito")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 } else if salvadanaio.type == "objective" {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")

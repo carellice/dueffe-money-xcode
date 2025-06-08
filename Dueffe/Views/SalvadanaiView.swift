@@ -48,7 +48,7 @@ struct SalvadanaiView: View {
     }
 }
 
-// MARK: - Salvadanaio Card (versione aggiornata)
+// MARK: - Salvadanaio Card (versione con supporto infinito)
 struct SalvadanaiCard: View {
     let salvadanaio: SalvadanaiModel
     @State private var isPressed = false
@@ -67,7 +67,7 @@ struct SalvadanaiCard: View {
                             .font(.headline)
                             .fontWeight(.semibold)
                         
-                        Text(salvadanaio.type == "objective" ? "Obiettivo" : "Glass")
+                        Text(typeDisplayName)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -75,13 +75,13 @@ struct SalvadanaiCard: View {
                 
                 Spacer()
                 
-                // Indica se è in negativo
+                // Icona in base al tipo
                 if salvadanaio.currentAmount < 0 {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.title2)
                         .foregroundColor(.red)
                 } else {
-                    Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                    Image(systemName: typeIcon)
                         .font(.title2)
                         .foregroundColor(Color(salvadanaio.color))
                 }
@@ -119,7 +119,11 @@ struct SalvadanaiCard: View {
             
             // Progress/Info specifiche
             if salvadanaio.type == "objective" {
-                ObjectiveProgressView(salvadanaio: salvadanaio)
+                if salvadanaio.isInfinite {
+                    InfiniteObjectiveView(salvadanaio: salvadanaio)
+                } else {
+                    ObjectiveProgressView(salvadanaio: salvadanaio)
+                }
             } else {
                 GlassInfoView(salvadanaio: salvadanaio)
             }
@@ -143,6 +147,77 @@ struct SalvadanaiCard: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeInOut(duration: 0.1)) {
                     isPressed = false
+                }
+            }
+        }
+    }
+    
+    private var typeDisplayName: String {
+        if salvadanaio.type == "objective" {
+            return salvadanaio.isInfinite ? "Obiettivo Infinito" : "Obiettivo"
+        } else {
+            return "Glass"
+        }
+    }
+    
+    private var typeIcon: String {
+        if salvadanaio.type == "objective" {
+            return salvadanaio.isInfinite ? "infinity" : "target"
+        } else {
+            return "drop.fill"
+        }
+    }
+}
+
+// MARK: - Infinite Objective View
+struct InfiniteObjectiveView: View {
+    let salvadanaio: SalvadanaiModel
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "infinity")
+                    .foregroundColor(Color(salvadanaio.color))
+                
+                Text("Obiettivo senza limiti")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(Color(salvadanaio.color))
+                
+                Spacer()
+            }
+            
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Creato il")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(salvadanaio.createdAt, style: .date)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                
+                Spacer()
+                
+                if salvadanaio.currentAmount >= 0 {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Continua a risparmiare!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                    }
+                } else {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Da recuperare")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Text("€\(String(format: "%.2f", abs(salvadanaio.currentAmount)))")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.red)
+                    }
                 }
             }
         }
@@ -312,19 +387,20 @@ struct GlassInfoView: View {
     }
 }
 
-// MARK: - Add Salvadanaio View
+// MARK: - Add Salvadanaio View (versione aggiornata)
 struct AddSalvadanaiView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
     @State private var name = ""
     @State private var selectedType = "objective"
-    @State private var targetAmount = 100.0  // Valore di default
+    @State private var targetAmount = 100.0
     @State private var targetDate = Date()
-    @State private var monthlyRefill = 50.0  // Valore di default
+    @State private var monthlyRefill = 50.0
     @State private var selectedColor = "blue"
     @State private var selectedAccount = ""
-    @State private var initialAmount = 0.0  // Nuovo: saldo iniziale
+    @State private var initialAmount = 0.0
+    @State private var isInfiniteObjective = false // Nuovo: toggle per obiettivo infinito
     
     let salvadanaiTypes = [
         ("objective", "Obiettivo", "target"),
@@ -332,17 +408,12 @@ struct AddSalvadanaiView: View {
     ]
     
     var isFormValid: Bool {
-        // Nome non deve essere vuoto
         if name.isEmpty { return false }
-        
-        // Deve esserci almeno un conto disponibile
         if dataManager.accounts.isEmpty { return false }
-        
-        // Deve essere selezionato un conto
         if selectedAccount.isEmpty { return false }
         
         // Validazione specifica per tipo
-        if selectedType == "objective" && targetAmount <= 0 { return false }
+        if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
         
         return true
@@ -373,6 +444,9 @@ struct AddSalvadanaiView: View {
                         ForEach(salvadanaiTypes, id: \.0) { type, displayName, icon in
                             Button(action: {
                                 selectedType = type
+                                if type == "glass" {
+                                    isInfiniteObjective = false // Reset quando si cambia tipo
+                                }
                             }) {
                                 HStack {
                                     Image(systemName: icon)
@@ -396,7 +470,7 @@ struct AddSalvadanaiView: View {
                     Text("Tipo di salvadanaio")
                 } footer: {
                     Text(selectedType == "objective"
-                         ? "Un obiettivo ha un importo target e una scadenza"
+                         ? "Un obiettivo può avere un importo target e una scadenza, oppure essere infinito"
                          : "Un salvadanaio Glass si ricarica automaticamente ogni mese")
                 }
                 
@@ -429,7 +503,6 @@ struct AddSalvadanaiView: View {
                             ForEach(dataManager.accounts, id: \.name) { account in
                                 Button(action: {
                                     selectedAccount = account.name
-                                    print("🔄 Conto selezionato: \(account.name)")
                                 }) {
                                     HStack {
                                         Image(systemName: selectedAccount == account.name ? "checkmark.circle.fill" : "circle")
@@ -459,19 +532,35 @@ struct AddSalvadanaiView: View {
                     Text("I soldi di questo salvadanaio saranno collegati al conto selezionato")
                 }
                 
+                // Sezione obiettivo con opzione infinito
                 if selectedType == "objective" {
                     Section {
-                        HStack {
-                            Text("Obiettivo")
-                            Spacer()
-                            TextField("100", value: $targetAmount, format: .currency(code: "EUR"))
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                        }
+                        Toggle("Obiettivo infinito", isOn: $isInfiniteObjective)
+                            .onChange(of: isInfiniteObjective) { _, newValue in
+                                if newValue {
+                                    targetAmount = 0
+                                } else {
+                                    targetAmount = 100.0
+                                }
+                            }
                         
-                        DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                        if !isInfiniteObjective {
+                            HStack {
+                                Text("Obiettivo")
+                                Spacer()
+                                TextField("100", value: $targetAmount, format: .currency(code: "EUR"))
+                                    .multilineTextAlignment(.trailing)
+                                    .keyboardType(.decimalPad)
+                            }
+                            
+                            DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                        }
                     } header: {
                         Text("Dettagli obiettivo")
+                    } footer: {
+                        Text(isInfiniteObjective
+                             ? "Un obiettivo infinito può essere riempito senza limiti e non ha scadenza"
+                             : "Imposta un importo target e una data di scadenza per il tuo obiettivo")
                     }
                 } else {
                     Section {
@@ -508,34 +597,6 @@ struct AddSalvadanaiView: View {
                 } header: {
                     Text("Colore")
                 }
-                
-                // Sezione Debug (rimuovere dopo il test)
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("🐛 DEBUG INFO:")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.purple)
-                        
-                        Text("Nome: '\(name)' (vuoto: \(name.isEmpty))")
-                            .font(.caption2)
-                        Text("Conto: '\(selectedAccount)' (vuoto: \(selectedAccount.isEmpty))")
-                            .font(.caption2)
-                        Text("Conti disponibili: \(dataManager.accounts.count)")
-                            .font(.caption2)
-                        Text("Tipo: \(selectedType)")
-                            .font(.caption2)
-                        Text("Target: €\(String(format: "%.2f", targetAmount))")
-                            .font(.caption2)
-                        Text("Refill: €\(String(format: "%.2f", monthlyRefill))")
-                            .font(.caption2)
-                        Text("Form valido: \(isFormValid ? "✅" : "❌")")
-                            .font(.caption2)
-                            .foregroundColor(isFormValid ? .green : .red)
-                    }
-                } header: {
-                    Text("Debug (rimuovi dopo test)")
-                }
             }
             .navigationTitle("Nuovo Salvadanaio")
             .navigationBarTitleDisplayMode(.inline)
@@ -560,32 +621,23 @@ struct AddSalvadanaiView: View {
     }
     
     private func setupDefaults() {
-        // Auto-seleziona il primo conto se disponibile
         if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
             selectedAccount = dataManager.accounts.first!.name
-            print("🔄 Auto-selezionato primo conto: \(selectedAccount)")
         }
-        
-        print("=== SETUP DEFAULTS ===")
-        print("Conti disponibili: \(dataManager.accounts.count)")
-        print("Conto auto-selezionato: '\(selectedAccount)'")
-        print("Form valido dopo setup: \(isFormValid)")
-        print("======================")
     }
     
     private func createSalvadanaio() {
-        print("🚀 Creando salvadanaio...")
         dataManager.addSalvadanaio(
             name: name,
             type: selectedType,
-            targetAmount: selectedType == "objective" ? targetAmount : 0,
-            targetDate: selectedType == "objective" ? targetDate : nil,
+            targetAmount: isInfiniteObjective ? 0 : (selectedType == "objective" ? targetAmount : 0),
+            targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
             accountName: selectedAccount,
-            initialAmount: initialAmount  // Nuovo parametro
+            initialAmount: initialAmount,
+            isInfinite: selectedType == "objective" ? isInfiniteObjective : false
         )
-        print("✅ Salvadanaio creato con successo!")
         dismiss()
     }
 }
@@ -729,17 +781,19 @@ struct SalvadanaiDetailView: View {
     }
 }
 
-// MARK: - Edit Salvadanaio View
+// MARK: - Edit Salvadanaio View (versione con supporto infinito)
 struct EditSalvadanaiView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
     @State private var salvadanaio: SalvadanaiModel
     @State private var targetDate: Date
+    @State private var isInfiniteObjective: Bool
     
     init(salvadanaio: SalvadanaiModel) {
         _salvadanaio = State(initialValue: salvadanaio)
         _targetDate = State(initialValue: salvadanaio.targetDate ?? Date())
+        _isInfiniteObjective = State(initialValue: salvadanaio.isInfinite)
     }
     
     var body: some View {
@@ -753,17 +807,32 @@ struct EditSalvadanaiView: View {
                 
                 if salvadanaio.type == "objective" {
                     Section {
-                        HStack {
-                            Text("Importo obiettivo")
-                            Spacer()
-                            TextField("0", value: $salvadanaio.targetAmount, format: .currency(code: "EUR"))
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                        }
+                        Toggle("Obiettivo infinito", isOn: $isInfiniteObjective)
+                            .onChange(of: isInfiniteObjective) { _, newValue in
+                                if newValue {
+                                    salvadanaio.targetAmount = 0
+                                } else if salvadanaio.targetAmount == 0 {
+                                    salvadanaio.targetAmount = 100.0
+                                }
+                            }
                         
-                        DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                        if !isInfiniteObjective {
+                            HStack {
+                                Text("Importo obiettivo")
+                                Spacer()
+                                TextField("0", value: $salvadanaio.targetAmount, format: .currency(code: "EUR"))
+                                    .multilineTextAlignment(.trailing)
+                                    .keyboardType(.decimalPad)
+                            }
+                            
+                            DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                        }
                     } header: {
                         Text("Obiettivo")
+                    } footer: {
+                        Text(isInfiniteObjective
+                             ? "Un obiettivo infinito può essere riempito senza limiti"
+                             : "Imposta un importo target e una scadenza")
                     }
                 } else {
                     Section {
@@ -810,7 +879,15 @@ struct EditSalvadanaiView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salva") {
-                        salvadanaio.targetDate = targetDate
+                        // Aggiorna le proprietà in base al tipo
+                        if isInfiniteObjective {
+                            salvadanaio.targetAmount = 0
+                            salvadanaio.targetDate = nil
+                        } else {
+                            salvadanaio.targetDate = targetDate
+                        }
+                        salvadanaio.isInfinite = isInfiniteObjective
+                        
                         dataManager.updateSalvadanaio(salvadanaio)
                         dismiss()
                     }

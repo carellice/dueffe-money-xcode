@@ -6,14 +6,15 @@ import SwiftUI
 struct SalvadanaiModel: Identifiable {
     let id = UUID()
     var name: String
-    var type: String // "objective" o "glass"
+    var type: String // "objective", "glass", "infinite"
     var currentAmount: Double
     var targetAmount: Double
     var targetDate: Date?
     var monthlyRefill: Double
     var color: String
-    var accountName: String // Nuovo: conto associato al salvadanaio
+    var accountName: String // Conto associato al salvadanaio
     var createdAt: Date
+    var isInfinite: Bool // Nuovo: indica se è un obiettivo infinito
 }
 
 struct TransactionModel: Identifiable {
@@ -80,18 +81,19 @@ class DataManager: ObservableObject {
         // loadSampleData() // Commentato per avere l'app vuota
     }
     
-    // MARK: - Salvadanai Methods
-    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0) {
+    // MARK: - Salvadanai Methods (aggiornato)
+    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0, isInfinite: Bool = false) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
             type: type,
-            currentAmount: initialAmount,  // Inizia con il saldo specificato
-            targetAmount: targetAmount,
-            targetDate: targetDate,
+            currentAmount: initialAmount,
+            targetAmount: isInfinite ? 0 : targetAmount, // Se infinito, target = 0
+            targetDate: isInfinite ? nil : targetDate,   // Se infinito, nessuna scadenza
             monthlyRefill: monthlyRefill,
             color: color,
             accountName: accountName,
-            createdAt: Date()
+            createdAt: Date(),
+            isInfinite: isInfinite
         )
         salvadanai.append(newSalvadanaio)
     }
