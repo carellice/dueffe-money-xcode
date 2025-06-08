@@ -270,6 +270,7 @@ struct AddSalvadanaiView: View {
     @State private var monthlyRefill = 50.0  // Valore di default
     @State private var selectedColor = "blue"
     @State private var selectedAccount = ""
+    @State private var initialAmount = 0.0  // Nuovo: saldo iniziale
     
     let salvadanaiTypes = [
         ("objective", "Obiettivo", "target"),
@@ -299,8 +300,18 @@ struct AddSalvadanaiView: View {
                 Section {
                     TextField("Nome salvadanaio", text: $name)
                         .textInputAutocapitalization(.words)
+                    
+                    HStack {
+                        Text("Saldo iniziale")
+                        Spacer()
+                        TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.decimalPad)
+                    }
                 } header: {
                     Text("Informazioni di base")
+                } footer: {
+                    Text("Se il salvadanaio ha già dei soldi, inserisci l'importo attuale")
                 }
                 
                 Section {
@@ -517,7 +528,8 @@ struct AddSalvadanaiView: View {
             targetDate: selectedType == "objective" ? targetDate : nil,
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
-            accountName: selectedAccount
+            accountName: selectedAccount,
+            initialAmount: initialAmount  // Nuovo parametro
         )
         print("✅ Salvadanaio creato con successo!")
         dismiss()

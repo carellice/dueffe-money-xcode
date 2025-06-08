@@ -1,55 +1,41 @@
 import SwiftUI
-import CoreData
 
 struct ContentView: View {
-    @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var dataManager = DataManager()
-    @State private var selectedTab = 0
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Home - Panoramica
+        TabView {
             HomeView()
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text("Home")
                 }
-                .tag(0)
             
-            // Salvadanai
             SalvadanaiView()
                 .tabItem {
                     Image(systemName: "banknote.fill")
                     Text("Salvadanai")
                 }
-                .tag(1)
             
-            // Transazioni
             TransactionsView()
                 .tabItem {
                     Image(systemName: "creditcard.fill")
                     Text("Transazioni")
                 }
-                .tag(2)
             
-            // Conti
             AccountsView()
                 .tabItem {
                     Image(systemName: "building.columns.fill")
                     Text("Conti")
                 }
-                .tag(3)
             
-            // Impostazioni
             SettingsView()
                 .tabItem {
-                    Image(systemName: "gearshape.fill")
+                    Image(systemName: "gear")
                     Text("Impostazioni")
                 }
-                .tag(4)
         }
         .environmentObject(dataManager)
-        .accentColor(.blue)
     }
 }
 
@@ -57,189 +43,276 @@ struct ContentView: View {
 struct HomeView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddTransaction = false
+    @State private var showingAddSalvadanaio = false
+    
+    var totalBalance: Double {
+        dataManager.accounts.reduce(0) { $0 + $1.balance }
+    }
+    
+    var totalSavings: Double {
+        dataManager.salvadanai.reduce(0) { $0 + $1.currentAmount }
+    }
+    
+    var recentTransactions: [TransactionModel] {
+        Array(dataManager.transactions.sorted { $0.date > $1.date }.prefix(5))
+    }
     
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Saldo Totale
-                    TotalBalanceCard()
-                    
-                    // Salvadanai Recenti
-                    VStack(alignment: .leading, spacing: 12) {
+                VStack(spacing: 24) {
+                    // Header finanziario
+                    VStack(spacing: 20) {
                         HStack {
-                            Text("I Tuoi Salvadanai")
-                                .font(.title2)
-                                .fontWeight(.bold)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Patrimonio Totale")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                    Text("€")
+                                        .font(.title)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
+                                    Text(String(format: "%.2f", totalBalance + totalSavings))
+                                        .font(.largeTitle)
+                                        .fontWeight(.bold)
+                                        .contentTransition(.numericText())
+                                }
+                            }
+                            
                             Spacer()
-                            NavigationLink("Vedi Tutti", destination: SalvadanaiView())
-                        }
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            ForEach(dataManager.salvadanai.prefix(4), id: \.id) { salvadanaio in
-                                SalvadanaiMiniCard(salvadanaio: salvadanaio)
+                            
+                            VStack(spacing: 12) {
+                                Button(action: { showingAddTransaction = true }) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.blue)
+                                }
+                                
+                                Button(action: { showingAddSalvadanaio = true }) {
+                                    Image(systemName: "banknote.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.green)
+                                }
                             }
                         }
+                        
+                        // Breakdown
+                        HStack(spacing: 20) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Conti")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("€\(String(format: "%.2f", totalBalance))")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Salvadanai")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("€\(String(format: "%.2f", totalSavings))")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                            }
+                            
+                            Spacer()
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.gray.opacity(0.1))
+                    )
+                    
+                    // Salvadanai Overview
+                    if !dataManager.salvadanai.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("I Tuoi Salvadanai")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: SalvadanaiView()) {
+                                    Text("Vedi tutti")
+                                        .font(.subheadline)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 16) {
+                                    ForEach(Array(dataManager.salvadanai.prefix(3)), id: \.id) { salvadanaio in
+                                        SalvadanaiHomeCard(salvadanaio: salvadanaio)
+                                    }
+                                }
+                                .padding(.horizontal, 2)
+                            }
+                        }
+                        .padding(.horizontal, 20)
                     }
                     
                     // Transazioni Recenti
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Transazioni Recenti")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            Spacer()
-                            NavigationLink("Vedi Tutte", destination: TransactionsView())
+                    if !recentTransactions.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Transazioni Recenti")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                NavigationLink(destination: TransactionsView()) {
+                                    Text("Vedi tutte")
+                                        .font(.subheadline)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            VStack(spacing: 12) {
+                                ForEach(recentTransactions, id: \.id) { transaction in
+                                    HomeTransactionRow(transaction: transaction)
+                                }
+                            }
                         }
+                        .padding(.horizontal, 20)
+                    }
+                    
+                    // Quick Actions
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("Azioni Rapide")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 20)
                         
-                        ForEach(dataManager.recentTransactions.prefix(5), id: \.id) { transaction in
-                            TransactionRowView(transaction: transaction)
+                        HStack(spacing: 16) {
+                            QuickActionCard(
+                                title: "Nuova Spesa",
+                                icon: "minus.circle.fill",
+                                color: .red,
+                                action: { showingAddTransaction = true }
+                            )
+                            
+                            QuickActionCard(
+                                title: "Nuovo Salvadanaio",
+                                icon: "banknote.fill",
+                                color: .green,
+                                action: { showingAddSalvadanaio = true }
+                            )
                         }
+                        .padding(.horizontal, 20)
                     }
                 }
-                .padding()
+                .padding(.vertical)
             }
-            .navigationTitle("Dueffe")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddTransaction = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                    }
-                }
+            .navigationTitle("Ciao! 👋")
+            .refreshable {
+                // Placeholder per refresh
             }
         }
         .sheet(isPresented: $showingAddTransaction) {
             AddTransactionView()
         }
-    }
-}
-
-// MARK: - Total Balance Card
-struct TotalBalanceCard: View {
-    @EnvironmentObject var dataManager: DataManager
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Text("Saldo Totale")
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("€")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                
-                Text(String(format: "%.2f", dataManager.totalBalance))
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .contentTransition(.numericText())
-            }
-            .foregroundColor(.primary)
-            
-            HStack(spacing: 16) {
-                VStack {
-                    Text("In Salvadanai")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("€\(String(format: "%.2f", dataManager.totalSavings))")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
-                
-                Divider()
-                    .frame(height: 30)
-                
-                VStack {
-                    Text("Disponibile")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("€\(String(format: "%.2f", dataManager.availableBalance))")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
-                }
-            }
+        .sheet(isPresented: $showingAddSalvadanaio) {
+            AddSalvadanaiView()
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.gray.opacity(0.1))
-        )
-        .animation(.easeInOut, value: dataManager.totalBalance)
     }
 }
 
-// MARK: - Salvadanaio Mini Card
-struct SalvadanaiMiniCard: View {
+// MARK: - Salvadanaio Home Card
+struct SalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
     
+    var progress: Double {
+        if salvadanaio.type == "objective" {
+            guard salvadanaio.targetAmount > 0 else { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
+        } else {
+            guard salvadanaio.monthlyRefill > 0 else { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+        }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Circle()
                     .fill(Color(salvadanaio.color))
                     .frame(width: 12, height: 12)
                 
                 Text(salvadanaio.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
+                    .font(.headline)
+                    .fontWeight(.semibold)
                     .lineLimit(1)
                 
                 Spacer()
+                
+                Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
             
-            Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
-                .font(.title3)
-                .fontWeight(.bold)
-            
-            if salvadanaio.type == "objective" {
-                ProgressView(value: salvadanaio.currentAmount, total: salvadanaio.targetAmount)
-                    .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
-                    .scaleEffect(y: 0.8)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                if salvadanaio.type == "objective" {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        ProgressView(value: progress)
+                            .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
+                            .scaleEffect(y: 0.8)
+                    }
+                } else {
+                    Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .padding(12)
+        .padding(16)
+        .frame(width: 180)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(Color.gray.opacity(0.1))
         )
     }
 }
 
-// MARK: - Transaction Row View
-struct TransactionRowView: View {
+// MARK: - Home Transaction Row
+struct HomeTransactionRow: View {
     let transaction: TransactionModel
     
     var body: some View {
         HStack(spacing: 12) {
-            // Icona
             Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(transaction.type == "expense" ? .red : .green)
             
-            // Dettagli
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.descr)
                     .font(.headline)
                     .lineLimit(1)
                 
-                HStack {
+                HStack(spacing: 4) {
                     Text(transaction.category)
                         .font(.caption)
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
+                        .background(Color.gray.opacity(0.2))
                         .clipShape(Capsule())
                     
-                    Spacer()
-                    
-                    Text(transaction.date, style: .date)
+                    Text("• \(transaction.accountName)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -247,21 +320,48 @@ struct TransactionRowView: View {
             
             Spacer()
             
-            // Importo
-            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(transaction.type == "expense" ? .red : .green)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(transaction.type == "expense" ? .red : .green)
+                
+                Text(transaction.date, style: .time)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(.vertical, 8)
     }
 }
 
-// MARK: - Preview Provider
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
-            .environmentObject(DataManager())
+// MARK: - Quick Action Card
+struct QuickActionCard: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 28))
+                    .foregroundColor(color)
+                
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.gray.opacity(0.1))
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

@@ -227,6 +227,34 @@ struct TransactionDetailRow: View {
     }
 }
 
+// MARK: - Transaction Row View (for details)
+struct TransactionRowView: View {
+    let transaction: TransactionModel
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
+                .foregroundColor(transaction.type == "expense" ? .red : .green)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.descr)
+                    .font(.headline)
+                Text(transaction.date, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(transaction.type == "expense" ? .red : .green)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
 // MARK: - Add Transaction View
 struct AddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
@@ -396,10 +424,10 @@ struct AddTransactionView: View {
                 salaryAmount: amount,
                 accountName: selectedAccount,
                 transactionType: transactionType,
-                onDistribute: { amount, account, transactionType, selectedSalvadanai in
-                    dataManager.distributeIncome(
+                onDistribute: { amount, account, transactionType, salvadanaiAmounts in
+                    dataManager.distributeIncomeWithCustomAmounts(
                         amount: amount,
-                        toSalvadanai: selectedSalvadanai,
+                        salvadanaiAmounts: salvadanaiAmounts,
                         accountName: account,
                         transactionType: transactionType
                     )
@@ -435,6 +463,150 @@ struct AddTransactionView: View {
     }
 }
 
+// MARK: - Custom Distribution Row
+struct CustomDistributionRow: View {
+    let salvadanaio: SalvadanaiModel
+    let isSelected: Bool
+    @Binding var customAmount: Double
+    let onToggle: () -> Void
+    
+    var isAvailable: Bool {
+        if salvadanaio.type == "glass" {
+            return salvadanaio.currentAmount < salvadanaio.monthlyRefill
+        } else {
+            return salvadanaio.currentAmount < salvadanaio.targetAmount
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Checkbox
+                Button(action: onToggle) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(isSelected ? .blue : .secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Info salvadanaio
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color(salvadanaio.color))
+                        .frame(width: 16, height: 16)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(salvadanaio.name)
+                                .font(.headline)
+                                .fontWeight(.medium)
+                            
+                            Image(systemName: salvadanaio.type == "glass" ? "drop.fill" : "target")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            if salvadanaio.type == "glass" {
+                                Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("/ €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                }
+            }
+            
+            // Sezione importo personalizzabile (solo se selezionato)
+            if isSelected {
+                VStack(spacing: 8) {
+                    Divider()
+                    
+                    HStack {
+                        if salvadanaio.type == "glass" {
+                            Text("Importo fisso:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            Text("€\(String(format: "%.2f", customAmount))")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.green)
+                        } else {
+                            Text("Quanto vuoi aggiungere:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            TextField("€", value: $customAmount, format: .currency(code: "EUR"))
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .keyboardType(.decimalPad)
+                                .frame(width: 100)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    
+                    if salvadanaio.type == "objective" {
+                        HStack {
+                            Button("€50") { customAmount = 50 }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.2))
+                                .clipShape(Capsule())
+                            
+                            Button("€100") { customAmount = 100 }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.2))
+                                .clipShape(Capsule())
+                            
+                            Button("Completa") {
+                                customAmount = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.2))
+                            .clipShape(Capsule())
+                            
+                            Spacer()
+                        }
+                        .font(.caption)
+                    }
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding()
+        .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
+        )
+        .onTapGesture {
+            onToggle()
+        }
+        .disabled(!isAvailable)
+        .opacity(isAvailable ? 1.0 : 0.6)
+    }
+}
+
 // MARK: - Salary Distribution View
 struct SalaryDistributionView: View {
     @Environment(\.dismiss) private var dismiss
@@ -443,19 +615,21 @@ struct SalaryDistributionView: View {
     let salaryAmount: Double
     let accountName: String
     let transactionType: String
-    let onDistribute: (Double, String, String, [String]) -> Void
+    let onDistribute: (Double, String, String, [String: Double]) -> Void
     
     @State private var selectedSalvadanai: Set<String> = []
+    @State private var customAmounts: [String: Double] = [:]
     @State private var showingAnimation = false
     
     var totalDistributionAmount: Double {
         dataManager.salvadanai
             .filter { selectedSalvadanai.contains($0.name) }
             .reduce(0) { total, salvadanaio in
-                if salvadanaio.type == "glass" {
+                if let customAmount = customAmounts[salvadanaio.name] {
+                    return total + customAmount
+                } else if salvadanaio.type == "glass" {
                     return total + max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
                 } else {
-                    // Per gli obiettivi, permettiamo di aggiungere qualsiasi importo fino al target
                     return total + min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
                 }
             }
@@ -502,15 +676,12 @@ struct SalaryDistributionView: View {
                             // Lista salvadanai
                             VStack(spacing: 12) {
                                 ForEach(dataManager.salvadanai, id: \.id) { salvadanaio in
-                                    UniversalDistributionRow(
+                                    CustomDistributionRow(
                                         salvadanaio: salvadanaio,
-                                        isSelected: selectedSalvadanai.contains(salvadanaio.name)
+                                        isSelected: selectedSalvadanai.contains(salvadanaio.name),
+                                        customAmount: customAmountBinding(for: salvadanaio)
                                     ) {
-                                        if selectedSalvadanai.contains(salvadanaio.name) {
-                                            selectedSalvadanai.remove(salvadanaio.name)
-                                        } else {
-                                            selectedSalvadanai.insert(salvadanaio.name)
-                                        }
+                                        toggleSalvadanaio(salvadanaio)
                                     }
                                 }
                             }
@@ -567,7 +738,7 @@ struct SalaryDistributionView: View {
                         }
                         
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                            onDistribute(salaryAmount, accountName, transactionType, Array(selectedSalvadanai))
+                            onDistribute(salaryAmount, accountName, transactionType, customAmounts.filter { selectedSalvadanai.contains($0.key) })
                         }
                     }
                     .disabled(selectedSalvadanai.isEmpty || totalDistributionAmount > salaryAmount)
@@ -584,9 +755,38 @@ struct SalaryDistributionView: View {
             }
         }
     }
+    
+    private func defaultAmountFor(_ salvadanaio: SalvadanaiModel) -> Double {
+        if salvadanaio.type == "glass" {
+            return max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
+        } else {
+            return min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
+        }
+    }
+    
+    private func customAmountBinding(for salvadanaio: SalvadanaiModel) -> Binding<Double> {
+        Binding(
+            get: {
+                customAmounts[salvadanaio.name] ?? defaultAmountFor(salvadanaio)
+            },
+            set: {
+                customAmounts[salvadanaio.name] = $0
+            }
+        )
+    }
+    
+    private func toggleSalvadanaio(_ salvadanaio: SalvadanaiModel) {
+        if selectedSalvadanai.contains(salvadanaio.name) {
+            selectedSalvadanai.remove(salvadanaio.name)
+            customAmounts.removeValue(forKey: salvadanaio.name)
+        } else {
+            selectedSalvadanai.insert(salvadanaio.name)
+            customAmounts[salvadanaio.name] = defaultAmountFor(salvadanaio)
+        }
+    }
 }
 
-// MARK: - Universal Distribution Row
+// MARK: - Universal Distribution Row (compatibility)
 struct UniversalDistributionRow: View {
     let salvadanaio: SalvadanaiModel
     let isSelected: Bool
@@ -596,7 +796,6 @@ struct UniversalDistributionRow: View {
         if salvadanaio.type == "glass" {
             return max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
         } else {
-            // Per gli obiettivi, suggerisco un importo ragionevole (€100 o quello che serve per completare)
             return min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
         }
     }
@@ -770,7 +969,6 @@ struct AddMoneyToSalvadanaiView: View {
     }
     
     private func addMoney() {
-        // Crea una transazione di trasferimento
         dataManager.addTransaction(
             amount: amount,
             descr: "Trasferimento a \(salvadanaio.name)",
@@ -779,7 +977,6 @@ struct AddMoneyToSalvadanaiView: View {
             accountName: selectedAccount,
             salvadanaiName: salvadanaio.name
         )
-        
         dismiss()
     }
 }
@@ -840,7 +1037,6 @@ struct AccountCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Icona conto
             Image(systemName: "building.columns.fill")
                 .font(.title)
                 .foregroundColor(.blue)
@@ -848,7 +1044,6 @@ struct AccountCard: View {
                 .background(Color.blue.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             
-            // Dettagli conto
             VStack(alignment: .leading, spacing: 4) {
                 Text(account.name)
                     .font(.headline)
@@ -861,7 +1056,6 @@ struct AccountCard: View {
             
             Spacer()
             
-            // Saldo
             VStack(alignment: .trailing, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                     Text("€")
@@ -966,7 +1160,6 @@ struct AccountDetailView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header del conto
                     VStack(spacing: 16) {
                         Image(systemName: "building.columns.fill")
                             .font(.system(size: 48))
@@ -993,7 +1186,6 @@ struct AccountDetailView: View {
                     .background(Color.gray.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     
-                    // Transazioni del conto
                     if !accountTransactions.isEmpty {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Transazioni")
