@@ -153,6 +153,12 @@ class DataManager: ObservableObject {
             isInfinite: isInfinite
         )
         salvadanai.append(newSalvadanaio)
+        
+        // Se c'è un saldo iniziale, sottrailo dal conto selezionato
+        // MA NON creare una transazione perché sarebbe un doppio conteggio
+        if initialAmount > 0 {
+            updateAccountBalance(accountName: accountName, amount: -initialAmount)
+        }
     }
     
     func updateSalvadanaio(_ salvadanaio: SalvadanaiModel) {

@@ -426,17 +426,39 @@ struct AddSalvadanaiView: View {
                     TextField("Nome salvadanaio", text: $name)
                         .textInputAutocapitalization(.words)
                     
-                    HStack {
-                        Text("Saldo iniziale")
-                        Spacer()
-                        TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Saldo iniziale")
+                            Spacer()
+                            TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                        }
+                        
+                        // Avviso se supera il saldo disponibile
+                        if initialAmount > 0 && !selectedAccount.isEmpty {
+                            if let account = dataManager.accounts.first(where: { $0.name == selectedAccount }) {
+                                if initialAmount > account.balance {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.red)
+                                        Text("Importo superiore al saldo disponibile (€\(String(format: "%.2f", account.balance)))")
+                                            .font(.caption)
+                                            .foregroundColor(.red)
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
                     }
                 } header: {
                     Text("Informazioni di base")
                 } footer: {
-                    Text("Se il salvadanaio ha già dei soldi, inserisci l'importo attuale")
+                    if initialAmount > 0 && !selectedAccount.isEmpty {
+                        Text("€\(String(format: "%.2f", initialAmount)) verranno sottratti dal conto \(selectedAccount)")
+                    } else {
+                        Text("Se il salvadanaio ha già dei soldi, inserisci l'importo attuale. Questo importo verrà sottratto dal conto selezionato.")
+                    }
                 }
                 
                 Section {
