@@ -605,21 +605,53 @@ struct BalanceBreakdownCard: View {
 }
 
 // MARK: - Beautiful Simple Salvadanaio Card
+// MARK: - Beautiful Simple Salvadanaio Card
 struct ImprovedSalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
-    @State private var animateProgress = false
     
     private var progress: Double {
-        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
-            guard salvadanaio.targetAmount > 0 else { return 0 }
-            if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
-        } else if salvadanaio.type == "glass" {
-            guard salvadanaio.monthlyRefill > 0 else { return 0 }
-            if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+        // Per glass: currentAmount / monthlyRefill
+        if salvadanaio.type == "glass" {
+            let current = salvadanaio.currentAmount
+            let monthly = salvadanaio.monthlyRefill
+            
+            if current > 0 && monthly > 0 {
+                let result = current / monthly
+                return min(result, 1.0)
+            }
         }
+        
+        // Per obiettivi: currentAmount / targetAmount
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            let current = salvadanaio.currentAmount
+            let target = salvadanaio.targetAmount
+            
+            if current > 0 && target > 0 {
+                let result = current / target
+                return min(result, 1.0)
+            }
+        }
+        
         return 0
+    }
+    
+    // Funzione per convertire string colore in Color
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue // Default fallback
+        }
     }
     
     var body: some View {
@@ -643,7 +675,7 @@ struct ImprovedSalvadanaiHomeCard: View {
                         .foregroundColor(.green)
                 } else if salvadanaio.isInfinite {
                     Image(systemName: "infinity")
-                        .foregroundColor(Color(salvadanaio.color))
+                        .foregroundColor(getColor(from: salvadanaio.color))
                 }
             }
             
@@ -653,8 +685,8 @@ struct ImprovedSalvadanaiHomeCard: View {
                 .fontWeight(.bold)
                 .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
             
-            // Progress visivo per obiettivi e glass (NON infiniti)
-            if !salvadanaio.isInfinite && salvadanaio.currentAmount > 0 {
+            // SEMPRE mostra progress (anche per test)
+            if !salvadanaio.isInfinite {
                 VStack(spacing: 8) {
                     HStack {
                         if salvadanaio.type == "objective" {
@@ -672,45 +704,20 @@ struct ImprovedSalvadanaiHomeCard: View {
                         Text("\(Int(progress * 100))%")
                             .font(.subheadline)
                             .fontWeight(.bold)
-                            .foregroundColor(Color(salvadanaio.color))
+                            .foregroundColor(getColor(from: salvadanaio.color))
                     }
                     
-                    // Progress bar semplice e pulita
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 6)
-                        
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color(salvadanaio.color))
-                            .frame(width: animateProgress ? progress * 150 : 0, height: 6)
-                            .animation(.easeOut(duration: 1.0), value: animateProgress)
-                    }
-                    .frame(width: 150)
+                    // Progress bar che FUNZIONA con colori corretti
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
+                        .scaleEffect(y: 2)
                 }
-            } else if salvadanaio.isInfinite {
+            } else {
                 // Info per infiniti
                 Text("Obiettivo senza limiti")
                     .font(.subheadline)
-                    .foregroundColor(Color(salvadanaio.color))
+                    .foregroundColor(getColor(from: salvadanaio.color))
                     .fontWeight(.medium)
-            } else if salvadanaio.currentAmount < 0 {
-                // Info per negativi
-                Text("Saldo in rosso")
-                    .font(.subheadline)
-                    .foregroundColor(.red)
-                    .fontWeight(.medium)
-            } else {
-                // Appena creato
-                if salvadanaio.type == "objective" {
-                    Text("Obiettivo €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
             }
         }
         .padding(20)
@@ -722,14 +729,9 @@ struct ImprovedSalvadanaiHomeCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(salvadanaio.color), lineWidth: 2)
+                .stroke(getColor(from: salvadanaio.color), lineWidth: 2)
         )
-        .padding(.vertical, 4) // Padding per evitare che l'ombra venga tagliata
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                animateProgress = true
-            }
-        }
+        .padding(.vertical, 4)
     }
 }
 
