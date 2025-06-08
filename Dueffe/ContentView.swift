@@ -850,7 +850,6 @@ struct EnhancedWealthCard: View {
     let totalSavings: Double
     @State private var animateBalance = false
     @State private var animateGlow = false
-    @State private var showDetails = false
     
     private var totalWealth: Double {
         totalBalance + totalSavings
@@ -981,52 +980,22 @@ struct EnhancedWealthCard: View {
                     }
                     
                     Spacer()
-                    
-                    // Pulsante dettagli
-                    Button(action: {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                            showDetails.toggle()
-                        }
-                    }) {
-                        Image(systemName: showDetails ? "eye.slash.fill" : "eye.fill")
-                            .font(.title3)
-                            .foregroundColor(.white.opacity(0.8))
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(Color.white.opacity(0.15))
-                            )
-                    }
                 }
                 
                 // Importo principale con effetto wow
                 VStack(spacing: 12) {
-                    if showDetails {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("€")
-                                .font(.title)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            Text(String(format: "%.2f", totalWealth))
-                                .font(.system(size: 42, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .contentTransition(.numericText())
-                                .scaleEffect(animateBalance ? 1.05 : 1.0)
-                                .shadow(color: .white.opacity(0.5), radius: animateGlow ? 10 : 5)
-                        }
-                    } else {
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("€")
-                                .font(.title)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white.opacity(0.7))
-                            
-                            Text("••••••")
-                                .font(.system(size: 42, weight: .bold, design: .rounded))
-                                .foregroundColor(.white.opacity(0.8))
-                                .scaleEffect(animateBalance ? 1.05 : 1.0)
-                        }
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("€")
+                            .font(.title)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Text(String(format: "%.2f", totalWealth))
+                            .font(.system(size: 42, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .contentTransition(.numericText())
+                            .scaleEffect(animateBalance ? 1.05 : 1.0)
+                            .shadow(color: .white.opacity(0.5), radius: animateGlow ? 10 : 5)
                     }
                     
                     // Sottotitolo dinamico
@@ -1038,61 +1007,39 @@ struct EnhancedWealthCard: View {
                 }
                 
                 // Breakdown animato
-                if showDetails {
-                    HStack(spacing: 20) {
-                        WealthBreakdownItem(
-                            title: "Conti",
-                            amount: totalBalance,
-                            icon: "building.columns.fill",
-                            color: Color.white.opacity(0.9),
-                            animate: animateBalance
-                        )
-                        
-                        // Separatore animato
-                        Rectangle()
-                            .fill(Color.white.opacity(0.3))
-                            .frame(width: 1, height: 40)
-                            .scaleEffect(y: animateGlow ? 1.2 : 0.8)
-                        
-                        WealthBreakdownItem(
-                            title: "Salvadanai",
-                            amount: totalSavings,
-                            icon: "banknote.fill",
-                            color: Color.white.opacity(0.9),
-                            animate: animateBalance
-                        )
-                    }
-                    .transition(.asymmetric(
-                        insertion: .scale.combined(with: .opacity),
-                        removal: .scale.combined(with: .opacity)
-                    ))
-                } else {
-                    // Indicatori nascosti
-                    HStack(spacing: 12) {
-                        ForEach(0..<3, id: \.self) { index in
-                            Circle()
-                                .fill(Color.white.opacity(0.4))
-                                .frame(width: 8, height: 8)
-                                .scaleEffect(animateGlow ? 1.2 : 0.8)
-                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(Double(index) * 0.2), value: animateGlow)
-                        }
-                    }
-                    .transition(.opacity)
+                HStack(spacing: 20) {
+                    WealthBreakdownItem(
+                        title: "Conti",
+                        amount: totalBalance,
+                        icon: "building.columns.fill",
+                        color: Color.white.opacity(0.9),
+                        animate: animateBalance
+                    )
+                    
+                    // Separatore animato
+                    Rectangle()
+                        .fill(Color.white.opacity(0.3))
+                        .frame(width: 1, height: 40)
+                        .scaleEffect(y: animateGlow ? 1.2 : 0.8)
+                    
+                    WealthBreakdownItem(
+                        title: "Salvadanai",
+                        amount: totalSavings,
+                        icon: "banknote.fill",
+                        color: Color.white.opacity(0.9),
+                        animate: animateBalance
+                    )
                 }
             }
             .padding(28)
         }
+        .padding(.horizontal, 20) // 🎯 MARGINI LATERALI AGGIUNTI
         .onAppear {
             withAnimation(.easeInOut(duration: 0.8)) {
                 animateBalance = true
             }
             withAnimation(.easeInOut(duration: 1.2)) {
                 animateGlow = true
-            }
-        }
-        .onTapGesture {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                showDetails.toggle()
             }
         }
     }
