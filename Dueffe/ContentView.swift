@@ -312,10 +312,8 @@ struct ExampleAccountCard: View {
 }
 
 // MARK: - Home View migliorata
-// MARK: - Home View migliorata (SENZA BOTTONI FLUTTUANTI)
 struct HomeView: View {
     @EnvironmentObject var dataManager: DataManager
-    @State private var animateBalance = false
     
     var totalBalance: Double {
         dataManager.accounts.reduce(0) { $0 + $1.balance }
@@ -332,9 +330,9 @@ struct HomeView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background gradient
+                // Background gradient più sottile per far risaltare la card
                 LinearGradient(
-                    gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.purple.opacity(0.05)]),
+                    gradient: Gradient(colors: [Color.gray.opacity(0.02), Color.blue.opacity(0.02)]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -342,53 +340,10 @@ struct HomeView: View {
                 
                 ScrollView {
                     VStack(spacing: 28) {
-                        // Header finanziario migliorato
-                        VStack(spacing: 24) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Patrimonio Totale")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text("€")
-                                        .font(.title)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.secondary)
-                                    Text(String(format: "%.2f", totalBalance + totalSavings))
-                                        .font(.largeTitle)
-                                        .fontWeight(.bold)
-                                        .contentTransition(.numericText())
-                                        .scaleEffect(animateBalance ? 1.05 : 1.0)
-                                        .animation(.easeInOut(duration: 0.3), value: animateBalance)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            
-                            // Breakdown migliorato
-                            HStack(spacing: 24) {
-                                BalanceBreakdownCard(
-                                    title: "Conti",
-                                    amount: totalBalance,
-                                    color: .blue,
-                                    icon: "building.columns.fill"
-                                )
-                                
-                                BalanceBreakdownCard(
-                                    title: "Salvadanai",
-                                    amount: totalSavings,
-                                    color: .green,
-                                    icon: "banknote.fill"
-                                )
-                                
-                                Spacer()
-                            }
-                        }
-                        .padding(28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
+                        // 🌟 NUOVA Enhanced Wealth Card
+                        EnhancedWealthCard(
+                            totalBalance: totalBalance,
+                            totalSavings: totalSavings
                         )
                         
                         // Salvadanai Overview migliorato
@@ -510,12 +465,6 @@ struct HomeView: View {
                 }
             }
             .navigationTitle("Ciao! 👋")
-            .onAppear {
-                animateBalance = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    animateBalance = false
-                }
-            }
             .refreshable {
                 // Placeholder per refresh
             }
@@ -892,5 +841,296 @@ struct ImprovedQuickActionCard: View {
             // Action eseguita nel button action
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Enhanced Wealth Card
+struct EnhancedWealthCard: View {
+    let totalBalance: Double
+    let totalSavings: Double
+    @State private var animateBalance = false
+    @State private var animateGlow = false
+    @State private var showDetails = false
+    
+    private var totalWealth: Double {
+        totalBalance + totalSavings
+    }
+    
+    private var wealthStatus: (String, Color, String) {
+        if totalWealth >= 10000 {
+            return ("Eccellente! 🚀", .green, "star.fill")
+        } else if totalWealth >= 5000 {
+            return ("Ottimo lavoro! 💪", .blue, "checkmark.seal.fill")
+        } else if totalWealth >= 1000 {
+            return ("Buon inizio! 📈", .orange, "arrow.up.circle.fill")
+        } else if totalWealth >= 0 {
+            return ("Inizia a risparmiare! 💡", .purple, "lightbulb.fill")
+        } else {
+            return ("Attenzione al bilancio! ⚠️", .red, "exclamationmark.triangle.fill")
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            // Background con gradiente avanzato
+            RoundedRectangle(cornerRadius: 28)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: Color.blue.opacity(0.8), location: 0.0),
+                            .init(color: Color.purple.opacity(0.9), location: 0.3),
+                            .init(color: Color.indigo.opacity(0.7), location: 0.7),
+                            .init(color: Color.blue.opacity(0.8), location: 1.0)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .blue.opacity(0.3), radius: animateGlow ? 25 : 15, x: 0, y: animateGlow ? 15 : 10)
+                .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
+            
+            // Overlay pattern decorativo
+            RoundedRectangle(cornerRadius: 28)
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.white.opacity(0.3),
+                            Color.clear,
+                            Color.black.opacity(0.1)
+                        ]),
+                        center: .topTrailing,
+                        startRadius: 20,
+                        endRadius: 200
+                    )
+                )
+            
+            // Elementi decorativi fluttuanti
+            GeometryReader { geometry in
+                ZStack {
+                    // Cerchi decorativi
+                    Circle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 120, height: 120)
+                        .position(x: geometry.size.width * 0.85, y: geometry.size.height * 0.2)
+                        .scaleEffect(animateBalance ? 1.1 : 0.9)
+                        .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateBalance)
+                    
+                    Circle()
+                        .fill(Color.white.opacity(0.05))
+                        .frame(width: 80, height: 80)
+                        .position(x: geometry.size.width * 0.15, y: geometry.size.height * 0.8)
+                        .scaleEffect(animateBalance ? 0.8 : 1.2)
+                        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateBalance)
+                    
+                    // Stelle decorative
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundColor(.white.opacity(0.6))
+                        .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.3)
+                        .scaleEffect(animateGlow ? 1.2 : 0.8)
+                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                    
+                    Image(systemName: "star.fill")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.4))
+                        .position(x: geometry.size.width * 0.8, y: geometry.size.height * 0.7)
+                        .scaleEffect(animateGlow ? 0.8 : 1.2)
+                        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
+                }
+            }
+            
+            // Contenuto principale
+            VStack(spacing: 24) {
+                // Header con icona animata
+                HStack {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 44, height: 44)
+                                    .blur(radius: animateGlow ? 2 : 0)
+                                    .scaleEffect(animateGlow ? 1.1 : 1.0)
+                                
+                                Image(systemName: "crown.fill")
+                                    .font(.title2)
+                                    .foregroundColor(.yellow)
+                                    .rotationEffect(.degrees(animateBalance ? 5 : -5))
+                                    .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateBalance)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Il Tuo Patrimonio")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white.opacity(0.9))
+                                
+                                HStack {
+                                    Image(systemName: wealthStatus.2)
+                                        .font(.caption)
+                                        .foregroundColor(wealthStatus.1)
+                                    Text(wealthStatus.0)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                    
+                    // Pulsante dettagli
+                    Button(action: {
+                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            showDetails.toggle()
+                        }
+                    }) {
+                        Image(systemName: showDetails ? "eye.slash.fill" : "eye.fill")
+                            .font(.title3)
+                            .foregroundColor(.white.opacity(0.8))
+                            .frame(width: 40, height: 40)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.15))
+                            )
+                    }
+                }
+                
+                // Importo principale con effetto wow
+                VStack(spacing: 12) {
+                    if showDetails {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("€")
+                                .font(.title)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Text(String(format: "%.2f", totalWealth))
+                                .font(.system(size: 42, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .contentTransition(.numericText())
+                                .scaleEffect(animateBalance ? 1.05 : 1.0)
+                                .shadow(color: .white.opacity(0.5), radius: animateGlow ? 10 : 5)
+                        }
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("€")
+                                .font(.title)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Text("••••••")
+                                .font(.system(size: 42, weight: .bold, design: .rounded))
+                                .foregroundColor(.white.opacity(0.8))
+                                .scaleEffect(animateBalance ? 1.05 : 1.0)
+                        }
+                    }
+                    
+                    // Sottotitolo dinamico
+                    Text(totalWealth >= 0 ? "Patrimonio disponibile" : "Situazione da monitorare")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                }
+                
+                // Breakdown animato
+                if showDetails {
+                    HStack(spacing: 20) {
+                        WealthBreakdownItem(
+                            title: "Conti",
+                            amount: totalBalance,
+                            icon: "building.columns.fill",
+                            color: Color.white.opacity(0.9),
+                            animate: animateBalance
+                        )
+                        
+                        // Separatore animato
+                        Rectangle()
+                            .fill(Color.white.opacity(0.3))
+                            .frame(width: 1, height: 40)
+                            .scaleEffect(y: animateGlow ? 1.2 : 0.8)
+                        
+                        WealthBreakdownItem(
+                            title: "Salvadanai",
+                            amount: totalSavings,
+                            icon: "banknote.fill",
+                            color: Color.white.opacity(0.9),
+                            animate: animateBalance
+                        )
+                    }
+                    .transition(.asymmetric(
+                        insertion: .scale.combined(with: .opacity),
+                        removal: .scale.combined(with: .opacity)
+                    ))
+                } else {
+                    // Indicatori nascosti
+                    HStack(spacing: 12) {
+                        ForEach(0..<3, id: \.self) { index in
+                            Circle()
+                                .fill(Color.white.opacity(0.4))
+                                .frame(width: 8, height: 8)
+                                .scaleEffect(animateGlow ? 1.2 : 0.8)
+                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(Double(index) * 0.2), value: animateGlow)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .padding(28)
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8)) {
+                animateBalance = true
+            }
+            withAnimation(.easeInOut(duration: 1.2)) {
+                animateGlow = true
+            }
+        }
+        .onTapGesture {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                showDetails.toggle()
+            }
+        }
+    }
+}
+
+// MARK: - Wealth Breakdown Item
+struct WealthBreakdownItem: View {
+    let title: String
+    let amount: Double
+    let icon: String
+    let color: Color
+    let animate: Bool
+    @State private var itemAnimate = false
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+                .scaleEffect(itemAnimate ? 1.1 : 1.0)
+                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: itemAnimate)
+            
+            Text("€\(String(format: "%.0f", amount))")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+                .contentTransition(.numericText())
+            
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(color.opacity(0.8))
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                itemAnimate = true
+            }
+        }
     }
 }
