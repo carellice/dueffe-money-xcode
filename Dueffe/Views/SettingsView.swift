@@ -19,13 +19,6 @@ struct SettingsView: View {
                 .ignoresSafeArea()
                 
                 Form {
-                    // App Info Section
-                    Section {
-                        AppInfoCard()
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                    
                     // Personalizzazione
                     Section {
                         SettingsRow(
