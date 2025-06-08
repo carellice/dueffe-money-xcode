@@ -255,14 +255,14 @@ struct TransactionRowView: View {
     }
 }
 
-// MARK: - Add Transaction View
+// MARK: - Add Transaction View (versione aggiornata)
 struct AddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
     @State private var amount = 0.0
     @State private var descr = ""
-    @State private var selectedCategory = ""
+    @State private var selectedCategory = "" // Inizia vuoto invece di auto-selezionare
     @State private var transactionType = "expense"
     @State private var selectedAccount = ""
     @State private var selectedSalvadanaio = ""
@@ -292,6 +292,8 @@ struct AddTransactionView: View {
                         ForEach(transactionTypes, id: \.0) { type, title, icon in
                             Button(action: {
                                 transactionType = type
+                                // Reset categoria quando cambia tipo
+                                selectedCategory = ""
                             }) {
                                 HStack {
                                     Image(systemName: icon)
@@ -334,7 +336,9 @@ struct AddTransactionView: View {
                 if !availableCategories.isEmpty {
                     Section {
                         Picker("Categoria", selection: $selectedCategory) {
-                            Text("Seleziona categoria").tag("")
+                            Text("Seleziona categoria")
+                                .tag("")
+                                .foregroundColor(.secondary)
                             ForEach(availableCategories, id: \.self) { category in
                                 Text(category).tag(category)
                             }
@@ -438,12 +442,15 @@ struct AddTransactionView: View {
     }
     
     private func setupDefaults() {
+        // Auto-seleziona solo il primo conto se disponibile
         if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
             selectedAccount = dataManager.accounts.first!.name
         }
-        if selectedCategory.isEmpty && !availableCategories.isEmpty {
-            selectedCategory = availableCategories.first!
-        }
+        
+        // NON auto-selezionare la categoria - lascia vuota
+        // Rimosso: if selectedCategory.isEmpty && !availableCategories.isEmpty {
+        //     selectedCategory = availableCategories.first!
+        // }
     }
     
     private func saveTransaction() {
