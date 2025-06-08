@@ -604,12 +604,12 @@ struct BalanceBreakdownCard: View {
     }
 }
 
-// MARK: - Improved Salvadanaio Home Card
+// MARK: - Beautiful Simple Salvadanaio Card
 struct ImprovedSalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
     @State private var animateProgress = false
     
-    var progress: Double {
+    private var progress: Double {
         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
             guard salvadanaio.targetAmount > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
@@ -624,94 +624,301 @@ struct ImprovedSalvadanaiHomeCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Header semplice
             HStack {
-                Circle()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [Color(salvadanaio.color), Color(salvadanaio.color).opacity(0.7)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 16, height: 16)
-                
                 Text(salvadanaio.name)
                     .font(.headline)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
                 
                 Spacer()
                 
+                // Status semplice
                 if salvadanaio.currentAmount < 0 {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
                         .foregroundColor(.red)
-                } else if salvadanaio.type == "objective" && salvadanaio.isInfinite {
+                } else if progress >= 1.0 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                } else if salvadanaio.isInfinite {
                     Image(systemName: "infinity")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
-                    Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
-                        .font(.caption)
                         .foregroundColor(Color(salvadanaio.color))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 12) {
-                Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
-                
-                if salvadanaio.currentAmount < 0 {
-                    Text("In rosso")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .fontWeight(.medium)
-                } else if salvadanaio.type == "objective" && salvadanaio.isInfinite {
-                    Text("Obiettivo infinito")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else if salvadanaio.type == "objective" {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(height: 6)
-                            
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(LinearGradient(
-                                    gradient: Gradient(colors: [Color(salvadanaio.color), Color(salvadanaio.color).opacity(0.7)]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ))
-                                .frame(width: animateProgress ? progress * 140 : 0, height: 6)
-                                .animation(.easeInOut(duration: 1.0), value: animateProgress)
+            // Importo grande
+            Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
+            
+            // Progress visivo per obiettivi e glass (NON infiniti)
+            if !salvadanaio.isInfinite && salvadanaio.currentAmount > 0 {
+                VStack(spacing: 8) {
+                    HStack {
+                        if salvadanaio.type == "objective" {
+                            Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        .frame(width: 140)
+                        
+                        Spacer()
+                        
+                        Text("\(Int(progress * 100))%")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color(salvadanaio.color))
                     }
+                    
+                    // Progress bar semplice e pulita
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 6)
+                        
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color(salvadanaio.color))
+                            .frame(width: animateProgress ? progress * 150 : 0, height: 6)
+                            .animation(.easeOut(duration: 1.0), value: animateProgress)
+                    }
+                    .frame(width: 150)
+                }
+            } else if salvadanaio.isInfinite {
+                // Info per infiniti
+                Text("Obiettivo senza limiti")
+                    .font(.subheadline)
+                    .foregroundColor(Color(salvadanaio.color))
+                    .fontWeight(.medium)
+            } else if salvadanaio.currentAmount < 0 {
+                // Info per negativi
+                Text("Saldo in rosso")
+                    .font(.subheadline)
+                    .foregroundColor(.red)
+                    .fontWeight(.medium)
+            } else {
+                // Appena creato
+                if salvadanaio.type == "objective" {
+                    Text("Obiettivo €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 } else {
-                    Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
-                        .font(.caption)
+                    Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
             }
         }
         .padding(20)
-        .frame(width: 200)
+        .frame(width: 190, height: 140)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(salvadanaio.color), lineWidth: 2)
+        )
+        .padding(.vertical, 4) // Padding per evitare che l'ombra venga tagliata
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                animateProgress = true
+            }
+        }
+    }
+}
+
+// MARK: - Versione ancora più minimal
+struct MinimalSalvadanaiCard: View {
+    let salvadanaio: SalvadanaiModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Nome con pallino colorato
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color(salvadanaio.color))
+                    .frame(width: 12, height: 12)
+                
+                Text(salvadanaio.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Spacer()
+            }
+            
+            // Importo
+            Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
+            
+            // Info essenziale
+            if salvadanaio.currentAmount < 0 {
+                Text("In rosso")
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            } else if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else if salvadanaio.type == "glass" {
+                Text("Glass €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else {
+                Text("Infinito")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(width: 160, height: 100)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(salvadanaio.color).opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(salvadanaio.color).opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Alternative: Versione più compatta ma stilosa
+struct CompactStylishSalvadanaiCard: View {
+    let salvadanaio: SalvadanaiModel
+    @State private var animateAmount = false
+    
+    private var progress: Double {
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            guard salvadanaio.targetAmount > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
+        } else if salvadanaio.type == "glass" {
+            guard salvadanaio.monthlyRefill > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+        }
+        return 0
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Header con icona colorata
+            HStack {
+                // Icona tipo
+                ZStack {
+                    Circle()
+                        .fill(Color(salvadanaio.color))
+                        .frame(width: 36, height: 36)
+                        .shadow(color: Color(salvadanaio.color).opacity(0.4), radius: 6, x: 0, y: 3)
+                    
+                    Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "drop.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                Spacer()
+                
+                // Status emoji
+                if salvadanaio.currentAmount < 0 {
+                    Text("⚠️")
+                        .font(.title3)
+                } else if progress >= 1.0 {
+                    Text("🎉")
+                        .font(.title3)
+                } else if progress >= 0.8 {
+                    Text("🔥")
+                        .font(.title3)
+                }
+            }
+            
+            // Nome e importo
+            VStack(alignment: .leading, spacing: 8) {
+                Text(salvadanaio.name)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : Color(salvadanaio.color))
+                    .scaleEffect(animateAmount ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 0.6), value: animateAmount)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Progress minimalista
+            if salvadanaio.currentAmount >= 0 && !salvadanaio.isInfinite && progress > 0 {
+                VStack(spacing: 4) {
+                    HStack {
+                        Text("\(Int(progress * 100))%")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color(salvadanaio.color))
+                        
+                        Spacer()
+                        
+                        if salvadanaio.type == "objective" {
+                            Text("€\(String(format: "%.0f", salvadanaio.targetAmount))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
+                        .scaleEffect(y: 1.5)
+                }
+            } else if salvadanaio.isInfinite {
+                HStack {
+                    Image(systemName: "infinity")
+                        .font(.caption)
+                        .foregroundColor(Color(salvadanaio.color))
+                    Text("Infinito")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(Color(salvadanaio.color))
+                    Spacer()
+                }
+            }
+        }
+        .padding(20)
+        .frame(width: 180, height: 160)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(.ultraThinMaterial)
-                .shadow(color: salvadanaio.currentAmount < 0 ? .red.opacity(0.2) : Color(salvadanaio.color).opacity(0.2), radius: 10, x: 0, y: 5)
+                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 6)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.3) : Color(salvadanaio.color).opacity(0.3), lineWidth: 1)
+                .stroke(LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(salvadanaio.color).opacity(0.3),
+                        Color(salvadanaio.color).opacity(0.1)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ), lineWidth: 1.5)
         )
         .onAppear {
-            animateProgress = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                animateAmount = true
+            }
         }
     }
 }
