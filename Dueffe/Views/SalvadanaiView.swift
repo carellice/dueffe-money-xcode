@@ -864,29 +864,31 @@ struct SimpleSalvadanaiFormView: View {
                         Text("Nessun conto disponibile")
                             .foregroundColor(.orange)
                     } else {
-                        ForEach(dataManager.accounts, id: \.name) { account in
-                            Button(action: {
-                                selectedAccount = account.name
-                            }) {
+                        Picker("Conto di riferimento", selection: $selectedAccount) {
+                            Text("Seleziona conto")
+                                .tag("")
+                            ForEach(dataManager.accounts, id: \.name) { account in
                                 HStack {
-                                    Image(systemName: selectedAccount == account.name ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(selectedAccount == account.name ? .blue : .secondary)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(account.name)
-                                            .font(.headline)
-                                        Text("€\(String(format: "%.2f", account.balance))")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    
+                                    Text(account.name)
                                     Spacer()
+                                    Text("€\(String(format: "%.2f", account.balance))")
+                                        .foregroundColor(.secondary)
                                 }
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                                .tag(account.name)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .foregroundColor(selectedAccount == account.name ? .blue : .primary)
+                        }
+                        .pickerStyle(MenuPickerStyle())
+                        
+                        if !selectedAccount.isEmpty {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Conto selezionato: \(selectedAccount)")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                Spacer()
+                            }
+                            .padding(.top, 8)
                         }
                     }
                 } header: {
@@ -927,16 +929,16 @@ struct SimpleSalvadanaiFormView: View {
                 
                 Section {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
-                        ForEach(dataManager.salvadanaiColors, id: \.self) { color in
+                        ForEach(getSalvadanaiColors(), id: \.name) { colorItem in
                             Circle()
-                                .fill(Color(color))
+                                .fill(colorItem.color)
                                 .frame(width: 40, height: 40)
                                 .overlay(
                                     Circle()
-                                        .stroke(selectedColor == color ? Color.primary : Color.clear, lineWidth: 3)
+                                        .stroke(selectedColor == colorItem.name ? Color.primary : Color.clear, lineWidth: 3)
                                 )
                                 .onTapGesture {
-                                    selectedColor = color
+                                    selectedColor = colorItem.name
                                 }
                         }
                     }
@@ -965,6 +967,23 @@ struct SimpleSalvadanaiFormView: View {
         .onAppear {
             setupDefaults()
         }
+    }
+    
+    private func getSalvadanaiColors() -> [(name: String, color: Color)] {
+        return [
+            ("blue", Color.blue),
+            ("green", Color.green),
+            ("orange", Color.orange),
+            ("purple", Color.purple),
+            ("pink", Color.pink),
+            ("red", Color.red),
+            ("yellow", Color.yellow),
+            ("indigo", Color.indigo),
+            ("mint", Color.mint),
+            ("teal", Color.teal),
+            ("cyan", Color.cyan),
+            ("brown", Color.brown)
+        ]
     }
     
     private func setupDefaults() {
