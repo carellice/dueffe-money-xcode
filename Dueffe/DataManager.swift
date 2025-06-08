@@ -12,6 +12,7 @@ struct SalvadanaiModel: Identifiable {
     var targetDate: Date?
     var monthlyRefill: Double
     var color: String
+    var accountName: String // Nuovo: conto associato al salvadanaio
     var createdAt: Date
 }
 
@@ -80,7 +81,7 @@ class DataManager: ObservableObject {
     }
     
     // MARK: - Salvadanai Methods
-    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String) {
+    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
             type: type,
@@ -89,6 +90,7 @@ class DataManager: ObservableObject {
             targetDate: targetDate,
             monthlyRefill: monthlyRefill,
             color: color,
+            accountName: accountName,
             createdAt: Date()
         )
         salvadanai.append(newSalvadanaio)
@@ -169,28 +171,39 @@ class DataManager: ObservableObject {
         }
     }
     
-    // MARK: - Salary Distribution
-    func distributeSalary(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String) {
+    // MARK: - Universal Distribution (per stipendi e entrate)
+    func distributeIncome(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String, transactionType: String = "salary") {
         // Prima aggiungi la transazione
+        let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
+        let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
+        
         addTransaction(
             amount: amount,
-            descr: "Stipendio",  // Cambiato da description a descr
-            category: "💼 Stipendio",
-            type: "salary",
+            descr: descriptionText,
+            category: categoryText,
+            type: transactionType,
             accountName: accountName
         )
         
-        // Poi distribuisci ai salvadanai glass
+        // Poi distribuisci ai salvadanai selezionati
         for salvadanaiName in selectedSalvadanai {
-            if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName && $0.type == "glass" }) {
-                let targetAmount = salvadanai[index].monthlyRefill
-                let currentAmount = salvadanai[index].currentAmount
-                let amountToAdd = max(0, targetAmount - currentAmount)
+            if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
+                var amountToAdd: Double = 0
+                
+                if salvadanai[index].type == "glass" {
+                    let targetAmount = salvadanai[index].monthlyRefill
+                    let currentAmount = salvadanai[index].currentAmount
+                    amountToAdd = max(0, targetAmount - currentAmount)
+                } else {
+                    // Per gli obiettivi, aggiungi un importo ragionevole o quello che serve per completare
+                    let remainingToTarget = salvadanai[index].targetAmount - salvadanai[index].currentAmount
+                    amountToAdd = min(100, max(0, remainingToTarget))
+                }
                 
                 if amountToAdd > 0 {
                     salvadanai[index].currentAmount += amountToAdd
-                    // Sottrai dal conto
-                    updateAccountBalance(accountName: accountName, amount: -amountToAdd)
+                    // Sottrai dal conto specificato nel salvadanaio
+                    updateAccountBalance(accountName: salvadanai[index].accountName, amount: -amountToAdd)
                 }
             }
         }
@@ -203,10 +216,10 @@ class DataManager: ObservableObject {
         addAccount(name: "Carta Prepagata", initialBalance: 150.00)
         
         // Salvadanai di esempio
-        addSalvadanaio(name: "Vacanze Estate", type: "objective", targetAmount: 1500, targetDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()), color: "blue")
-        addSalvadanaio(name: "Quotidianità", type: "glass", monthlyRefill: 400, color: "green")
-        addSalvadanaio(name: "Svago", type: "glass", monthlyRefill: 150, color: "orange")
-        addSalvadanaio(name: "Nuovo iPhone", type: "objective", targetAmount: 1200, targetDate: Calendar.current.date(byAdding: .month, value: 8, to: Date()), color: "purple")
+        addSalvadanaio(name: "Vacanze Estate", type: "objective", targetAmount: 1500, targetDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()), color: "blue", accountName: "Conto Principale")
+        addSalvadanaio(name: "Quotidianità", type: "glass", monthlyRefill: 400, color: "green", accountName: "Conto Principale")
+        addSalvadanaio(name: "Svago", type: "glass", monthlyRefill: 150, color: "orange", accountName: "Carta Prepagata")
+        addSalvadanaio(name: "Nuovo iPhone", type: "objective", targetAmount: 1200, targetDate: Calendar.current.date(byAdding: .month, value: 8, to: Date()), color: "purple", accountName: "Conto Principale")
         
         // Aggiorna alcuni salvadanai con importi
         if salvadanai.count >= 4 {

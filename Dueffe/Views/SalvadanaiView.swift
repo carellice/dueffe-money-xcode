@@ -265,15 +265,33 @@ struct AddSalvadanaiView: View {
     
     @State private var name = ""
     @State private var selectedType = "objective"
-    @State private var targetAmount = 0.0
+    @State private var targetAmount = 100.0  // Valore di default
     @State private var targetDate = Date()
-    @State private var monthlyRefill = 0.0
+    @State private var monthlyRefill = 50.0  // Valore di default
     @State private var selectedColor = "blue"
+    @State private var selectedAccount = ""
     
     let salvadanaiTypes = [
         ("objective", "Obiettivo", "target"),
         ("glass", "Glass", "drop.fill")
     ]
+    
+    var isFormValid: Bool {
+        // Nome non deve essere vuoto
+        if name.isEmpty { return false }
+        
+        // Deve esserci almeno un conto disponibile
+        if dataManager.accounts.isEmpty { return false }
+        
+        // Deve essere selezionato un conto
+        if selectedAccount.isEmpty { return false }
+        
+        // Validazione specifica per tipo
+        if selectedType == "objective" && targetAmount <= 0 { return false }
+        if selectedType == "glass" && monthlyRefill <= 0 { return false }
+        
+        return true
+    }
     
     var body: some View {
         NavigationView {
@@ -286,16 +304,29 @@ struct AddSalvadanaiView: View {
                 }
                 
                 Section {
-                    Picker("Tipo", selection: $selectedType) {
+                    VStack(spacing: 12) {
                         ForEach(salvadanaiTypes, id: \.0) { type, displayName, icon in
-                            HStack {
-                                Image(systemName: icon)
-                                Text(displayName)
+                            Button(action: {
+                                selectedType = type
+                            }) {
+                                HStack {
+                                    Image(systemName: icon)
+                                        .frame(width: 24)
+                                        .foregroundColor(selectedType == type ? .blue : .secondary)
+                                    Text(displayName)
+                                    Spacer()
+                                    if selectedType == type {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
                             }
-                            .tag(type)
+                            .buttonStyle(PlainButtonStyle())
+                            .foregroundColor(selectedType == type ? .blue : .primary)
                         }
                     }
-                    .pickerStyle(SegmentedPickerStyle())
                 } header: {
                     Text("Tipo di salvadanaio")
                 } footer: {
@@ -304,12 +335,71 @@ struct AddSalvadanaiView: View {
                          : "Un salvadanaio Glass si ricarica automaticamente ogni mese")
                 }
                 
+                // Selezione conto
+                Section {
+                    if dataManager.accounts.isEmpty {
+                        VStack(spacing: 12) {
+                            Text("⚠️ Nessun conto disponibile")
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                            
+                            Text("Vai nel tab 'Conti' e crea almeno un conto prima di creare un salvadanaio")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding()
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if !selectedAccount.isEmpty {
+                                Text("✅ Conto selezionato: \(selectedAccount)")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Text("❌ Nessun conto selezionato")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            
+                            ForEach(dataManager.accounts, id: \.name) { account in
+                                Button(action: {
+                                    selectedAccount = account.name
+                                    print("🔄 Conto selezionato: \(account.name)")
+                                }) {
+                                    HStack {
+                                        Image(systemName: selectedAccount == account.name ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(selectedAccount == account.name ? .blue : .secondary)
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(account.name)
+                                                .font(.headline)
+                                            Text("€\(String(format: "%.2f", account.balance))")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .foregroundColor(selectedAccount == account.name ? .blue : .primary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Conto di riferimento")
+                } footer: {
+                    Text("I soldi di questo salvadanaio saranno collegati al conto selezionato")
+                }
+                
                 if selectedType == "objective" {
                     Section {
                         HStack {
                             Text("Obiettivo")
                             Spacer()
-                            TextField("0", value: $targetAmount, format: .currency(code: "EUR"))
+                            TextField("100", value: $targetAmount, format: .currency(code: "EUR"))
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
                         }
@@ -323,14 +413,14 @@ struct AddSalvadanaiView: View {
                         HStack {
                             Text("Ricarica mensile")
                             Spacer()
-                            TextField("0", value: $monthlyRefill, format: .currency(code: "EUR"))
+                            TextField("50", value: $monthlyRefill, format: .currency(code: "EUR"))
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
                         }
                     } header: {
                         Text("Dettagli Glass")
                     } footer: {
-                        Text("Questo importo verrà aggiunto automaticamente ogni volta che inserisci lo stipendio")
+                        Text("Questo importo verrà aggiunto automaticamente quando inserisci entrate")
                     }
                 }
                 
@@ -353,6 +443,34 @@ struct AddSalvadanaiView: View {
                 } header: {
                     Text("Colore")
                 }
+                
+                // Sezione Debug (rimuovere dopo il test)
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("🐛 DEBUG INFO:")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.purple)
+                        
+                        Text("Nome: '\(name)' (vuoto: \(name.isEmpty))")
+                            .font(.caption2)
+                        Text("Conto: '\(selectedAccount)' (vuoto: \(selectedAccount.isEmpty))")
+                            .font(.caption2)
+                        Text("Conti disponibili: \(dataManager.accounts.count)")
+                            .font(.caption2)
+                        Text("Tipo: \(selectedType)")
+                            .font(.caption2)
+                        Text("Target: €\(String(format: "%.2f", targetAmount))")
+                            .font(.caption2)
+                        Text("Refill: €\(String(format: "%.2f", monthlyRefill))")
+                            .font(.caption2)
+                        Text("Form valido: \(isFormValid ? "✅" : "❌")")
+                            .font(.caption2)
+                            .foregroundColor(isFormValid ? .green : .red)
+                    }
+                } header: {
+                    Text("Debug (rimuovi dopo test)")
+                }
             }
             .navigationTitle("Nuovo Salvadanaio")
             .navigationBarTitleDisplayMode(.inline)
@@ -367,21 +485,41 @@ struct AddSalvadanaiView: View {
                     Button("Salva") {
                         createSalvadanaio()
                     }
-                    .disabled(name.isEmpty || (selectedType == "objective" && targetAmount <= 0) || (selectedType == "glass" && monthlyRefill <= 0))
+                    .disabled(!isFormValid)
                 }
             }
         }
+        .onAppear {
+            setupDefaults()
+        }
+    }
+    
+    private func setupDefaults() {
+        // Auto-seleziona il primo conto se disponibile
+        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
+            selectedAccount = dataManager.accounts.first!.name
+            print("🔄 Auto-selezionato primo conto: \(selectedAccount)")
+        }
+        
+        print("=== SETUP DEFAULTS ===")
+        print("Conti disponibili: \(dataManager.accounts.count)")
+        print("Conto auto-selezionato: '\(selectedAccount)'")
+        print("Form valido dopo setup: \(isFormValid)")
+        print("======================")
     }
     
     private func createSalvadanaio() {
+        print("🚀 Creando salvadanaio...")
         dataManager.addSalvadanaio(
             name: name,
             type: selectedType,
             targetAmount: selectedType == "objective" ? targetAmount : 0,
             targetDate: selectedType == "objective" ? targetDate : nil,
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
-            color: selectedColor
+            color: selectedColor,
+            accountName: selectedAccount
         )
+        print("✅ Salvadanaio creato con successo!")
         dismiss()
     }
 }
@@ -442,7 +580,7 @@ struct SalvadanaiDetailView: View {
                     .padding(24)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(.regularMaterial)
+                            .fill(Color.gray.opacity(0.1))
                     )
                     
                     // Actions
@@ -460,7 +598,7 @@ struct SalvadanaiDetailView: View {
                             Label("Modifica", systemImage: "pencil.circle.fill")
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(.regularMaterial)
+                                .background(Color.gray.opacity(0.1))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
@@ -531,20 +669,24 @@ struct EditSalvadanaiView: View {
     @EnvironmentObject var dataManager: DataManager
     
     @State private var salvadanaio: SalvadanaiModel
+    @State private var targetDate: Date
     
     init(salvadanaio: SalvadanaiModel) {
         _salvadanaio = State(initialValue: salvadanaio)
+        _targetDate = State(initialValue: salvadanaio.targetDate ?? Date())
     }
     
     var body: some View {
         NavigationView {
             Form {
-                Section("Nome") {
+                Section {
                     TextField("Nome salvadanaio", text: $salvadanaio.name)
+                } header: {
+                    Text("Nome")
                 }
                 
                 if salvadanaio.type == "objective" {
-                    Section("Obiettivo") {
+                    Section {
                         HStack {
                             Text("Importo obiettivo")
                             Spacer()
@@ -553,10 +695,12 @@ struct EditSalvadanaiView: View {
                                 .keyboardType(.decimalPad)
                         }
                         
-                        DatePicker("Scadenza", selection: Binding($salvadanaio.targetDate)!, displayedComponents: .date)
+                        DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                    } header: {
+                        Text("Obiettivo")
                     }
                 } else {
-                    Section("Glass") {
+                    Section {
                         HStack {
                             Text("Ricarica mensile")
                             Spacer()
@@ -564,10 +708,12 @@ struct EditSalvadanaiView: View {
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.decimalPad)
                         }
+                    } header: {
+                        Text("Glass")
                     }
                 }
                 
-                Section("Colore") {
+                Section {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
                         ForEach(dataManager.salvadanaiColors, id: \.self) { color in
                             Circle()
@@ -583,6 +729,8 @@ struct EditSalvadanaiView: View {
                         }
                     }
                     .padding(.vertical, 8)
+                } header: {
+                    Text("Colore")
                 }
             }
             .navigationTitle("Modifica Salvadanaio")
@@ -596,130 +744,12 @@ struct EditSalvadanaiView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salva") {
+                        salvadanaio.targetDate = targetDate
                         dataManager.updateSalvadanaio(salvadanaio)
                         dismiss()
                     }
                 }
             }
         }
-    }
-}
-
-// MARK: - Add Money to Salvadanaio View
-struct AddMoneyToSalvadanaiView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    let salvadanaio: SalvadanaiModel
-    
-    @State private var amount = 0.0
-    @State private var selectedAccount = ""
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    HStack {
-                        Text("Importo")
-                        Spacer()
-                        TextField("0", value: $amount, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
-                    }
-                } header: {
-                    Text("Quanto vuoi aggiungere?")
-                }
-                
-                if !dataManager.accounts.isEmpty {
-                    Section("Da quale conto?") {
-                        Picker("Conto", selection: $selectedAccount) {
-                            ForEach(dataManager.accounts, id: \.name) { account in
-                                HStack {
-                                    Text(account.name)
-                                    Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
-                                        .foregroundColor(.secondary)
-                                }
-                                .tag(account.name)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Aggiungi Fondi")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Aggiungi") {
-                        addMoney()
-                    }
-                    .disabled(amount <= 0 || selectedAccount.isEmpty)
-                }
-            }
-        }
-        .onAppear {
-            if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
-                selectedAccount = dataManager.accounts.first!.name
-            }
-        }
-    }
-    
-    private func addMoney() {
-        // Crea una transazione di trasferimento
-        dataManager.addTransaction(
-            amount: amount,
-            descr: "Trasferimento a \(salvadanaio.name)",  // Cambiato da description a descr
-            category: "💰 Trasferimento",
-            type: "expense",
-            accountName: selectedAccount,
-            salvadanaiName: salvadanaio.name
-        )
-        
-        // Aggiungi i soldi al salvadanaio (viene fatto automaticamente nella addTransaction)
-        dismiss()
-    }
-}
-
-// MARK: - Empty State View
-struct EmptyStateView: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let buttonText: String
-    let action: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-            
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text(subtitle)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            Button(action: action) {
-                Text(buttonText)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 12)
-                    .background(.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-        }
-        .padding(40)
     }
 }
