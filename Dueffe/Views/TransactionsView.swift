@@ -292,8 +292,12 @@ struct AddTransactionView: View {
                         ForEach(transactionTypes, id: \.0) { type, title, icon in
                             Button(action: {
                                 transactionType = type
-                                // Reset categoria quando cambia tipo
-                                selectedCategory = ""
+                                // Reset categoria quando cambia tipo, eccetto per stipendio
+                                if type == "salary" {
+                                    selectedCategory = "💼 Stipendio"
+                                } else {
+                                    selectedCategory = ""
+                                }
                             }) {
                                 HStack {
                                     Image(systemName: icon)
@@ -332,8 +336,8 @@ struct AddTransactionView: View {
                     Text("Dettagli")
                 }
                 
-                // Categoria
-                if !availableCategories.isEmpty {
+                // Categoria (solo per spese e entrate, non per stipendi)
+                if transactionType != "salary" && !availableCategories.isEmpty {
                     Section {
                         Picker("Categoria", selection: $selectedCategory) {
                             Text("Seleziona categoria")
@@ -345,6 +349,19 @@ struct AddTransactionView: View {
                         }
                     } header: {
                         Text("Categoria")
+                    }
+                } else if transactionType == "salary" {
+                    Section {
+                        HStack {
+                            Text("Categoria")
+                            Spacer()
+                            Text("💼 Stipendio")
+                                .foregroundColor(.secondary)
+                        }
+                    } header: {
+                        Text("Categoria")
+                    } footer: {
+                        Text("La categoria per gli stipendi è fissa")
                     }
                 }
                 
@@ -418,7 +435,7 @@ struct AddTransactionView: View {
                     Button("Salva") {
                         saveTransaction()
                     }
-                    .disabled(amount <= 0 || descr.isEmpty || selectedCategory.isEmpty || selectedAccount.isEmpty)
+                    .disabled(amount <= 0 || descr.isEmpty || selectedAccount.isEmpty || (transactionType != "salary" && selectedCategory.isEmpty))
                 }
             }
         }
@@ -447,10 +464,12 @@ struct AddTransactionView: View {
             selectedAccount = dataManager.accounts.first!.name
         }
         
-        // NON auto-selezionare la categoria - lascia vuota
-        // Rimosso: if selectedCategory.isEmpty && !availableCategories.isEmpty {
-        //     selectedCategory = availableCategories.first!
-        // }
+        // Auto-seleziona categoria solo per stipendi
+        if transactionType == "salary" {
+            selectedCategory = "💼 Stipendio"
+        }
+        
+        // NON auto-selezionare la categoria per spese e entrate - lascia vuota
     }
     
     private func saveTransaction() {
