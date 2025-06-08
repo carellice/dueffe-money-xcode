@@ -4,6 +4,25 @@ struct ContentView: View {
     @StateObject private var dataManager = DataManager()
     
     var body: some View {
+        Group {
+            if dataManager.accounts.isEmpty {
+                // Mostra onboarding se non ci sono conti
+                FirstAccountOnboardingView()
+                    .environmentObject(dataManager)
+            } else {
+                // Mostra l'app normale se c'è almeno un conto
+                MainTabView()
+                    .environmentObject(dataManager)
+            }
+        }
+    }
+}
+
+// MARK: - Main Tab View
+struct MainTabView: View {
+    @EnvironmentObject var dataManager: DataManager
+    
+    var body: some View {
         TabView {
             HomeView()
                 .tabItem {
@@ -35,7 +54,171 @@ struct ContentView: View {
                     Text("Impostazioni")
                 }
         }
-        .environmentObject(dataManager)
+    }
+}
+
+// MARK: - First Account Onboarding
+struct FirstAccountOnboardingView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @State private var accountName = ""
+    @State private var initialBalance = 0.0
+    @State private var showingValidationError = false
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 32) {
+                    Spacer()
+                    
+                    // Header
+                    VStack(spacing: 20) {
+                        Image(systemName: "building.columns.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.blue)
+                        
+                        VStack(spacing: 12) {
+                            Text("Benvenuto in Dueffe! 👋")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                            
+                            Text("Per iniziare, aggiungi il tuo primo conto")
+                                .font(.title3)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    
+                    // Form
+                    VStack(spacing: 24) {
+                        VStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Nome del conto")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                TextField("es. Conto Principale, Carta Prepagata...", text: $accountName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .textInputAutocapitalization(.words)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Saldo attuale")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                HStack {
+                                    Text("€")
+                                        .font(.title2)
+                                        .foregroundColor(.secondary)
+                                    
+                                    TextField("0,00", value: $initialBalance, format: .currency(code: "EUR"))
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .keyboardType(.decimalPad)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                            }
+                        }
+                        .padding(24)
+                        .background(Color.gray.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        
+                        // Esempi
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("💡 Esempi di conti:")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                ExampleAccountRow(name: "Conto Corrente", icon: "building.columns")
+                                ExampleAccountRow(name: "Carta Prepagata", icon: "creditcard")
+                                ExampleAccountRow(name: "Conto Risparmio", icon: "banknote")
+                                ExampleAccountRow(name: "Contanti", icon: "dollarsign.circle")
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    
+                    Spacer()
+                    
+                    // Bottone Continua
+                    VStack(spacing: 16) {
+                        Button(action: {
+                            createFirstAccount()
+                        }) {
+                            HStack {
+                                Text("Crea il mio primo conto")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.title2)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(accountName.isEmpty ? Color.gray : Color.blue)
+                            )
+                        }
+                        .disabled(accountName.isEmpty)
+                        .animation(.easeInOut(duration: 0.2), value: accountName.isEmpty)
+                        
+                        Text("Potrai aggiungere altri conti in seguito")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationBarHidden(true)
+        }
+        .alert("Errore", isPresented: $showingValidationError) {
+            Button("OK") { }
+        } message: {
+            Text("Inserisci un nome valido per il conto")
+        }
+    }
+    
+    private func createFirstAccount() {
+        let trimmedName = accountName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedName.isEmpty else {
+            showingValidationError = true
+            return
+        }
+        
+        dataManager.addAccount(name: trimmedName, initialBalance: initialBalance)
+        
+        // Animazione di successo
+        withAnimation(.spring()) {
+            // L'app si aggiornerà automaticamente mostrando la TabView
+        }
+    }
+}
+
+// MARK: - Example Account Row
+struct ExampleAccountRow: View {
+    let name: String
+    let icon: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(.blue)
+                .frame(width: 20)
+            
+            Text(name)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
     }
 }
 

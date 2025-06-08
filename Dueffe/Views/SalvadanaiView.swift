@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Updated SalvadanaiView con controllo conti
 struct SalvadanaiView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddSalvadanaio = false
@@ -8,7 +9,15 @@ struct SalvadanaiView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if dataManager.salvadanai.isEmpty {
+                if dataManager.accounts.isEmpty {
+                    // Mostra messaggio se non ci sono conti
+                    NoAccountsWarningView(
+                        icon: "banknote.fill",
+                        title: "Impossibile creare salvadanai",
+                        subtitle: "Prima di creare un salvadanaio, devi aggiungere almeno un conto nel tab 'Conti'",
+                        actionText: "Vai ai Conti"
+                    )
+                } else if dataManager.salvadanai.isEmpty {
                     EmptyStateView(
                         icon: "banknote.fill",
                         title: "Nessun Salvadanaio",
@@ -36,11 +45,16 @@ struct SalvadanaiView: View {
                     Button(action: { showingAddSalvadanaio = true }) {
                         Image(systemName: "plus.circle.fill")
                     }
+                    .disabled(dataManager.accounts.isEmpty)
                 }
             }
         }
         .sheet(isPresented: $showingAddSalvadanaio) {
-            AddSalvadanaiView()
+            if dataManager.accounts.isEmpty {
+                NoAccountsModalView()
+            } else {
+                AddSalvadanaiView()
+            }
         }
         .sheet(item: $selectedSalvadanaio) { salvadanaio in
             SalvadanaiDetailView(salvadanaio: salvadanaio)

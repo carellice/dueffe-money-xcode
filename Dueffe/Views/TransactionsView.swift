@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Updated TransactionsView con controllo conti
 struct TransactionsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddTransaction = false
@@ -16,12 +17,10 @@ struct TransactionsView: View {
     var filteredTransactions: [TransactionModel] {
         var transactions = dataManager.transactions
         
-        // Filtro per tipo
         if selectedFilter != "all" {
             transactions = transactions.filter { $0.type == selectedFilter }
         }
         
-        // Filtro per ricerca
         if !searchText.isEmpty {
             transactions = transactions.filter { transaction in
                 transaction.descr.localizedCaseInsensitiveContains(searchText) ||
@@ -35,7 +34,14 @@ struct TransactionsView: View {
     var body: some View {
         NavigationView {
             VStack {
-                if dataManager.transactions.isEmpty {
+                if dataManager.accounts.isEmpty {
+                    NoAccountsWarningView(
+                        icon: "creditcard.fill",
+                        title: "Impossibile aggiungere transazioni",
+                        subtitle: "Prima di registrare una transazione, devi aggiungere almeno un conto nel tab 'Conti'",
+                        actionText: "Vai ai Conti"
+                    )
+                } else if dataManager.transactions.isEmpty {
                     EmptyStateView(
                         icon: "creditcard.fill",
                         title: "Nessuna Transazione",
@@ -88,11 +94,16 @@ struct TransactionsView: View {
                     Button(action: { showingAddTransaction = true }) {
                         Image(systemName: "plus.circle.fill")
                     }
+                    .disabled(dataManager.accounts.isEmpty)
                 }
             }
         }
         .sheet(isPresented: $showingAddTransaction) {
-            AddTransactionView()
+            if dataManager.accounts.isEmpty {
+                NoAccountsModalView()
+            } else {
+                AddTransactionView()
+            }
         }
     }
     
@@ -106,6 +117,99 @@ struct TransactionsView: View {
         }
         
         return grouped.sorted { $0.key > $1.key }
+    }
+}
+
+// MARK: - No Accounts Warning View
+struct NoAccountsWarningView: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    let actionText: String
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: icon)
+                .font(.system(size: 64))
+                .foregroundColor(.orange)
+            
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                
+                Text("È necessario almeno un conto per utilizzare questa funzione")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .fontWeight(.medium)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .padding(40)
+    }
+}
+
+// MARK: - No Accounts Modal View
+struct NoAccountsModalView: View {
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 32) {
+                Spacer()
+                
+                Image(systemName: "building.columns.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(.orange)
+                
+                VStack(spacing: 16) {
+                    Text("Nessun conto disponibile")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text("Prima di procedere, devi creare almeno un conto nel tab 'Conti'")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                Spacer()
+                
+                Button("Ho capito") {
+                    dismiss()
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .padding()
+            .navigationTitle("Attenzione")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
