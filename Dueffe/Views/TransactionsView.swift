@@ -57,7 +57,7 @@ struct TransactionsView: View {
                         EmptyTransactionsView(action: { showingAddTransaction = true })
                     } else {
                         VStack(spacing: 0) {
-                            // Header con statistiche
+                            // Header con statistiche (MODIFICATO - rimosso bilancio netto)
                             TransactionsStatsHeaderView(
                                 totalExpenses: totalExpenses,
                                 totalIncome: totalIncome,
@@ -161,43 +161,25 @@ struct TransactionsView: View {
     }
 }
 
-// MARK: - Transactions Stats Header
+// MARK: - Transactions Stats Header (MODIFICATO - rimosso bilancio netto)
 struct TransactionsStatsHeaderView: View {
     let totalExpenses: Double
     let totalIncome: Double
     let transactionCount: Int
     
-    private var netBalance: Double {
-        totalIncome - totalExpenses
-    }
-    
     var body: some View {
         VStack(spacing: 20) {
-            // Bilancio netto
-            VStack(spacing: 8) {
-                Text("Bilancio Netto")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("€")
-                        .font(.title)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    Text(String(format: "%.2f", netBalance))
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(netBalance >= 0 ? .green : .red)
-                        .contentTransition(.numericText())
-                }
-                
-                Text(netBalance >= 0 ? "In positivo" : "In negativo")
-                    .font(.caption)
-                    .foregroundColor(netBalance >= 0 ? .green : .red)
-                    .fontWeight(.medium)
+            // Header titolo
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(.purple)
+                Text("Riepilogo Transazioni")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                Spacer()
             }
             
-            // Statistiche dettagliate
+            // Solo le tre statistiche principali
             HStack(spacing: 20) {
                 TransactionStatCardView(
                     title: "Entrate",
