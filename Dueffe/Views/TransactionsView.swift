@@ -123,7 +123,7 @@ struct TransactionsView: View {
                             .font(.title2)
                             .foregroundColor(.purple)
                     }
-                    .disabled(dataManager.accounts.isEmpty)
+                    .disabled(dataManager.accounts.isEmpty) // Non serve cambiare qui perché controlleremo nel sheet
                 }
             }
         }
@@ -131,7 +131,7 @@ struct TransactionsView: View {
             if dataManager.accounts.isEmpty {
                 SimpleModalView(
                     title: "Nessun conto disponibile",
-                    message: "Prima di procedere, devi creare almeno un conto nel tab 'Conti'",
+                    message: "Prima di procedere, devi creare almeno un conto nel tab 'Conti' per poter registrare entrate",
                     buttonText: "Ho capito"
                 )
             } else {
@@ -351,7 +351,7 @@ struct TransactionSectionHeaderView: View {
     }
 }
 
-// MARK: - Transaction Row View
+// MARK: - Transaction Row View (MODIFICATO)
 struct TransactionRowView: View {
     let transaction: TransactionModel
     @State private var animateAmount = false
@@ -398,7 +398,7 @@ struct TransactionRowView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
-                // Tags
+                // Tags - MODIFICATO
                 HStack(spacing: 8) {
                     TransactionTagView(
                         text: transaction.category,
@@ -406,12 +406,16 @@ struct TransactionRowView: View {
                         icon: getCategoryIcon(transaction.category)
                     )
                     
-                    TransactionTagView(
-                        text: transaction.accountName,
-                        color: .blue,
-                        icon: "building.columns"
-                    )
+                    // Mostra conto solo se non è vuoto (per entrate)
+                    if !transaction.accountName.isEmpty {
+                        TransactionTagView(
+                            text: transaction.accountName,
+                            color: .blue,
+                            icon: "building.columns"
+                        )
+                    }
                     
+                    // Mostra salvadanaio solo se presente (per spese)
                     if let salvadanaiName = transaction.salvadanaiName {
                         TransactionTagView(
                             text: salvadanaiName,
@@ -525,6 +529,7 @@ struct TransactionTagView: View {
 struct EmptyTransactionsView: View {
     let action: () -> Void
     @State private var animateIcon = false
+    @EnvironmentObject var dataManager: DataManager
     
     var body: some View {
         VStack(spacing: 32) {
@@ -559,6 +564,29 @@ struct EmptyTransactionsView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+            }
+            
+            // NUOVO: Avviso se mancano salvadanai per le spese
+            if dataManager.salvadanai.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundColor(.blue)
+                    
+                    Text("Suggerimento: crea almeno un salvadanaio per registrare le spese")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.blue.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                        )
+                )
             }
             
             Button(action: action) {
@@ -657,7 +685,7 @@ extension Character {
     }
 }
 
-// MARK: - Simple Add Transaction View
+// MARK: - Simple Add Transaction View (MODIFICATO)
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -685,10 +713,19 @@ struct SimpleAddTransactionView: View {
     }
     
     var isFormValid: Bool {
-        return amount > 0 &&
-               !descr.isEmpty &&
-               !selectedAccount.isEmpty &&
-               (transactionType == "salary" || !selectedCategory.isEmpty)
+        if transactionType == "expense" {
+            // Per le spese: serve importo, descrizione e salvadanaio
+            return amount > 0 &&
+                   !descr.isEmpty &&
+                   !selectedSalvadanaio.isEmpty &&
+                   !selectedCategory.isEmpty
+        } else {
+            // Per entrate: serve importo, descrizione e conto
+            return amount > 0 &&
+                   !descr.isEmpty &&
+                   !selectedAccount.isEmpty &&
+                   (transactionType == "salary" || !selectedCategory.isEmpty)
+        }
     }
     
     var body: some View {
@@ -768,27 +805,7 @@ struct SimpleAddTransactionView: View {
                     }
                 }
                 
-                // Account
-                if !dataManager.accounts.isEmpty {
-                    Section {
-                        Picker("Da quale conto", selection: $selectedAccount) {
-                            Text("Seleziona conto").tag("")
-                            ForEach(dataManager.accounts, id: \.name) { account in
-                                HStack {
-                                    Text(account.name)
-                                    Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
-                                        .foregroundColor(.secondary)
-                                }
-                                .tag(account.name)
-                            }
-                        }
-                    } header: {
-                        Text("Conto")
-                    }
-                }
-                
-                // Salvadanaio (solo per spese)
+                // NUOVO: Salvadanaio per spese
                 if transactionType == "expense" && !dataManager.salvadanai.isEmpty {
                     Section {
                         Picker("Da quale salvadanaio", selection: $selectedSalvadanaio) {
@@ -801,15 +818,68 @@ struct SimpleAddTransactionView: View {
                                     Text(salvadanaio.name)
                                     Spacer()
                                     Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(salvadanaio.currentAmount >= amount ? .green : .red)
                                 }
                                 .tag(salvadanaio.name)
                             }
                         }
                     } header: {
-                        Text("Salvadanaio")
+                        HStack {
+                            Image(systemName: "banknote.fill")
+                                .foregroundColor(.green)
+                            Text("Salvadanaio")
+                        }
                     } footer: {
-                        Text("Opzionale: scegli da quale salvadanaio prelevare i soldi")
+                        if !selectedSalvadanaio.isEmpty {
+                            let selectedSalv = dataManager.salvadanai.first { $0.name == selectedSalvadanaio }
+                            if let salvadanaio = selectedSalv, salvadanaio.currentAmount < amount {
+                                Text("⚠️ Attenzione: il salvadanaio non ha fondi sufficienti. Il saldo diventerà negativo.")
+                                    .foregroundColor(.red)
+                            } else {
+                                Text("I soldi verranno prelevati da questo salvadanaio")
+                                    .foregroundColor(.green)
+                            }
+                        } else {
+                            Text("Scegli da quale salvadanaio prelevare i soldi per questa spesa")
+                        }
+                    }
+                } else if transactionType == "expense" && dataManager.salvadanai.isEmpty {
+                    Section {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("Nessun salvadanaio disponibile")
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 8)
+                    } footer: {
+                        Text("Per registrare una spesa devi prima creare almeno un salvadanaio nel tab 'Salvadanai'")
+                    }
+                }
+                
+                // Account solo per entrate
+                if transactionType != "expense" && !dataManager.accounts.isEmpty {
+                    Section {
+                        Picker("A quale conto", selection: $selectedAccount) {
+                            Text("Seleziona conto").tag("")
+                            ForEach(dataManager.accounts, id: \.name) { account in
+                                HStack {
+                                    Text(account.name)
+                                    Spacer()
+                                    Text("€\(String(format: "%.2f", account.balance))")
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(account.name)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "building.columns.fill")
+                                .foregroundColor(.blue)
+                            Text("Conto di destinazione")
+                        }
+                    } footer: {
+                        Text("L'entrata verrà aggiunta a questo conto")
                     }
                 }
             }
@@ -842,24 +912,42 @@ struct SimpleAddTransactionView: View {
     }
     
     private func setupDefaults() {
-        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
+        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && transactionType != "expense" {
             selectedAccount = dataManager.accounts.first!.name
         }
         
         if transactionType == "salary" {
             selectedCategory = "💼 Stipendio"
         }
+        
+        // NUOVO: Seleziona automaticamente il primo salvadanaio per le spese
+        if selectedSalvadanaio.isEmpty && !dataManager.salvadanai.isEmpty && transactionType == "expense" {
+            selectedSalvadanaio = dataManager.salvadanai.first!.name
+        }
     }
     
     private func saveTransaction() {
-        dataManager.addTransaction(
-            amount: amount,
-            descr: descr,
-            category: selectedCategory,
-            type: transactionType,
-            accountName: selectedAccount,
-            salvadanaiName: selectedSalvadanaio.isEmpty ? nil : selectedSalvadanaio
-        )
+        if transactionType == "expense" {
+            // Per le spese: usa solo il salvadanaio
+            dataManager.addTransaction(
+                amount: amount,
+                descr: descr,
+                category: selectedCategory,
+                type: transactionType,
+                accountName: nil, // Nessun conto per le spese
+                salvadanaiName: selectedSalvadanaio
+            )
+        } else {
+            // Per entrate: usa solo il conto
+            dataManager.addTransaction(
+                amount: amount,
+                descr: descr,
+                category: selectedCategory,
+                type: transactionType,
+                accountName: selectedAccount,
+                salvadanaiName: nil
+            )
+        }
         dismiss()
     }
 }

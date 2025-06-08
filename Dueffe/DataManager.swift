@@ -16,6 +16,7 @@ struct SalvadanaiModel: Identifiable, Codable {
     var isInfinite: Bool
 }
 
+// MARK: - Transaction Model (MODIFICATO)
 struct TransactionModel: Identifiable, Codable {
     let id = UUID()
     var amount: Double
@@ -23,7 +24,7 @@ struct TransactionModel: Identifiable, Codable {
     var category: String
     var type: String // "expense", "income", "salary"
     var date: Date
-    var accountName: String
+    var accountName: String // Può essere vuoto per le spese
     var salvadanaiName: String?
 }
 
@@ -32,6 +33,27 @@ struct AccountModel: Identifiable, Codable {
     var name: String
     var balance: Double
     var createdAt: Date
+}
+
+// MARK: - Computed Properties aggiornate per DataManager
+extension DataManager {
+    var totalBalance: Double {
+        accounts.reduce(0) { $0 + $1.balance }
+    }
+    
+    var totalSavings: Double {
+        salvadanai.reduce(0) { $0 + $1.currentAmount }
+    }
+    
+    // NUOVO: Patrimonio totale considerando solo salvadanai positivi per il calcolo disponibile
+    var availableBalance: Double {
+        let positiveSavings = salvadanai.filter { $0.currentAmount > 0 }.reduce(0) { $0 + $1.currentAmount }
+        return totalBalance + positiveSavings
+    }
+    
+    var recentTransactions: [TransactionModel] {
+        transactions.sorted { $0.date > $1.date }
+    }
 }
 
 // MARK: - Data Manager con persistenza
@@ -50,23 +72,6 @@ class DataManager: ObservableObject {
     }
     @Published var customIncomeCategories: [String] = [] {
         didSet { saveCategories() }
-    }
-    
-    // Computed Properties
-    var totalBalance: Double {
-        accounts.reduce(0) { $0 + $1.balance }
-    }
-    
-    var totalSavings: Double {
-        salvadanai.reduce(0) { $0 + $1.currentAmount }
-    }
-    
-    var availableBalance: Double {
-        totalBalance - totalSavings
-    }
-    
-    var recentTransactions: [TransactionModel] {
-        transactions.sorted { $0.date > $1.date }
     }
     
     // Categorie predefinite (base)
@@ -231,37 +236,46 @@ class DataManager: ObservableObject {
         salvadanai.removeAll { $0.id == salvadanaio.id }
     }
     
-    // MARK: - Transaction Methods
-    func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String, salvadanaiName: String? = nil) {
+    // MARK: - Transaction Methods (MODIFICATO)
+    func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String? = nil, salvadanaiName: String? = nil) {
         let newTransaction = TransactionModel(
             amount: amount,
             descr: descr,
             category: category,
             type: type,
             date: Date(),
-            accountName: accountName,
+            accountName: accountName ?? "", // Per spese sarà vuoto, per entrate avrà il conto
             salvadanaiName: salvadanaiName
         )
         transactions.append(newTransaction)
         
-        // Aggiorna il saldo del conto
-        updateAccountBalance(accountName: accountName, amount: type == "expense" ? -amount : amount)
-        
-        // Se è una spesa, sottrai dal salvadanaio
-        if type == "expense", let salvadanaiName = salvadanaiName {
-            updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
+        if type == "expense" {
+            // Per le spese: sottrai SOLO dal salvadanaio
+            if let salvadanaiName = salvadanaiName {
+                updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
+            }
+        } else {
+            // Per entrate e stipendi: aggiungi al conto selezionato
+            if let accountName = accountName {
+                updateAccountBalance(accountName: accountName, amount: amount)
+            }
         }
     }
-    
+
+    // MARK: - Metodo per eliminare transazioni (MODIFICATO)
     func deleteTransaction(_ transaction: TransactionModel) {
         transactions.removeAll { $0.id == transaction.id }
         
-        // Ripristina il saldo
-        let reverseAmount = transaction.type == "expense" ? transaction.amount : -transaction.amount
-        updateAccountBalance(accountName: transaction.accountName, amount: reverseAmount)
-        
-        if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
-            updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
+        if transaction.type == "expense" {
+            // Per le spese: ripristina il saldo del salvadanaio
+            if let salvadanaiName = transaction.salvadanaiName {
+                updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
+            }
+        } else {
+            // Per entrate: ripristina il saldo del conto
+            if !transaction.accountName.isEmpty {
+                updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
+            }
         }
     }
     
