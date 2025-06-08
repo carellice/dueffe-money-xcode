@@ -34,7 +34,7 @@ struct SalvadanaiView: View {
                     } else {
                         VStack(spacing: 0) {
                             // Header con statistiche (MODIFICATO - rimosso totale risparmiato)
-                            SalvadanaiStatsView(salvadanai: dataManager.salvadanai)
+                            CompactSalvadanaiStatsView(salvadanai: dataManager.salvadanai)
                                 .padding(.horizontal)
                                 .padding(.bottom, 16)
                             
@@ -84,7 +84,7 @@ struct SalvadanaiView: View {
     }
 }
 
-// MARK: - Salvadanai Stats Header (MODIFICATO - rimosso totale risparmiato)
+// MARK: - Improved Salvadanai Stats Header (COMPATTO CON ICONA CORRETTA)
 struct SalvadanaiStatsView: View {
     let salvadanai: [SalvadanaiModel]
     
@@ -100,46 +100,221 @@ struct SalvadanaiStatsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Header titolo
-            HStack {
-                Image(systemName: "banknote.circle.fill")
-                    .foregroundColor(.green)
+        VStack(spacing: 16) {
+            // Header titolo più compatto
+            HStack(spacing: 12) {
+                // Icona salvadanai corretta
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [Color.green, Color.green.opacity(0.8)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 36, height: 36)
+                        .shadow(color: .green.opacity(0.3), radius: 6, x: 0, y: 3)
+                    
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
                 Text("I Tuoi Salvadanai")
                     .font(.title3)
                     .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
                 Spacer()
             }
             
-            // Solo le tre statistiche principali
-            HStack(spacing: 24) {
-                StatView(
-                    title: "Salvadanai",
-                    value: "\(salvadanai.count)",
-                    icon: "banknote.circle.fill",
-                    color: .green
-                )
+            // Statistiche compatte
+            HStack(spacing: 16) {
+                // Salvadanai totali con icona corretta
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.green.opacity(0.15))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: "dollarsign.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.green)
+                    }
+                    
+                    VStack(spacing: 2) {
+                        Text("\(salvadanai.count)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("Salvadanai")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
                 
-                StatView(
-                    title: "Completati",
-                    value: "\(completedGoals)",
-                    icon: "checkmark.circle.fill",
-                    color: .blue
-                )
+                // Completati
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue.opacity(0.15))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    VStack(spacing: 2) {
+                        Text("\(completedGoals)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("Completati")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
                 
-                StatView(
-                    title: "In corso",
-                    value: "\(salvadanai.count - completedGoals)",
-                    icon: "clock.circle.fill",
-                    color: .orange
-                )
+                // In corso
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.15))
+                            .frame(width: 48, height: 48)
+                        
+                        Image(systemName: "clock.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                    }
+                    
+                    VStack(spacing: 2) {
+                        Text("\(salvadanai.count - completedGoals)")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("In corso")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
         }
-        .padding(24)
+        .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+                .shadow(color: .black.opacity(0.08), radius: 12, x: 0, y: 6)
+        )
+    }
+}
+
+// MARK: - Versione alternativa ancora più compatta
+struct CompactSalvadanaiStatsView: View {
+    let salvadanai: [SalvadanaiModel]
+    
+    private var completedGoals: Int {
+        salvadanai.filter { salvadanaio in
+            if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                return salvadanaio.currentAmount >= salvadanaio.targetAmount
+            } else if salvadanaio.type == "glass" {
+                return salvadanaio.currentAmount >= salvadanaio.monthlyRefill
+            }
+            return false
+        }.count
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Header super compatto
+            HStack(spacing: 10) {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.green)
+                
+                Text("I Tuoi Salvadanai")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+            }
+            
+            // Statistiche in riga orizzontale compatta
+            HStack(spacing: 20) {
+                // Totali
+                HStack(spacing: 8) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                        .frame(width: 20, height: 20)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(salvadanai.count)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text("Totali")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // Completati
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .frame(width: 20, height: 20)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(completedGoals)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text("Fatti")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Divider()
+                    .frame(height: 30)
+                
+                // In corso
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.orange)
+                        .frame(width: 20, height: 20)
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("\(salvadanai.count - completedGoals)")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        Text("In corso")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
         )
     }
 }
