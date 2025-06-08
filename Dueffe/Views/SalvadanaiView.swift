@@ -33,7 +33,7 @@ struct SalvadanaiView: View {
                         EmptySalvadanaiView(action: { showingAddSalvadanaio = true })
                     } else {
                         VStack(spacing: 0) {
-                            // Header con statistiche
+                            // Header con statistiche (MODIFICATO - rimosso totale risparmiato)
                             SalvadanaiStatsView(salvadanai: dataManager.salvadanai)
                                 .padding(.horizontal)
                                 .padding(.bottom, 16)
@@ -84,13 +84,9 @@ struct SalvadanaiView: View {
     }
 }
 
-// MARK: - Salvadanai Stats Header
+// MARK: - Salvadanai Stats Header (MODIFICATO - rimosso totale risparmiato)
 struct SalvadanaiStatsView: View {
     let salvadanai: [SalvadanaiModel]
-    
-    private var totalAmount: Double {
-        salvadanai.reduce(0) { $0 + $1.currentAmount }
-    }
     
     private var completedGoals: Int {
         salvadanai.filter { salvadanaio in
@@ -104,23 +100,18 @@ struct SalvadanaiStatsView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("€")
-                    .font(.title)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                Text(String(format: "%.2f", totalAmount))
-                    .font(.largeTitle)
+        VStack(spacing: 20) {
+            // Header titolo
+            HStack {
+                Image(systemName: "banknote.circle.fill")
+                    .foregroundColor(.green)
+                Text("I Tuoi Salvadanai")
+                    .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(totalAmount < 0 ? .red : .primary)
-                    .contentTransition(.numericText())
+                Spacer()
             }
             
-            Text("Totale risparmiato")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
+            // Solo le tre statistiche principali
             HStack(spacing: 24) {
                 StatView(
                     title: "Salvadanai",
