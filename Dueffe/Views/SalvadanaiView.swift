@@ -1,87 +1,229 @@
 import SwiftUI
 
-// MARK: - Updated SalvadanaiView con controllo conti
+// MARK: - SalvadanaiView completamente riscritta
 struct SalvadanaiView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddSalvadanaio = false
     @State private var selectedSalvadanaio: SalvadanaiModel?
+    @State private var searchText = ""
+    
+    var filteredSalvadanai: [SalvadanaiModel] {
+        if searchText.isEmpty {
+            return dataManager.salvadanai
+        } else {
+            return dataManager.salvadanai.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
     
     var body: some View {
         NavigationView {
-            VStack {
-                if dataManager.accounts.isEmpty {
-                    // Mostra messaggio se non ci sono conti
-                    NoAccountsWarningView(
-                        icon: "banknote.fill",
-                        title: "Impossibile creare salvadanai",
-                        subtitle: "Prima di creare un salvadanaio, devi aggiungere almeno un conto nel tab 'Conti'",
-                        actionText: "Vai ai Conti"
-                    )
-                } else if dataManager.salvadanai.isEmpty {
-                    EmptyStateView(
-                        icon: "banknote.fill",
-                        title: "Nessun Salvadanaio",
-                        subtitle: "Crea il tuo primo salvadanaio per iniziare a risparmiare!",
-                        buttonText: "Crea Salvadanaio",
-                        action: { showingAddSalvadanaio = true }
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(dataManager.salvadanai, id: \.id) { salvadanaio in
-                                SalvadanaiCard(salvadanaio: salvadanaio)
-                                    .onTapGesture {
-                                        selectedSalvadanaio = salvadanaio
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.green.opacity(0.05), Color.blue.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack {
+                    if dataManager.accounts.isEmpty {
+                        NoAccountsView()
+                    } else if dataManager.salvadanai.isEmpty {
+                        EmptySalvadanaiView(action: { showingAddSalvadanaio = true })
+                    } else {
+                        VStack(spacing: 0) {
+                            // Header con statistiche
+                            SalvadanaiStatsView(salvadanai: dataManager.salvadanai)
+                                .padding(.horizontal)
+                                .padding(.bottom, 16)
+                            
+                            // Lista salvadanai
+                            ScrollView {
+                                LazyVStack(spacing: 16) {
+                                    ForEach(filteredSalvadanai, id: \.id) { salvadanaio in
+                                        SalvadanaiCardView(salvadanaio: salvadanaio)
+                                            .onTapGesture {
+                                                selectedSalvadanaio = salvadanaio
+                                            }
                                     }
+                                }
+                                .padding()
                             }
+                            .searchable(text: $searchText, prompt: "Cerca salvadanai...")
                         }
-                        .padding()
                     }
                 }
             }
             .navigationTitle("Salvadanai")
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddSalvadanaio = true }) {
                         Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
                     }
                     .disabled(dataManager.accounts.isEmpty)
                 }
-            }
+            })
         }
         .sheet(isPresented: $showingAddSalvadanaio) {
             if dataManager.accounts.isEmpty {
-                NoAccountsModalView()
+                SimpleModalView(
+                    title: "Nessun conto disponibile",
+                    message: "Prima di procedere, devi creare almeno un conto nel tab 'Conti'",
+                    buttonText: "Ho capito"
+                )
             } else {
-                AddSalvadanaiView()
+                SimpleSalvadanaiFormView()
             }
         }
         .sheet(item: $selectedSalvadanaio) { salvadanaio in
-            SalvadanaiDetailView(salvadanaio: salvadanaio)
+            SimpleSalvadanaiDetailView(salvadanaio: salvadanaio)
         }
     }
 }
 
-// MARK: - Salvadanaio Card (versione con supporto infinito)
-struct SalvadanaiCard: View {
-    let salvadanaio: SalvadanaiModel
-    @State private var isPressed = false
+// MARK: - Salvadanai Stats Header
+struct SalvadanaiStatsView: View {
+    let salvadanai: [SalvadanaiModel]
+    
+    private var totalAmount: Double {
+        salvadanai.reduce(0) { $0 + $1.currentAmount }
+    }
+    
+    private var completedGoals: Int {
+        salvadanai.filter { salvadanaio in
+            if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                return salvadanaio.currentAmount >= salvadanaio.targetAmount
+            } else if salvadanaio.type == "glass" {
+                return salvadanaio.currentAmount >= salvadanaio.monthlyRefill
+            }
+            return false
+        }.count
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(spacing: 16) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("€")
+                    .font(.title)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                Text(String(format: "%.2f", totalAmount))
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(totalAmount < 0 ? .red : .primary)
+                    .contentTransition(.numericText())
+            }
+            
+            Text("Totale risparmiato")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 24) {
+                StatView(
+                    title: "Salvadanai",
+                    value: "\(salvadanai.count)",
+                    icon: "banknote.circle.fill",
+                    color: .green
+                )
+                
+                StatView(
+                    title: "Completati",
+                    value: "\(completedGoals)",
+                    icon: "checkmark.circle.fill",
+                    color: .blue
+                )
+                
+                StatView(
+                    title: "In corso",
+                    value: "\(salvadanai.count - completedGoals)",
+                    icon: "clock.circle.fill",
+                    color: .orange
+                )
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+        )
+    }
+}
+
+// MARK: - Stat View
+struct StatView: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Salvadanaio Card View
+struct SalvadanaiCardView: View {
+    let salvadanaio: SalvadanaiModel
+    @State private var isPressed = false
+    @State private var animateProgress = false
+    
+    private var progress: Double {
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            guard salvadanaio.targetAmount > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
+        } else if salvadanaio.type == "glass" {
+            guard salvadanaio.monthlyRefill > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
+            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+        }
+        return 0
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
             // Header
             HStack {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color(salvadanaio.color))
-                        .frame(width: 20, height: 20)
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(LinearGradient(
+                                gradient: Gradient(colors: [Color(salvadanaio.color), Color(salvadanaio.color).opacity(0.7)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(width: 28, height: 28)
+                            .shadow(color: Color(salvadanaio.color).opacity(0.3), radius: 4, x: 0, y: 2)
+                        
+                        Image(systemName: getTypeIcon())
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(salvadanaio.name)
                             .font(.headline)
                             .fontWeight(.semibold)
                         
-                        Text(typeDisplayName)
+                        Text(getTypeDisplayName())
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -89,84 +231,81 @@ struct SalvadanaiCard: View {
                 
                 Spacer()
                 
-                // Icona in base al tipo
-                if salvadanaio.currentAmount < 0 {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.title2)
-                        .foregroundColor(.red)
-                } else {
-                    Image(systemName: typeIcon)
-                        .font(.title2)
-                        .foregroundColor(Color(salvadanaio.color))
-                }
+                // Status indicator
+                SalvadanaiStatusView(salvadanaio: salvadanaio)
             }
             
-            // Importo con gestione negativo
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("€")
-                    .font(.title2)
-                    .fontWeight(.medium)
-                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .secondary)
-                
-                Text(String(format: "%.2f", salvadanaio.currentAmount))
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
-                    .contentTransition(.numericText())
-            }
-            
-            // Avviso se in negativo
-            if salvadanaio.currentAmount < 0 {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                    Text("Salvadanaio in rosso")
-                        .font(.caption)
+            // Importo
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("€")
+                        .font(.title2)
                         .fontWeight(.medium)
-                        .foregroundColor(.red)
+                        .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .secondary)
+                    
+                    Text(String(format: "%.2f", salvadanaio.currentAmount))
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
+                        .contentTransition(.numericText())
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.red.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                
+                // Avviso se in negativo
+                if salvadanaio.currentAmount < 0 {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                        Text("Salvadanaio in rosso")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
             
             // Progress/Info specifiche
             if salvadanaio.type == "objective" {
                 if salvadanaio.isInfinite {
-                    InfiniteObjectiveView(salvadanaio: salvadanaio)
+                    SalvadanaiInfiniteView(salvadanaio: salvadanaio)
                 } else {
-                    ObjectiveProgressView(salvadanaio: salvadanaio)
+                    SalvadanaiObjectiveView(salvadanaio: salvadanaio, progress: progress)
                 }
             } else {
-                GlassInfoView(salvadanaio: salvadanaio)
+                SalvadanaiGlassView(salvadanaio: salvadanaio)
             }
         }
-        .padding(20)
+        .padding(24)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.05) : Color.gray.opacity(0.1))
-                .shadow(color: Color.black.opacity(isPressed ? 0.1 : 0.05), radius: isPressed ? 2 : 8, x: 0, y: isPressed ? 1 : 4)
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .shadow(color: salvadanaio.currentAmount < 0 ? .red.opacity(0.2) : Color(salvadanaio.color).opacity(0.2), radius: 12, x: 0, y: 6)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.3) : Color(salvadanaio.color).opacity(0.3), lineWidth: 1)
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
         .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.1)) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
                 isPressed = true
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeInOut(duration: 0.1)) {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
                     isPressed = false
                 }
             }
         }
+        .onAppear {
+            animateProgress = true
+        }
     }
     
-    private var typeDisplayName: String {
+    private func getTypeDisplayName() -> String {
         if salvadanaio.type == "objective" {
             return salvadanaio.isInfinite ? "Obiettivo Infinito" : "Obiettivo"
         } else {
@@ -174,7 +313,7 @@ struct SalvadanaiCard: View {
         }
     }
     
-    private var typeIcon: String {
+    private func getTypeIcon() -> String {
         if salvadanaio.type == "objective" {
             return salvadanaio.isInfinite ? "infinity" : "target"
         } else {
@@ -183,12 +322,68 @@ struct SalvadanaiCard: View {
     }
 }
 
-// MARK: - Infinite Objective View
-struct InfiniteObjectiveView: View {
+// MARK: - Salvadanaio Status View
+struct SalvadanaiStatusView: View {
     let salvadanaio: SalvadanaiModel
     
     var body: some View {
-        VStack(spacing: 12) {
+        Group {
+            if salvadanaio.currentAmount < 0 {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.title2)
+                    .foregroundColor(.red)
+                    .background(
+                        Circle()
+                            .fill(.red.opacity(0.1))
+                            .frame(width: 32, height: 32)
+                    )
+            } else if salvadanaio.type == "objective" && salvadanaio.isInfinite {
+                Image(systemName: "infinity")
+                    .font(.title2)
+                    .foregroundColor(Color(salvadanaio.color))
+                    .background(
+                        Circle()
+                            .fill(Color(salvadanaio.color).opacity(0.1))
+                            .frame(width: 32, height: 32)
+                    )
+            } else if isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+                    .background(
+                        Circle()
+                            .fill(.green.opacity(0.1))
+                            .frame(width: 32, height: 32)
+                    )
+            } else {
+                Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                    .font(.title2)
+                    .foregroundColor(Color(salvadanaio.color))
+                    .background(
+                        Circle()
+                            .fill(Color(salvadanaio.color).opacity(0.1))
+                            .frame(width: 32, height: 32)
+                    )
+            }
+        }
+    }
+    
+    private var isCompleted: Bool {
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            return salvadanaio.currentAmount >= salvadanaio.targetAmount
+        } else if salvadanaio.type == "glass" {
+            return salvadanaio.currentAmount >= salvadanaio.monthlyRefill
+        }
+        return false
+    }
+}
+
+// MARK: - Salvadanaio Infinite View
+struct SalvadanaiInfiniteView: View {
+    let salvadanaio: SalvadanaiModel
+    
+    var body: some View {
+        VStack(spacing: 16) {
             HStack {
                 Image(systemName: "infinity")
                     .foregroundColor(Color(salvadanaio.color))
@@ -200,6 +395,12 @@ struct InfiniteObjectiveView: View {
                 
                 Spacer()
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(salvadanaio.color).opacity(0.1))
+            )
             
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
@@ -218,9 +419,14 @@ struct InfiniteObjectiveView: View {
                         Text("Continua a risparmiare!")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
+                        HStack {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .font(.subheadline)
+                                .foregroundColor(.green)
+                            Text("Crescita")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
                     }
                 } else {
                     VStack(alignment: .trailing, spacing: 4) {
@@ -238,17 +444,10 @@ struct InfiniteObjectiveView: View {
     }
 }
 
-// MARK: - Objective Progress View (versione aggiornata)
-struct ObjectiveProgressView: View {
+// MARK: - Salvadanaio Objective View
+struct SalvadanaiObjectiveView: View {
     let salvadanaio: SalvadanaiModel
-    
-    var progress: Double {
-        guard salvadanaio.targetAmount > 0 else { return 0 }
-        if salvadanaio.currentAmount < 0 {
-            return 0 // Se è negativo, progresso a zero
-        }
-        return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
-    }
+    let progress: Double
     
     var daysRemaining: Int {
         guard let targetDate = salvadanaio.targetDate else { return 0 }
@@ -326,14 +525,14 @@ struct ObjectiveProgressView: View {
     }
 }
 
-// MARK: - Glass Info View (versione aggiornata)
-struct GlassInfoView: View {
+// MARK: - Salvadanaio Glass View
+struct SalvadanaiGlassView: View {
     let salvadanaio: SalvadanaiModel
     
     var fillPercentage: Double {
         guard salvadanaio.monthlyRefill > 0 else { return 0 }
         if salvadanaio.currentAmount < 0 {
-            return 0 // Se è negativo, non mostra riempimento
+            return 0
         }
         return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
     }
@@ -401,8 +600,189 @@ struct GlassInfoView: View {
     }
 }
 
-// MARK: - Add Salvadanaio View (versione aggiornata)
-struct AddSalvadanaiView: View {
+// MARK: - Empty Salvadanai View
+struct EmptySalvadanaiView: View {
+    let action: () -> Void
+    @State private var animateIcon = false
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [Color.green.opacity(0.2), Color.mint.opacity(0.2)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
+                
+                Image(systemName: "banknote.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(LinearGradient(
+                        gradient: Gradient(colors: [.green, .mint]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+            }
+            
+            VStack(spacing: 12) {
+                Text("Nessun Salvadanaio")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text("Crea il tuo primo salvadanaio per iniziare a risparmiare!")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            Button(action: action) {
+                HStack {
+                    Text("Crea Salvadanaio")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.green, .mint]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .green.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+        }
+        .padding(40)
+        .onAppear {
+            animateIcon = true
+        }
+    }
+}
+
+// MARK: - No Accounts View
+struct NoAccountsView: View {
+    @State private var animateWarning = false
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateWarning ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 1.5).repeatForever(), value: animateWarning)
+                
+                Image(systemName: "banknote.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+            }
+            
+            VStack(spacing: 16) {
+                Text("Impossibile creare salvadanai")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text("Prima di creare un salvadanaio, devi aggiungere almeno un conto nel tab 'Conti'")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                
+                Text("È necessario almeno un conto per utilizzare questa funzione")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .fontWeight(.medium)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.orange.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .padding(40)
+        .onAppear {
+            animateWarning = true
+        }
+    }
+}
+
+// MARK: - Simple Modal View
+struct SimpleModalView: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let message: String
+    let buttonText: String
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 32) {
+                Spacer()
+                
+                Image(systemName: "building.columns.fill")
+                    .font(.system(size: 80))
+                    .foregroundColor(.orange)
+                
+                VStack(spacing: 16) {
+                    Text(title)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text(message)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                
+                Spacer()
+                
+                Button(buttonText) {
+                    dismiss()
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .padding()
+            .navigationTitle("Attenzione")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(content: {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
+            })
+        }
+    }
+}
+
+// MARK: - Simple Salvadanaio Form View
+struct SimpleSalvadanaiFormView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
@@ -414,7 +794,7 @@ struct AddSalvadanaiView: View {
     @State private var selectedColor = "blue"
     @State private var selectedAccount = ""
     @State private var initialAmount = 0.0
-    @State private var isInfiniteObjective = false // Nuovo: toggle per obiettivo infinito
+    @State private var isInfiniteObjective = false
     
     let salvadanaiTypes = [
         ("objective", "Obiettivo", "target"),
@@ -426,7 +806,6 @@ struct AddSalvadanaiView: View {
         if dataManager.accounts.isEmpty { return false }
         if selectedAccount.isEmpty { return false }
         
-        // Validazione specifica per tipo
         if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
         
@@ -440,145 +819,83 @@ struct AddSalvadanaiView: View {
                     TextField("Nome salvadanaio", text: $name)
                         .textInputAutocapitalization(.words)
                     
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("Saldo iniziale")
-                            Spacer()
-                            TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                        }
-                        
-                        // Avviso se supera il saldo disponibile
-                        if initialAmount > 0 && !selectedAccount.isEmpty {
-                            if let account = dataManager.accounts.first(where: { $0.name == selectedAccount }) {
-                                if initialAmount > account.balance {
-                                    HStack {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .foregroundColor(.red)
-                                        Text("Importo superiore al saldo disponibile (€\(String(format: "%.2f", account.balance)))")
-                                            .font(.caption)
-                                            .foregroundColor(.red)
-                                        Spacer()
-                                    }
-                                }
-                            }
-                        }
+                    HStack {
+                        Text("Saldo iniziale")
+                        Spacer()
+                        TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.decimalPad)
                     }
                 } header: {
                     Text("Informazioni di base")
-                } footer: {
-                    if initialAmount > 0 && !selectedAccount.isEmpty {
-                        Text("€\(String(format: "%.2f", initialAmount)) verranno sottratti dal conto \(selectedAccount)")
-                    } else {
-                        Text("Se il salvadanaio ha già dei soldi, inserisci l'importo attuale. Questo importo verrà sottratto dal conto selezionato.")
-                    }
                 }
                 
                 Section {
-                    VStack(spacing: 12) {
-                        ForEach(salvadanaiTypes, id: \.0) { type, displayName, icon in
-                            Button(action: {
-                                selectedType = type
-                                if type == "glass" {
-                                    isInfiniteObjective = false // Reset quando si cambia tipo
+                    ForEach(salvadanaiTypes, id: \.0) { type, displayName, icon in
+                        Button(action: {
+                            selectedType = type
+                            if type == "glass" {
+                                isInfiniteObjective = false
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: icon)
+                                    .frame(width: 24)
+                                    .foregroundColor(selectedType == type ? .blue : .secondary)
+                                Text(displayName)
+                                Spacer()
+                                if selectedType == type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
                                 }
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .foregroundColor(selectedType == type ? .blue : .primary)
+                    }
+                } header: {
+                    Text("Tipo di salvadanaio")
+                }
+                
+                Section {
+                    if dataManager.accounts.isEmpty {
+                        Text("Nessun conto disponibile")
+                            .foregroundColor(.orange)
+                    } else {
+                        ForEach(dataManager.accounts, id: \.name) { account in
+                            Button(action: {
+                                selectedAccount = account.name
                             }) {
                                 HStack {
-                                    Image(systemName: icon)
-                                        .frame(width: 24)
-                                        .foregroundColor(selectedType == type ? .blue : .secondary)
-                                    Text(displayName)
-                                    Spacer()
-                                    if selectedType == type {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.blue)
+                                    Image(systemName: selectedAccount == account.name ? "checkmark.circle.fill" : "circle")
+                                        .foregroundColor(selectedAccount == account.name ? .blue : .secondary)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(account.name)
+                                            .font(.headline)
+                                        Text("€\(String(format: "%.2f", account.balance))")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                     }
+                                    
+                                    Spacer()
                                 }
                                 .padding(.vertical, 8)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(PlainButtonStyle())
-                            .foregroundColor(selectedType == type ? .blue : .primary)
-                        }
-                    }
-                } header: {
-                    Text("Tipo di salvadanaio")
-                } footer: {
-                    Text(selectedType == "objective"
-                         ? "Un obiettivo può avere un importo target e una scadenza, oppure essere infinito"
-                         : "Un salvadanaio Glass si ricarica automaticamente ogni mese")
-                }
-                
-                // Selezione conto
-                Section {
-                    if dataManager.accounts.isEmpty {
-                        VStack(spacing: 12) {
-                            Text("⚠️ Nessun conto disponibile")
-                                .foregroundColor(.orange)
-                                .fontWeight(.medium)
-                            
-                            Text("Vai nel tab 'Conti' e crea almeno un conto prima di creare un salvadanaio")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding()
-                    } else {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if !selectedAccount.isEmpty {
-                                Text("✅ Conto selezionato: \(selectedAccount)")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            } else {
-                                Text("❌ Nessun conto selezionato")
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                            
-                            ForEach(dataManager.accounts, id: \.name) { account in
-                                Button(action: {
-                                    selectedAccount = account.name
-                                }) {
-                                    HStack {
-                                        Image(systemName: selectedAccount == account.name ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(selectedAccount == account.name ? .blue : .secondary)
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(account.name)
-                                                .font(.headline)
-                                            Text("€\(String(format: "%.2f", account.balance))")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 8)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .foregroundColor(selectedAccount == account.name ? .blue : .primary)
-                            }
+                            .foregroundColor(selectedAccount == account.name ? .blue : .primary)
                         }
                     }
                 } header: {
                     Text("Conto di riferimento")
-                } footer: {
-                    Text("I soldi di questo salvadanaio saranno collegati al conto selezionato")
                 }
                 
-                // Sezione obiettivo con opzione infinito
                 if selectedType == "objective" {
                     Section {
                         Toggle("Obiettivo infinito", isOn: $isInfiniteObjective)
-                            .onChange(of: isInfiniteObjective) { _, newValue in
-                                if newValue {
-                                    targetAmount = 0
-                                } else {
-                                    targetAmount = 100.0
-                                }
-                            }
                         
                         if !isInfiniteObjective {
                             HStack {
@@ -593,10 +910,6 @@ struct AddSalvadanaiView: View {
                         }
                     } header: {
                         Text("Dettagli obiettivo")
-                    } footer: {
-                        Text(isInfiniteObjective
-                             ? "Un obiettivo infinito può essere riempito senza limiti e non ha scadenza"
-                             : "Imposta un importo target e una data di scadenza per il tuo obiettivo")
                     }
                 } else {
                     Section {
@@ -609,8 +922,6 @@ struct AddSalvadanaiView: View {
                         }
                     } header: {
                         Text("Dettagli Glass")
-                    } footer: {
-                        Text("Questo importo verrà aggiunto automaticamente quando inserisci entrate")
                     }
                 }
                 
@@ -636,7 +947,7 @@ struct AddSalvadanaiView: View {
             }
             .navigationTitle("Nuovo Salvadanaio")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Annulla") {
                         dismiss()
@@ -649,7 +960,7 @@ struct AddSalvadanaiView: View {
                     }
                     .disabled(!isFormValid)
                 }
-            }
+            })
         }
         .onAppear {
             setupDefaults()
@@ -678,15 +989,13 @@ struct AddSalvadanaiView: View {
     }
 }
 
-// MARK: - Salvadanaio Detail View
-struct SalvadanaiDetailView: View {
+// MARK: - Simple Salvadanaio Detail View
+struct SimpleSalvadanaiDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     let salvadanaio: SalvadanaiModel
     
-    @State private var showingEditView = false
     @State private var showingDeleteAlert = false
-    @State private var showingAddMoneyView = false
     
     var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter { $0.salvadanaiName == salvadanaio.name }
@@ -726,9 +1035,26 @@ struct SalvadanaiDetailView: View {
                         }
                         
                         if salvadanaio.type == "objective" {
-                            ObjectiveProgressView(salvadanaio: salvadanaio)
+                            if salvadanaio.isInfinite {
+                                Text("Obiettivo infinito")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                VStack(spacing: 8) {
+                                    Text("Obiettivo: €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    
+                                    if salvadanaio.targetAmount > 0 {
+                                        ProgressView(value: min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0))
+                                            .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
+                                    }
+                                }
+                            }
                         } else {
-                            GlassInfoView(salvadanaio: salvadanaio)
+                            Text("Glass: €\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
                     }
                     .padding(24)
@@ -736,26 +1062,6 @@ struct SalvadanaiDetailView: View {
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color.gray.opacity(0.1))
                     )
-                    
-                    // Actions
-                    HStack(spacing: 16) {
-                        Button(action: { showingAddMoneyView = true }) {
-                            Label("Aggiungi", systemImage: "plus.circle.fill")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color(salvadanaio.color))
-                                .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        
-                        Button(action: { showingEditView = true }) {
-                            Label("Modifica", systemImage: "pencil.circle.fill")
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                    }
                     
                     // Transazioni correlate
                     if !relatedTransactions.isEmpty {
@@ -765,7 +1071,26 @@ struct SalvadanaiDetailView: View {
                                 .fontWeight(.bold)
                             
                             ForEach(relatedTransactions.sorted { $0.date > $1.date }, id: \.id) { transaction in
-                                TransactionRowView(transaction: transaction)
+                                HStack(spacing: 12) {
+                                    Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
+                                        .foregroundColor(transaction.type == "expense" ? .red : .green)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(transaction.descr)
+                                            .font(.headline)
+                                        Text(transaction.date, style: .date)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(transaction.type == "expense" ? .red : .green)
+                                }
+                                .padding(.vertical, 8)
                             }
                         }
                         .padding(20)
@@ -777,7 +1102,7 @@ struct SalvadanaiDetailView: View {
             }
             .navigationTitle("Dettagli")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Chiudi") {
                         dismiss()
@@ -786,10 +1111,6 @@ struct SalvadanaiDetailView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button("Modifica", systemImage: "pencil") {
-                            showingEditView = true
-                        }
-                        
                         Button("Elimina", systemImage: "trash", role: .destructive) {
                             showingDeleteAlert = true
                         }
@@ -797,13 +1118,7 @@ struct SalvadanaiDetailView: View {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
-            }
-        }
-        .sheet(isPresented: $showingEditView) {
-            EditSalvadanaiView(salvadanaio: salvadanaio)
-        }
-        .sheet(isPresented: $showingAddMoneyView) {
-            AddMoneyToSalvadanaiView(salvadanaio: salvadanaio)
+            })
         }
         .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
             Button("Elimina", role: .destructive) {
@@ -813,122 +1128,6 @@ struct SalvadanaiDetailView: View {
             Button("Annulla", role: .cancel) { }
         } message: {
             Text("Sei sicuro di voler eliminare questo salvadanaio? Questa azione non può essere annullata.")
-        }
-    }
-}
-
-// MARK: - Edit Salvadanaio View (versione con supporto infinito)
-struct EditSalvadanaiView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    
-    @State private var salvadanaio: SalvadanaiModel
-    @State private var targetDate: Date
-    @State private var isInfiniteObjective: Bool
-    
-    init(salvadanaio: SalvadanaiModel) {
-        _salvadanaio = State(initialValue: salvadanaio)
-        _targetDate = State(initialValue: salvadanaio.targetDate ?? Date())
-        _isInfiniteObjective = State(initialValue: salvadanaio.isInfinite)
-    }
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    TextField("Nome salvadanaio", text: $salvadanaio.name)
-                } header: {
-                    Text("Nome")
-                }
-                
-                if salvadanaio.type == "objective" {
-                    Section {
-                        Toggle("Obiettivo infinito", isOn: $isInfiniteObjective)
-                            .onChange(of: isInfiniteObjective) { _, newValue in
-                                if newValue {
-                                    salvadanaio.targetAmount = 0
-                                } else if salvadanaio.targetAmount == 0 {
-                                    salvadanaio.targetAmount = 100.0
-                                }
-                            }
-                        
-                        if !isInfiniteObjective {
-                            HStack {
-                                Text("Importo obiettivo")
-                                Spacer()
-                                TextField("0", value: $salvadanaio.targetAmount, format: .currency(code: "EUR"))
-                                    .multilineTextAlignment(.trailing)
-                                    .keyboardType(.decimalPad)
-                            }
-                            
-                            DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
-                        }
-                    } header: {
-                        Text("Obiettivo")
-                    } footer: {
-                        Text(isInfiniteObjective
-                             ? "Un obiettivo infinito può essere riempito senza limiti"
-                             : "Imposta un importo target e una scadenza")
-                    }
-                } else {
-                    Section {
-                        HStack {
-                            Text("Ricarica mensile")
-                            Spacer()
-                            TextField("0", value: $salvadanaio.monthlyRefill, format: .currency(code: "EUR"))
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                        }
-                    } header: {
-                        Text("Glass")
-                    }
-                }
-                
-                Section {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
-                        ForEach(dataManager.salvadanaiColors, id: \.self) { color in
-                            Circle()
-                                .fill(Color(color))
-                                .frame(width: 40, height: 40)
-                                .overlay(
-                                    Circle()
-                                        .stroke(salvadanaio.color == color ? Color.primary : Color.clear, lineWidth: 3)
-                                )
-                                .onTapGesture {
-                                    salvadanaio.color = color
-                                }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                } header: {
-                    Text("Colore")
-                }
-            }
-            .navigationTitle("Modifica Salvadanaio")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Salva") {
-                        // Aggiorna le proprietà in base al tipo
-                        if isInfiniteObjective {
-                            salvadanaio.targetAmount = 0
-                            salvadanaio.targetDate = nil
-                        } else {
-                            salvadanaio.targetDate = targetDate
-                        }
-                        salvadanaio.isInfinite = isInfiniteObjective
-                        
-                        dataManager.updateSalvadanaio(salvadanaio)
-                        dismiss()
-                    }
-                }
-            }
         }
     }
 }

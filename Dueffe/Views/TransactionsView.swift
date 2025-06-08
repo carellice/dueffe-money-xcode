@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Updated TransactionsView con controllo conti
+// MARK: - TransactionsView completamente riscritta
 struct TransactionsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddTransaction = false
@@ -31,60 +31,87 @@ struct TransactionsView: View {
         return transactions.sorted { $0.date > $1.date }
     }
     
+    var totalExpenses: Double {
+        dataManager.transactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount }
+    }
+    
+    var totalIncome: Double {
+        dataManager.transactions.filter { $0.type != "expense" }.reduce(0) { $0 + $1.amount }
+    }
+    
     var body: some View {
         NavigationView {
-            VStack {
-                if dataManager.accounts.isEmpty {
-                    NoAccountsWarningView(
-                        icon: "creditcard.fill",
-                        title: "Impossibile aggiungere transazioni",
-                        subtitle: "Prima di registrare una transazione, devi aggiungere almeno un conto nel tab 'Conti'",
-                        actionText: "Vai ai Conti"
-                    )
-                } else if dataManager.transactions.isEmpty {
-                    EmptyStateView(
-                        icon: "creditcard.fill",
-                        title: "Nessuna Transazione",
-                        subtitle: "Inizia aggiungendo le tue prime spese o entrate",
-                        buttonText: "Aggiungi Transazione",
-                        action: { showingAddTransaction = true }
-                    )
-                } else {
-                    VStack(spacing: 0) {
-                        // Filtri
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(filterOptions, id: \.0) { filter, title, icon in
-                                    FilterButton(
-                                        title: title,
-                                        icon: icon,
-                                        isSelected: selectedFilter == filter
-                                    ) {
-                                        selectedFilter = filter
-                                    }
-                                }
-                            }
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.purple.opacity(0.05), Color.blue.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack {
+                    if dataManager.accounts.isEmpty {
+                        NoAccountsTransactionsView()
+                    } else if dataManager.transactions.isEmpty {
+                        EmptyTransactionsView(action: { showingAddTransaction = true })
+                    } else {
+                        VStack(spacing: 0) {
+                            // Header con statistiche
+                            TransactionsStatsHeaderView(
+                                totalExpenses: totalExpenses,
+                                totalIncome: totalIncome,
+                                transactionCount: dataManager.transactions.count
+                            )
                             .padding(.horizontal)
-                        }
-                        .padding(.vertical, 8)
-                        
-                        // Lista transazioni
-                        List {
-                            ForEach(groupedTransactions, id: \.0) { dateString, transactions in
-                                Section(dateString) {
-                                    ForEach(transactions, id: \.id) { transaction in
-                                        TransactionDetailRow(transaction: transaction)
-                                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                                Button("Elimina", role: .destructive) {
-                                                    dataManager.deleteTransaction(transaction)
-                                                }
+                            .padding(.bottom, 16)
+                            
+                            // Filtri
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(filterOptions, id: \.0) { filter, title, icon in
+                                        TransactionFilterButton(
+                                            title: title,
+                                            icon: icon,
+                                            isSelected: selectedFilter == filter,
+                                            count: getFilterCount(filter)
+                                        ) {
+                                            withAnimation(.spring()) {
+                                                selectedFilter = filter
                                             }
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            .padding(.vertical, 12)
+                            
+                            // Lista transazioni
+                            List {
+                                ForEach(groupedTransactions, id: \.0) { dateString, transactions in
+                                    Section {
+                                        ForEach(transactions, id: \.id) { transaction in
+                                            TransactionRowView(transaction: transaction)
+                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                    Button("Elimina", role: .destructive) {
+                                                        withAnimation {
+                                                            dataManager.deleteTransaction(transaction)
+                                                        }
+                                                    }
+                                                }
+                                        }
+                                    } header: {
+                                        TransactionSectionHeaderView(
+                                            dateString: dateString,
+                                            transactionCount: transactions.count
+                                        )
                                     }
                                 }
                             }
+                            .searchable(text: $searchText, prompt: "Cerca transazioni...")
+                            .listStyle(PlainListStyle())
+                            .background(Color.clear)
                         }
-                        .searchable(text: $searchText, prompt: "Cerca transazioni...")
-                        .listStyle(PlainListStyle())
                     }
                 }
             }
@@ -93,6 +120,8 @@ struct TransactionsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddTransaction = true }) {
                         Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.purple)
                     }
                     .disabled(dataManager.accounts.isEmpty)
                 }
@@ -100,9 +129,13 @@ struct TransactionsView: View {
         }
         .sheet(isPresented: $showingAddTransaction) {
             if dataManager.accounts.isEmpty {
-                NoAccountsModalView()
+                SimpleModalView(
+                    title: "Nessun conto disponibile",
+                    message: "Prima di procedere, devi creare almeno un conto nel tab 'Conti'",
+                    buttonText: "Ho capito"
+                )
             } else {
-                AddTransactionView()
+                SimpleAddTransactionView()
             }
         }
     }
@@ -118,31 +151,475 @@ struct TransactionsView: View {
         
         return grouped.sorted { $0.key > $1.key }
     }
+    
+    private func getFilterCount(_ filter: String) -> Int {
+        if filter == "all" {
+            return dataManager.transactions.count
+        } else {
+            return dataManager.transactions.filter { $0.type == filter }.count
+        }
+    }
 }
 
-// MARK: - No Accounts Warning View
-struct NoAccountsWarningView: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let actionText: String
+// MARK: - Transactions Stats Header
+struct TransactionsStatsHeaderView: View {
+    let totalExpenses: Double
+    let totalIncome: Double
+    let transactionCount: Int
+    
+    private var netBalance: Double {
+        totalIncome - totalExpenses
+    }
     
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(.orange)
-            
+        VStack(spacing: 20) {
+            // Bilancio netto
             VStack(spacing: 8) {
+                Text("Bilancio Netto")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("€")
+                        .font(.title)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                    Text(String(format: "%.2f", netBalance))
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(netBalance >= 0 ? .green : .red)
+                        .contentTransition(.numericText())
+                }
+                
+                Text(netBalance >= 0 ? "In positivo" : "In negativo")
+                    .font(.caption)
+                    .foregroundColor(netBalance >= 0 ? .green : .red)
+                    .fontWeight(.medium)
+            }
+            
+            // Statistiche dettagliate
+            HStack(spacing: 20) {
+                TransactionStatCardView(
+                    title: "Entrate",
+                    amount: totalIncome,
+                    icon: "plus.circle.fill",
+                    color: .green
+                )
+                
+                TransactionStatCardView(
+                    title: "Spese",
+                    amount: totalExpenses,
+                    icon: "minus.circle.fill",
+                    color: .red
+                )
+                
+                TransactionStatCardView(
+                    title: "Transazioni",
+                    amount: Double(transactionCount),
+                    icon: "list.bullet.circle.fill",
+                    color: .blue,
+                    isCount: true
+                )
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+        )
+    }
+}
+
+// MARK: - Transaction Stat Card
+struct TransactionStatCardView: View {
+    let title: String
+    let amount: Double
+    let icon: String
+    let color: Color
+    let isCount: Bool
+    
+    init(title: String, amount: Double, icon: String, color: Color, isCount: Bool = false) {
+        self.title = title
+        self.amount = amount
+        self.icon = icon
+        self.color = color
+        self.isCount = isCount
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            if isCount {
+                Text("\(Int(amount))")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+            } else {
+                Text("€\(String(format: "%.0f", amount))")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(color)
+            }
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Transaction Filter Button
+struct TransactionFilterButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let count: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.subheadline)
+                
                 Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isSelected ? .white : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.white.opacity(0.3) : Color.gray.opacity(0.2))
+                        )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ?
+                          LinearGradient(gradient: Gradient(colors: [.blue, .purple]), startPoint: .leading, endPoint: .trailing) :
+                          LinearGradient(gradient: Gradient(colors: [Color.gray.opacity(0.15)]), startPoint: .leading, endPoint: .trailing)
+                    )
+                    .shadow(color: isSelected ? .blue.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
+            )
+            .foregroundColor(isSelected ? .white : .primary)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+    }
+}
+
+// MARK: - Transaction Section Header
+struct TransactionSectionHeaderView: View {
+    let dateString: String
+    let transactionCount: Int
+    
+    var body: some View {
+        HStack {
+            Text(dateString)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            Spacer()
+            
+            Text("\(transactionCount) transazioni")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Color.gray.opacity(0.1))
+                )
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.clear)
+    }
+}
+
+// MARK: - Transaction Row View
+struct TransactionRowView: View {
+    let transaction: TransactionModel
+    @State private var animateAmount = false
+    
+    private var transactionColor: Color {
+        switch transaction.type {
+        case "expense": return .red
+        case "salary": return .blue
+        default: return .green
+        }
+    }
+    
+    private var iconName: String {
+        switch transaction.type {
+        case "expense": return "minus.circle.fill"
+        case "salary": return "banknote.fill"
+        default: return "plus.circle.fill"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Icona migliorata con animazione
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [transactionColor, transactionColor.opacity(0.7)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 48, height: 48)
+                    .shadow(color: transactionColor.opacity(0.3), radius: 6, x: 0, y: 3)
+                
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundColor(.white)
+            }
+            
+            // Dettagli transazione
+            VStack(alignment: .leading, spacing: 8) {
+                Text(transaction.descr)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                // Tags
+                HStack(spacing: 8) {
+                    TransactionTagView(
+                        text: transaction.category,
+                        color: transactionColor,
+                        icon: getCategoryIcon(transaction.category)
+                    )
+                    
+                    TransactionTagView(
+                        text: transaction.accountName,
+                        color: .blue,
+                        icon: "building.columns"
+                    )
+                    
+                    if let salvadanaiName = transaction.salvadanaiName {
+                        TransactionTagView(
+                            text: salvadanaiName,
+                            color: .green,
+                            icon: "banknote"
+                        )
+                    }
+                }
+                
+                HStack {
+                    Text(transaction.date, style: .time)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(getTransactionTypeText())
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            // Importo
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(transactionColor)
+                    .scaleEffect(animateAmount ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 0.3), value: animateAmount)
+                
+                // Indicatore visivo del tipo
+                Image(systemName: transaction.type == "expense" ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(transactionColor.opacity(0.7))
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        )
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                animateAmount = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    animateAmount = false
+                }
+            }
+        }
+    }
+    
+    private func getCategoryIcon(_ category: String) -> String {
+        // Estrae l'emoji dalla categoria se presente
+        if let firstChar = category.first, firstChar.isEmoji {
+            return ""
+        }
+        
+        // Fallback icons basati sul tipo
+        switch transaction.type {
+        case "expense": return "cart"
+        case "salary": return "banknote"
+        default: return "plus"
+        }
+    }
+    
+    private func getTransactionTypeText() -> String {
+        switch transaction.type {
+        case "expense": return "Spesa"
+        case "salary": return "Stipendio"
+        default: return "Entrata"
+        }
+    }
+}
+
+// MARK: - Transaction Tag
+struct TransactionTagView: View {
+    let text: String
+    let color: Color
+    let icon: String
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            if !icon.isEmpty {
+                Image(systemName: icon)
+                    .font(.caption2)
+            }
+            Text(text)
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.1))
+                .overlay(
+                    Capsule()
+                        .stroke(color.opacity(0.3), lineWidth: 0.5)
+                )
+        )
+        .foregroundColor(color)
+    }
+}
+
+// MARK: - Empty Transactions View
+struct EmptyTransactionsView: View {
+    let action: () -> Void
+    @State private var animateIcon = false
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(
+                        gradient: Gradient(colors: [Color.purple.opacity(0.2), Color.blue.opacity(0.2)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
+                
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(LinearGradient(
+                        gradient: Gradient(colors: [.purple, .blue]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ))
+            }
+            
+            VStack(spacing: 12) {
+                Text("Nessuna Transazione")
                     .font(.title2)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .multilineTextAlignment(.center)
                 
-                Text(subtitle)
+                Text("Inizia aggiungendo le tue prime spese o entrate")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            Button(action: action) {
+                HStack {
+                    Text("Aggiungi Transazione")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.purple, .blue]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
+        }
+        .padding(40)
+        .onAppear {
+            animateIcon = true
+        }
+    }
+}
+
+// MARK: - No Accounts Transactions View
+struct NoAccountsTransactionsView: View {
+    @State private var animateWarning = false
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateWarning ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 1.5).repeatForever(), value: animateWarning)
+                
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+            }
+            
+            VStack(spacing: 16) {
+                Text("Impossibile aggiungere transazioni")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text("Prima di registrare una transazione, devi aggiungere almeno un conto nel tab 'Conti'")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
             
             HStack(spacing: 12) {
@@ -154,213 +631,34 @@ struct NoAccountsWarningView: View {
                     .foregroundColor(.orange)
                     .fontWeight(.medium)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.orange.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.orange.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    )
+            )
         }
         .padding(40)
-    }
-}
-
-// MARK: - No Accounts Modal View
-struct NoAccountsModalView: View {
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 32) {
-                Spacer()
-                
-                Image(systemName: "building.columns.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(.orange)
-                
-                VStack(spacing: 16) {
-                    Text("Nessun conto disponibile")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Prima di procedere, devi creare almeno un conto nel tab 'Conti'")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                
-                Spacer()
-                
-                Button("Ho capito") {
-                    dismiss()
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.orange)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding()
-            .navigationTitle("Attenzione")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Chiudi") {
-                        dismiss()
-                    }
-                }
-            }
+        .onAppear {
+            animateWarning = true
         }
     }
 }
 
-// MARK: - Filter Button
-struct FilterButton: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                Text(title)
-            }
-            .font(.subheadline)
-            .fontWeight(.medium)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.blue : Color.gray.opacity(0.15))
-            .foregroundColor(isSelected ? .white : .primary)
-            .clipShape(Capsule())
-        }
-        .buttonStyle(PlainButtonStyle())
+// MARK: - Extensions
+extension Character {
+    var isEmoji: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return scalar.properties.isEmoji && (scalar.value >= 0x238d || unicodeScalars.count > 1)
     }
 }
 
-// MARK: - Transaction Detail Row
-struct TransactionDetailRow: View {
-    let transaction: TransactionModel
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Icona tipo transazione
-            Image(systemName: iconForTransaction)
-                .font(.title2)
-                .foregroundColor(colorForTransaction)
-                .frame(width: 32, height: 32)
-                .background(colorForTransaction.opacity(0.1))
-                .clipShape(Circle())
-            
-            // Dettagli transazione
-            VStack(alignment: .leading, spacing: 4) {
-                Text(transaction.descr)
-                    .font(.headline)
-                    .lineLimit(1)
-                
-                HStack(spacing: 8) {
-                    // Categoria
-                    Text(transaction.category)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(colorForTransaction.opacity(0.1))
-                        .foregroundColor(colorForTransaction)
-                        .clipShape(Capsule())
-                    
-                    // Account
-                    Text("• \(transaction.accountName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if let salvadanaiName = transaction.salvadanaiName {
-                        Text("• \(salvadanaiName)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Text(transaction.date, style: .time)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            // Importo
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(colorForTransaction)
-                
-                if transaction.type == "expense" {
-                    Text("Spesa")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text(transaction.type == "salary" ? "Stipendio" : "Entrata")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-    
-    private var iconForTransaction: String {
-        switch transaction.type {
-        case "expense":
-            return "minus.circle.fill"
-        case "salary":
-            return "banknote.fill"
-        default:
-            return "plus.circle.fill"
-        }
-    }
-    
-    private var colorForTransaction: Color {
-        switch transaction.type {
-        case "expense":
-            return .red
-        case "salary":
-            return .blue
-        default:
-            return .green
-        }
-    }
-}
-
-// MARK: - Transaction Row View (for details)
-struct TransactionRowView: View {
-    let transaction: TransactionModel
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
-                .foregroundColor(transaction.type == "expense" ? .red : .green)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.descr)
-                    .font(.headline)
-                Text(transaction.date, style: .date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(transaction.type == "expense" ? .red : .green)
-        }
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Add Transaction View (con categorie personalizzabili)
-struct AddTransactionView: View {
+// MARK: - Simple Add Transaction View
+struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
@@ -370,9 +668,6 @@ struct AddTransactionView: View {
     @State private var transactionType = "expense"
     @State private var selectedAccount = ""
     @State private var selectedSalvadanaio = ""
-    @State private var showingSalaryDistribution = false
-    @State private var showingAddCategory = false // Nuovo: mostra dialog per aggiungere categoria
-    @State private var newCategoryText = "" // Nuovo: testo per nuova categoria
     
     let transactionTypes = [
         ("expense", "Spesa", "minus.circle"),
@@ -389,38 +684,42 @@ struct AddTransactionView: View {
         }
     }
     
+    var isFormValid: Bool {
+        return amount > 0 &&
+               !descr.isEmpty &&
+               !selectedAccount.isEmpty &&
+               (transactionType == "salary" || !selectedCategory.isEmpty)
+    }
+    
     var body: some View {
         NavigationView {
             Form {
                 // Tipo transazione
                 Section {
-                    VStack(spacing: 12) {
-                        ForEach(transactionTypes, id: \.0) { type, title, icon in
-                            Button(action: {
-                                transactionType = type
-                                // Reset categoria quando cambia tipo, eccetto per stipendio
-                                if type == "salary" {
-                                    selectedCategory = "💼 Stipendio"
-                                } else {
-                                    selectedCategory = ""
-                                }
-                            }) {
-                                HStack {
-                                    Image(systemName: icon)
-                                        .frame(width: 24)
-                                    Text(title)
-                                    Spacer()
-                                    if transactionType == type {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
+                    ForEach(transactionTypes, id: \.0) { type, title, icon in
+                        Button(action: {
+                            transactionType = type
+                            if type == "salary" {
+                                selectedCategory = "💼 Stipendio"
+                            } else {
+                                selectedCategory = ""
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .foregroundColor(transactionType == type ? .blue : .primary)
+                        }) {
+                            HStack {
+                                Image(systemName: icon)
+                                    .frame(width: 24)
+                                Text(title)
+                                Spacer()
+                                if transactionType == type {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(PlainButtonStyle())
+                        .foregroundColor(transactionType == type ? .blue : .primary)
                     }
                 } header: {
                     Text("Tipo di transazione")
@@ -442,39 +741,19 @@ struct AddTransactionView: View {
                     Text("Dettagli")
                 }
                 
-                // Categoria (solo per spese e entrate, non per stipendi)
+                // Categoria
                 if transactionType != "salary" && !availableCategories.isEmpty {
                     Section {
-                        VStack(spacing: 12) {
-                            // Picker per categoria esistente
-                            Picker("Categoria", selection: $selectedCategory) {
-                                Text("Seleziona categoria")
-                                    .tag("")
-                                    .foregroundColor(.secondary)
-                                ForEach(availableCategories, id: \.self) { category in
-                                    Text(category).tag(category)
-                                }
+                        Picker("Categoria", selection: $selectedCategory) {
+                            Text("Seleziona categoria")
+                                .tag("")
+                                .foregroundColor(.secondary)
+                            ForEach(availableCategories, id: \.self) { category in
+                                Text(category).tag(category)
                             }
-                            
-                            // Bottone per aggiungere nuova categoria
-                            Button(action: {
-                                showingAddCategory = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Aggiungi nuova categoria")
-                                        .foregroundColor(.blue)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
                         }
                     } header: {
                         Text("Categoria")
-                    } footer: {
-                        Text("Seleziona una categoria esistente o creane una nuova")
                     }
                 } else if transactionType == "salary" {
                     Section {
@@ -486,8 +765,6 @@ struct AddTransactionView: View {
                         }
                     } header: {
                         Text("Categoria")
-                    } footer: {
-                        Text("La categoria per gli stipendi è fissa")
                     }
                 }
                 
@@ -535,22 +812,10 @@ struct AddTransactionView: View {
                         Text("Opzionale: scegli da quale salvadanaio prelevare i soldi")
                     }
                 }
-                
-                // Bottone distribuzione per tutte le entrate
-                if (transactionType == "income" || transactionType == "salary") && !dataManager.salvadanai.isEmpty {
-                    Section {
-                        Button("Distribuisci ai Salvadanai") {
-                            showingSalaryDistribution = true
-                        }
-                        .foregroundColor(.blue)
-                    } footer: {
-                        Text("Distribuisci automaticamente questa entrata nei tuoi salvadanai")
-                    }
-                }
             }
-            .navigationTitle(transactionType == "expense" ? "Nuova Spesa" : (transactionType == "salary" ? "Nuovo Stipendio" : "Nuova Entrata"))
+            .navigationTitle(getNavigationTitle())
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Annulla") {
                         dismiss()
@@ -561,1426 +826,40 @@ struct AddTransactionView: View {
                     Button("Salva") {
                         saveTransaction()
                     }
-                    .disabled(amount <= 0 || descr.isEmpty || selectedAccount.isEmpty || (transactionType != "salary" && selectedCategory.isEmpty))
+                    .disabled(!isFormValid)
                 }
-            }
+            })
         }
         .onAppear(perform: setupDefaults)
-        .sheet(isPresented: $showingSalaryDistribution) {
-            SalaryDistributionView(
-                salaryAmount: amount,
-                accountName: selectedAccount,
-                transactionType: transactionType,
-                onDistribute: { amount, account, transactionType, salvadanaiAmounts in
-                    dataManager.distributeIncomeWithCustomAmounts(
-                        amount: amount,
-                        salvadanaiAmounts: salvadanaiAmounts,
-                        accountName: account,
-                        transactionType: transactionType
-                    )
-                    dismiss()
-                }
-            )
-        }
-        .alert("Nuova Categoria", isPresented: $showingAddCategory) {
-            TextField("Nome categoria", text: $newCategoryText)
-            Button("Annulla", role: .cancel) {
-                newCategoryText = ""
-            }
-            Button("Aggiungi") {
-                addNewCategory()
-            }
-            .disabled(newCategoryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        } message: {
-            Text("Inserisci il nome della nuova categoria \(transactionType == "expense" ? "di spesa" : "di entrata")")
+    }
+    
+    private func getNavigationTitle() -> String {
+        switch transactionType {
+        case "expense": return "Nuova Spesa"
+        case "salary": return "Nuovo Stipendio"
+        default: return "Nuova Entrata"
         }
     }
     
     private func setupDefaults() {
-        // Auto-seleziona solo il primo conto se disponibile
         if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
             selectedAccount = dataManager.accounts.first!.name
         }
         
-        // Auto-seleziona categoria solo per stipendi
         if transactionType == "salary" {
             selectedCategory = "💼 Stipendio"
         }
     }
     
-    private func addNewCategory() {
-        let categoryName = newCategoryText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !categoryName.isEmpty else { return }
-        
-        if transactionType == "expense" {
-            dataManager.addExpenseCategory(categoryName)
-        } else {
-            dataManager.addIncomeCategory(categoryName)
-        }
-        
-        // Seleziona automaticamente la nuova categoria
-        selectedCategory = categoryName
-        newCategoryText = ""
-    }
-    
     private func saveTransaction() {
-        if transactionType == "salary" || transactionType == "income" {
-            showingSalaryDistribution = true
-        } else {
-            dataManager.addTransaction(
-                amount: amount,
-                descr: descr,
-                category: selectedCategory,
-                type: transactionType,
-                accountName: selectedAccount,
-                salvadanaiName: selectedSalvadanaio.isEmpty ? nil : selectedSalvadanaio
-            )
-            dismiss()
-        }
-    }
-}
-
-// MARK: - Custom Distribution Row
-struct CustomDistributionRow: View {
-    let salvadanaio: SalvadanaiModel
-    let isSelected: Bool
-    @Binding var customAmount: Double
-    let onToggle: () -> Void
-    
-    var isAvailable: Bool {
-        if salvadanaio.type == "glass" {
-            return salvadanaio.currentAmount < salvadanaio.monthlyRefill
-        } else {
-            return salvadanaio.currentAmount < salvadanaio.targetAmount
-        }
-    }
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                // Checkbox
-                Button(action: onToggle) {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.title2)
-                        .foregroundColor(isSelected ? .blue : .secondary)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Info salvadanaio
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color(salvadanaio.color))
-                        .frame(width: 16, height: 16)
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(salvadanaio.name)
-                                .font(.headline)
-                                .fontWeight(.medium)
-                            
-                            Image(systemName: salvadanaio.type == "glass" ? "drop.fill" : "target")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        HStack {
-                            Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            if salvadanaio.type == "glass" {
-                                Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                Text("/ €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                }
-            }
-            
-            // Sezione importo personalizzabile (solo se selezionato)
-            if isSelected {
-                VStack(spacing: 8) {
-                    Divider()
-                    
-                    HStack {
-                        if salvadanaio.type == "glass" {
-                            Text("Importo fisso:")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("€\(String(format: "%.2f", customAmount))")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.green)
-                        } else {
-                            Text("Quanto vuoi aggiungere:")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            TextField("€", value: $customAmount, format: .currency(code: "EUR"))
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .keyboardType(.decimalPad)
-                                .frame(width: 100)
-                                .multilineTextAlignment(.trailing)
-                        }
-                    }
-                    
-                    if salvadanaio.type == "objective" {
-                        HStack {
-                            Button("€50") { customAmount = 50 }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(Capsule())
-                            
-                            Button("€100") { customAmount = 100 }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.gray.opacity(0.2))
-                                .clipShape(Capsule())
-                            
-                            Button("Completa") {
-                                customAmount = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.blue.opacity(0.2))
-                            .clipShape(Capsule())
-                            
-                            Spacer()
-                        }
-                        .font(.caption)
-                    }
-                }
-                .padding(.top, 8)
-            }
-        }
-        .padding()
-        .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-        )
-        .onTapGesture {
-            onToggle()
-        }
-        .disabled(!isAvailable)
-        .opacity(isAvailable ? 1.0 : 0.6)
-    }
-}
-
-// MARK: - Salary Distribution View (correzione toolbar)
-struct SalaryDistributionView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    
-    let salaryAmount: Double
-    let accountName: String
-    let transactionType: String
-    let onDistribute: (Double, String, String, [String: Double]) -> Void
-    
-    @State private var selectedSalvadanai: Set<String> = []
-    @State private var customAmounts: [String: Double] = [:]
-    @State private var showingAnimation = false
-    
-    var totalDistributionAmount: Double {
-        dataManager.salvadanai
-            .filter { selectedSalvadanai.contains($0.name) }
-            .reduce(0) { total, salvadanaio in
-                if let customAmount = customAmounts[salvadanaio.name] {
-                    return total + customAmount
-                } else if salvadanaio.type == "glass" {
-                    return total + max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
-                } else {
-                    return total + min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
-                }
-            }
-    }
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                if dataManager.salvadanai.isEmpty {
-                    EmptyStateView(
-                        icon: "banknote.fill",
-                        title: "Nessun Salvadanaio",
-                        subtitle: "Crea almeno un salvadanaio per utilizzare la distribuzione automatica",
-                        buttonText: "Chiudi",
-                        action: { dismiss() }
-                    )
-                } else {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // Header con info entrata
-                            VStack(spacing: 12) {
-                                Text("Distribuzione \(transactionType == "salary" ? "Stipendio" : "Entrata")")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                
-                                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                    Text("€")
-                                        .font(.title2)
-                                        .foregroundColor(.secondary)
-                                    Text(String(format: "%.2f", salaryAmount))
-                                        .font(.largeTitle)
-                                        .fontWeight(.bold)
-                                }
-                                
-                                Text("Seleziona i salvadanai da ricaricare")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            
-                            // Lista salvadanai
-                            VStack(spacing: 12) {
-                                ForEach(dataManager.salvadanai, id: \.id) { salvadanaio in
-                                    CustomDistributionRow(
-                                        salvadanaio: salvadanaio,
-                                        isSelected: selectedSalvadanai.contains(salvadanaio.name),
-                                        customAmount: customAmountBinding(for: salvadanaio)
-                                    ) {
-                                        toggleSalvadanaio(salvadanaio)
-                                    }
-                                }
-                            }
-                            
-                            // Riepilogo distribuzione
-                            if !selectedSalvadanai.isEmpty {
-                                VStack(spacing: 16) {
-                                    Divider()
-                                    
-                                    VStack(spacing: 8) {
-                                        Text("Riepilogo Distribuzione")
-                                            .font(.headline)
-                                            .fontWeight(.semibold)
-                                        
-                                        HStack {
-                                            Text("Totale da distribuire:")
-                                            Spacer()
-                                            Text("€\(String(format: "%.2f", totalDistributionAmount))")
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.blue)
-                                        }
-                                        
-                                        HStack {
-                                            Text("Rimanente disponibile:")
-                                            Spacer()
-                                            Text("€\(String(format: "%.2f", max(0, salaryAmount - totalDistributionAmount)))")
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.green)
-                                        }
-                                    }
-                                    .padding()
-                                    .background(Color.gray.opacity(0.1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        }
-                        .padding()
-                    }
-                }
-            }
-            .navigationTitle("Distribuzione")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(false)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button("Distribuisci") {
-                        withAnimation {
-                            showingAnimation = true
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                            onDistribute(salaryAmount, accountName, transactionType, customAmounts.filter { selectedSalvadanai.contains($0.key) })
-                        }
-                    }
-                    .disabled(selectedSalvadanai.isEmpty || totalDistributionAmount > salaryAmount)
-                }
-            }
-        }
-        .overlay {
-            if showingAnimation {
-                MoneyFlowAnimation(
-                    fromAccount: accountName,
-                    toSalvadanaio: "\(selectedSalvadanai.count) salvadanai",
-                    amount: totalDistributionAmount
-                )
-            }
-        }
-    }
-    
-    private func defaultAmountFor(_ salvadanaio: SalvadanaiModel) -> Double {
-        if salvadanaio.type == "glass" {
-            return max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
-        } else {
-            return min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
-        }
-    }
-    
-    private func customAmountBinding(for salvadanaio: SalvadanaiModel) -> Binding<Double> {
-        Binding(
-            get: {
-                customAmounts[salvadanaio.name] ?? defaultAmountFor(salvadanaio)
-            },
-            set: {
-                customAmounts[salvadanaio.name] = $0
-            }
-        )
-    }
-    
-    private func toggleSalvadanaio(_ salvadanaio: SalvadanaiModel) {
-        if selectedSalvadanai.contains(salvadanaio.name) {
-            selectedSalvadanai.remove(salvadanaio.name)
-            customAmounts.removeValue(forKey: salvadanaio.name)
-        } else {
-            selectedSalvadanai.insert(salvadanaio.name)
-            customAmounts[salvadanaio.name] = defaultAmountFor(salvadanaio)
-        }
-    }
-}
-
-// MARK: - Universal Distribution Row (compatibility)
-struct UniversalDistributionRow: View {
-    let salvadanaio: SalvadanaiModel
-    let isSelected: Bool
-    let onToggle: () -> Void
-    
-    var amountToAdd: Double {
-        if salvadanaio.type == "glass" {
-            return max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
-        } else {
-            return min(100, max(0, salvadanaio.targetAmount - salvadanaio.currentAmount))
-        }
-    }
-    
-    var isAvailable: Bool {
-        if salvadanaio.type == "glass" {
-            return amountToAdd > 0
-        } else {
-            return salvadanaio.currentAmount < salvadanaio.targetAmount
-        }
-    }
-    
-    var statusText: String {
-        if salvadanaio.type == "glass" {
-            return amountToAdd > 0 ? "da ricaricare" : "già pieno"
-        } else {
-            return salvadanaio.currentAmount < salvadanaio.targetAmount ? "obiettivo" : "completato"
-        }
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Checkbox
-            Button(action: onToggle) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundColor(isSelected ? .blue : .secondary)
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // Info salvadanaio
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color(salvadanaio.color))
-                    .frame(width: 16, height: 16)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(salvadanaio.name)
-                            .font(.headline)
-                            .fontWeight(.medium)
-                        
-                        Image(systemName: salvadanaio.type == "glass" ? "drop.fill" : "target")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        if salvadanaio.type == "glass" {
-                            Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("/ €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                
-                Spacer()
-                
-                if isAvailable {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("+€\(String(format: "%.0f", amountToAdd))")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.green)
-                        
-                        Text(statusText)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Completo")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
-                        
-                        Text(statusText)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(isSelected ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-        )
-        .onTapGesture {
-            onToggle()
-        }
-        .disabled(!isAvailable)
-        .opacity(isAvailable ? 1.0 : 0.6)
-    }
-}
-
-// MARK: - Add Money to Salvadanaio View
-struct AddMoneyToSalvadanaiView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    let salvadanaio: SalvadanaiModel
-    
-    @State private var amount = 0.0
-    @State private var selectedAccount = ""
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    HStack {
-                        Text("Importo")
-                        Spacer()
-                        TextField("0", value: $amount, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
-                    }
-                } header: {
-                    Text("Quanto vuoi aggiungere?")
-                }
-                
-                if !dataManager.accounts.isEmpty {
-                    Section {
-                        Picker("Conto", selection: $selectedAccount) {
-                            ForEach(dataManager.accounts, id: \.name) { account in
-                                HStack {
-                                    Text(account.name)
-                                    Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
-                                        .foregroundColor(.secondary)
-                                }
-                                .tag(account.name)
-                            }
-                        }
-                    } header: {
-                        Text("Da quale conto?")
-                    }
-                }
-            }
-            .navigationTitle("Aggiungi Fondi")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Aggiungi") {
-                        addMoney()
-                    }
-                    .disabled(amount <= 0 || selectedAccount.isEmpty)
-                }
-            }
-        }
-        .onAppear {
-            if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
-                selectedAccount = dataManager.accounts.first!.name
-            }
-        }
-    }
-    
-    private func addMoney() {
         dataManager.addTransaction(
             amount: amount,
-            descr: "Trasferimento a \(salvadanaio.name)",
-            category: "💰 Trasferimento",
-            type: "expense",
+            descr: descr,
+            category: selectedCategory,
+            type: transactionType,
             accountName: selectedAccount,
-            salvadanaiName: salvadanaio.name
+            salvadanaiName: selectedSalvadanaio.isEmpty ? nil : selectedSalvadanaio
         )
         dismiss()
-    }
-}
-
-// MARK: - Accounts View
-struct AccountsView: View {
-    @EnvironmentObject var dataManager: DataManager
-    @State private var showingAddAccount = false
-    @State private var selectedAccount: AccountModel?
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                if dataManager.accounts.isEmpty {
-                    EmptyStateView(
-                        icon: "building.columns.fill",
-                        title: "Nessun Conto",
-                        subtitle: "Aggiungi i tuoi conti correnti e carte per tenere traccia dei tuoi soldi",
-                        buttonText: "Aggiungi Conto",
-                        action: { showingAddAccount = true }
-                    )
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(dataManager.accounts, id: \.id) { account in
-                                AccountCard(account: account)
-                                    .onTapGesture {
-                                        selectedAccount = account
-                                    }
-                            }
-                        }
-                        .padding()
-                    }
-                }
-            }
-            .navigationTitle("Conti")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddAccount = true }) {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddAccount) {
-            AddAccountView()
-        }
-        .sheet(item: $selectedAccount) { account in
-            AccountDetailView(account: account)
-        }
-    }
-}
-
-// MARK: - Account Card
-struct AccountCard: View {
-    let account: AccountModel
-    @State private var isPressed = false
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "building.columns.fill")
-                .font(.title)
-                .foregroundColor(.blue)
-                .frame(width: 48, height: 48)
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(account.name)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Text("Creato \(account.createdAt, style: .date)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                    Text("€")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    Text(String(format: "%.2f", account.balance))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                }
-                
-                Text("Saldo")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(20)
-        .background(Color.gray.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.easeInOut(duration: 0.1), value: isPressed)
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isPressed = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    isPressed = false
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Add Account View
-struct AddAccountView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    
-    @State private var name = ""
-    @State private var initialBalance = 0.0
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    TextField("Nome del conto", text: $name)
-                        .textInputAutocapitalization(.words)
-                } header: {
-                    Text("Informazioni del conto")
-                }
-                
-                Section {
-                    HStack {
-                        Text("Saldo iniziale")
-                        Spacer()
-                        TextField("0", value: $initialBalance, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
-                    }
-                } header: {
-                    Text("Saldo")
-                } footer: {
-                    Text("Inserisci il saldo attuale del conto")
-                }
-            }
-            .navigationTitle("Nuovo Conto")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Salva") {
-                        dataManager.addAccount(name: name, initialBalance: initialBalance)
-                        dismiss()
-                    }
-                    .disabled(name.isEmpty)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Account Detail View
-struct AccountDetailView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var dataManager: DataManager
-    let account: AccountModel
-    
-    @State private var showingDeleteAlert = false
-    
-    var accountTransactions: [TransactionModel] {
-        dataManager.transactions
-            .filter { $0.accountName == account.name }
-            .sorted { $0.date > $1.date }
-    }
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    VStack(spacing: 16) {
-                        Image(systemName: "building.columns.fill")
-                            .font(.system(size: 48))
-                            .foregroundColor(.blue)
-                        
-                        Text(account.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("€")
-                                .font(.title)
-                                .foregroundColor(.secondary)
-                            Text(String(format: "%.2f", account.balance))
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                        }
-                        
-                        Text("Saldo attuale")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(24)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    
-                    if !accountTransactions.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            Text("Transazioni")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                            
-                            ForEach(accountTransactions.prefix(10), id: \.id) { transaction in
-                                TransactionDetailRow(transaction: transaction)
-                            }
-                            
-                            if accountTransactions.count > 10 {
-                                Text("... e altre \(accountTransactions.count - 10) transazioni")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .padding(.top, 8)
-                            }
-                        }
-                        .padding(20)
-                        .background(Color.gray.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                    }
-                }
-                .padding()
-            }
-            .navigationTitle("Dettagli Conto")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Chiudi") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button("Elimina", systemImage: "trash", role: .destructive) {
-                            showingDeleteAlert = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
-        }
-        .alert("Elimina Conto", isPresented: $showingDeleteAlert) {
-            Button("Elimina", role: .destructive) {
-                dataManager.deleteAccount(account)
-                dismiss()
-            }
-            Button("Annulla", role: .cancel) { }
-        } message: {
-            Text("Sei sicuro di voler eliminare questo conto? Tutte le transazioni associate verranno mantenute ma non saranno più collegate a questo conto.")
-        }
-    }
-}
-
-// MARK: - Settings View (versione aggiornata)
-struct SettingsView: View {
-    @EnvironmentObject var dataManager: DataManager
-    @State private var showingCategoriesManagement = false
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    HStack {
-                        Image(systemName: "app.badge.fill")
-                            .foregroundColor(.blue)
-                        Text("Dueffe")
-                        Spacer()
-                        Text("v1.0")
-                            .foregroundColor(.secondary)
-                    }
-                } header: {
-                    Text("App")
-                }
-                
-                Section {
-                    Button(action: {
-                        showingCategoriesManagement = true
-                    }) {
-                        HStack {
-                            Image(systemName: "tag.fill")
-                                .foregroundColor(.purple)
-                            Text("Gestisci Categorie")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .foregroundColor(.primary)
-                } header: {
-                    Text("Personalizzazione")
-                } footer: {
-                    Text("Aggiungi, modifica o elimina le categorie per spese e entrate")
-                }
-                
-                Section {
-                    HStack {
-                        Image(systemName: "banknote.fill")
-                            .foregroundColor(.green)
-                        Text("Totale Salvadanai")
-                        Spacer()
-                        Text("\(dataManager.salvadanai.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Image(systemName: "creditcard.fill")
-                            .foregroundColor(.orange)
-                        Text("Totale Transazioni")
-                        Spacer()
-                        Text("\(dataManager.transactions.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Image(systemName: "building.columns.fill")
-                            .foregroundColor(.blue)
-                        Text("Conti Configurati")
-                        Spacer()
-                        Text("\(dataManager.accounts.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Image(systemName: "tag.fill")
-                            .foregroundColor(.purple)
-                        Text("Categorie Personalizzate")
-                        Spacer()
-                        Text("\(dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count)")
-                            .foregroundColor(.secondary)
-                    }
-                } header: {
-                    Text("Statistiche")
-                }
-                
-                Section {
-                    Text("Sviluppato con ❤️ per aiutarti a risparmiare")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                } footer: {
-                    Text("Dueffe ti aiuta a gestire i tuoi salvadanai e a raggiungere i tuoi obiettivi finanziari")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top)
-                }
-            }
-            .navigationTitle("Impostazioni")
-        }
-        .sheet(isPresented: $showingCategoriesManagement) {
-            CategoriesManagementView()
-        }
-    }
-}
-
-// MARK: - Empty State View
-struct EmptyStateView: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let buttonText: String
-    let action: () -> Void
-    
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-            
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                Text(subtitle)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            
-            Button(action: action) {
-                Text(buttonText)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 12)
-                    .background(.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-        }
-        .padding(40)
-    }
-}
-
-// MARK: - Categories Management View
-struct CategoriesManagementView: View {
-    @EnvironmentObject var dataManager: DataManager
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var selectedTab = 0
-    @State private var showingQuickAddExpense = false
-    @State private var showingQuickAddIncome = false
-    @State private var showingDeleteAlert = false
-    @State private var categoryToDelete = ""
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                // Tab Selector
-                Picker("Tipo", selection: $selectedTab) {
-                    Text("Spese").tag(0)
-                    Text("Entrate").tag(1)
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
-                
-                // Categories List
-                List {
-                    if selectedTab == 0 {
-                        // Expense Categories
-                        Section {
-                            ForEach(dataManager.defaultExpenseCategories, id: \.self) { category in
-                                HStack {
-                                    Text(category)
-                                    Spacer()
-                                    Text("Predefinita")
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 2)
-                                        .background(Color.blue.opacity(0.1))
-                                        .foregroundColor(.blue)
-                                        .clipShape(Capsule())
-                                }
-                                .padding(.vertical, 2)
-                            }
-                        } header: {
-                            HStack {
-                                Text("Categorie Predefinite")
-                                Spacer()
-                                Text("\(dataManager.defaultExpenseCategories.count)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if !dataManager.customExpenseCategories.isEmpty {
-                            Section {
-                                ForEach(dataManager.customExpenseCategories.sorted(), id: \.self) { category in
-                                    HStack {
-                                        Text(category)
-                                        Spacer()
-                                        Button(action: {
-                                            categoryToDelete = category
-                                            showingDeleteAlert = true
-                                        }) {
-                                            Image(systemName: "trash.circle.fill")
-                                                .foregroundColor(.red)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                    .padding(.vertical, 2)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button("Elimina", role: .destructive) {
-                                            dataManager.deleteExpenseCategory(category)
-                                        }
-                                    }
-                                }
-                            } header: {
-                                HStack {
-                                    Text("Categorie Personalizzate")
-                                    Spacer()
-                                    Text("\(dataManager.customExpenseCategories.count)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            } footer: {
-                                Text("Scorri verso sinistra per eliminare una categoria personalizzata")
-                            }
-                        }
-                        
-                        Section {
-                            Button(action: {
-                                showingQuickAddExpense = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Aggiungi categoria spesa")
-                                        .foregroundColor(.blue)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        
-                    } else {
-                        // Income Categories
-                        Section {
-                            ForEach(dataManager.defaultIncomeCategories, id: \.self) { category in
-                                HStack {
-                                    Text(category)
-                                    Spacer()
-                                    Text("Predefinita")
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 2)
-                                        .background(Color.green.opacity(0.1))
-                                        .foregroundColor(.green)
-                                        .clipShape(Capsule())
-                                }
-                                .padding(.vertical, 2)
-                            }
-                        } header: {
-                            HStack {
-                                Text("Categorie Predefinite")
-                                Spacer()
-                                Text("\(dataManager.defaultIncomeCategories.count)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        if !dataManager.customIncomeCategories.isEmpty {
-                            Section {
-                                ForEach(dataManager.customIncomeCategories.sorted(), id: \.self) { category in
-                                    HStack {
-                                        Text(category)
-                                        Spacer()
-                                        Button(action: {
-                                            categoryToDelete = category
-                                            showingDeleteAlert = true
-                                        }) {
-                                            Image(systemName: "trash.circle.fill")
-                                                .foregroundColor(.red)
-                                        }
-                                        .buttonStyle(PlainButtonStyle())
-                                    }
-                                    .padding(.vertical, 2)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button("Elimina", role: .destructive) {
-                                            dataManager.deleteIncomeCategory(category)
-                                        }
-                                    }
-                                }
-                            } header: {
-                                HStack {
-                                    Text("Categorie Personalizzate")
-                                    Spacer()
-                                    Text("\(dataManager.customIncomeCategories.count)")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            } footer: {
-                                Text("Scorri verso sinistra per eliminare una categoria personalizzata")
-                            }
-                        }
-                        
-                        Section {
-                            Button(action: {
-                                showingQuickAddIncome = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.green)
-                                    Text("Aggiungi categoria entrata")
-                                        .foregroundColor(.green)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                }
-                .listStyle(InsetGroupedListStyle())
-            }
-            .navigationTitle("Gestione Categorie")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Chiudi") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        if selectedTab == 0 {
-                            showingQuickAddExpense = true
-                        } else {
-                            showingQuickAddIncome = true
-                        }
-                    }) {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                }
-            }
-        }
-        .sheet(isPresented: $showingQuickAddExpense) {
-            QuickCategoryAddView(categoryType: "expense")
-        }
-        .sheet(isPresented: $showingQuickAddIncome) {
-            QuickCategoryAddView(categoryType: "income")
-        }
-        .alert("Elimina Categoria", isPresented: $showingDeleteAlert) {
-            Button("Elimina", role: .destructive) {
-                if selectedTab == 0 {
-                    dataManager.deleteExpenseCategory(categoryToDelete)
-                } else {
-                    dataManager.deleteIncomeCategory(categoryToDelete)
-                }
-                categoryToDelete = ""
-            }
-            Button("Annulla", role: .cancel) {
-                categoryToDelete = ""
-            }
-        } message: {
-            Text("Sei sicuro di voler eliminare la categoria '\(categoryToDelete)'? Questa azione non può essere annullata.")
-        }
-    }
-}
-
-// MARK: - Quick Category Add View (versione corretta)
-struct QuickCategoryAddView: View {
-    @EnvironmentObject var dataManager: DataManager
-    @Environment(\.dismiss) private var dismiss
-    
-    let categoryType: String // "expense" o "income"
-    @State private var categoryName = ""
-    @State private var selectedEmoji = "📝"
-    
-    let commonEmojis = ["📝", "💰", "🏠", "🚗", "🍕", "🎬", "👕", "🏥", "📚", "🎁", "💼", "📈", "💸", "🔄", "⚡", "🎮", "☕", "🛒", "💊", "🎯", "🎨", "🔧", "🎪", "⛽"]
-    
-    var title: String {
-        categoryType == "expense" ? "Nuova Categoria Spesa" : "Nuova Categoria Entrata"
-    }
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section {
-                    HStack {
-                        Text("Emoji")
-                        Spacer()
-                        Text(selectedEmoji)
-                            .font(.title2)
-                    }
-                    
-                    // Griglia emoji con ScrollView
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHGrid(rows: Array(repeating: GridItem(.fixed(50)), count: 2), spacing: 8) {
-                            ForEach(Array(commonEmojis.enumerated()), id: \.offset) { index, emoji in
-                                Button(action: {
-                                    selectedEmoji = emoji
-                                }) {
-                                    Text(emoji)
-                                        .font(.title2)
-                                        .frame(width: 45, height: 45)
-                                        .background(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle()
-                                                .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
-                                        )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 8)
-                    }
-                    .frame(height: 110) // Altezza fissa per 2 righe
-                    
-                    // Opzione senza emoji
-                    Button(action: {
-                        selectedEmoji = ""
-                    }) {
-                        HStack {
-                            Text("Nessuna emoji")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            if selectedEmoji.isEmpty {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                } header: {
-                    Text("Icona (opzionale)")
-                } footer: {
-                    Text("Scorri orizzontalmente per vedere tutte le emoji disponibili")
-                }
-                
-                Section {
-                    TextField("Nome categoria", text: $categoryName)
-                        .textInputAutocapitalization(.words)
-                } header: {
-                    Text("Nome")
-                } footer: {
-                    Text("Esempio: \(categoryType == "expense" ? "Benzina, Gaming, Farmaci" : "Cashback, Rimborsi, Vendite")")
-                }
-                
-                Section {
-                    HStack {
-                        Text("Anteprima:")
-                        Spacer()
-                        Text(previewText)
-                            .foregroundColor(categoryName.isEmpty ? .secondary : .primary)
-                            .fontWeight(.medium)
-                    }
-                } header: {
-                    Text("Risultato")
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Annulla") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Aggiungi") {
-                        addCategory()
-                    }
-                    .disabled(categoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-    }
-    
-    private var previewText: String {
-        let name = categoryName.isEmpty ? "Nome categoria" : categoryName
-        if selectedEmoji.isEmpty {
-            return name
-        } else {
-            return "\(selectedEmoji) \(name)"
-        }
-    }
-    
-    private func addCategory() {
-        let trimmedName = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalName = selectedEmoji.isEmpty ? trimmedName : "\(selectedEmoji) \(trimmedName)"
-        
-        if categoryType == "expense" {
-            dataManager.addExpenseCategory(finalName)
-        } else {
-            dataManager.addIncomeCategory(finalName)
-        }
-        
-        dismiss()
-    }
-}
-
-// MARK: - Money Flow Animation (sposta questa struct in TransactionsView.swift)
-struct MoneyFlowAnimation: View {
-    @State private var isAnimating = false
-    let fromAccount: String
-    let toSalvadanaio: String
-    let amount: Double
-    
-    var body: some View {
-        ZStack {
-            // Background
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 40) {
-                Text("Smistamento in corso...")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                
-                // Animazione soldi
-                HStack(spacing: 20) {
-                    ForEach(0..<5, id: \.self) { index in
-                        Image(systemName: "banknote.fill")
-                            .font(.title)
-                            .foregroundColor(.green)
-                            .scaleEffect(isAnimating ? 1.2 : 0.8)
-                            .opacity(isAnimating ? 1.0 : 0.3)
-                            .animation(
-                                .easeInOut(duration: 0.6)
-                                .repeatForever(autoreverses: true)
-                                .delay(Double(index) * 0.1),
-                                value: isAnimating
-                            )
-                    }
-                }
-                
-                VStack(spacing: 8) {
-                    Text("€\(String(format: "%.2f", amount))")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text("da \(fromAccount) → \(toSalvadanaio)")
-                        .font(.headline)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-            }
-            .padding()
-        }
-        .onAppear {
-            isAnimating = true
-        }
     }
 }
