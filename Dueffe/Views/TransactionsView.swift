@@ -255,18 +255,20 @@ struct TransactionRowView: View {
     }
 }
 
-// MARK: - Add Transaction View (versione aggiornata)
+// MARK: - Add Transaction View (con categorie personalizzabili)
 struct AddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
     @State private var amount = 0.0
     @State private var descr = ""
-    @State private var selectedCategory = "" // Inizia vuoto invece di auto-selezionare
+    @State private var selectedCategory = ""
     @State private var transactionType = "expense"
     @State private var selectedAccount = ""
     @State private var selectedSalvadanaio = ""
     @State private var showingSalaryDistribution = false
+    @State private var showingAddCategory = false // Nuovo: mostra dialog per aggiungere categoria
+    @State private var newCategoryText = "" // Nuovo: testo per nuova categoria
     
     let transactionTypes = [
         ("expense", "Spesa", "minus.circle"),
@@ -339,16 +341,36 @@ struct AddTransactionView: View {
                 // Categoria (solo per spese e entrate, non per stipendi)
                 if transactionType != "salary" && !availableCategories.isEmpty {
                     Section {
-                        Picker("Categoria", selection: $selectedCategory) {
-                            Text("Seleziona categoria")
-                                .tag("")
-                                .foregroundColor(.secondary)
-                            ForEach(availableCategories, id: \.self) { category in
-                                Text(category).tag(category)
+                        VStack(spacing: 12) {
+                            // Picker per categoria esistente
+                            Picker("Categoria", selection: $selectedCategory) {
+                                Text("Seleziona categoria")
+                                    .tag("")
+                                    .foregroundColor(.secondary)
+                                ForEach(availableCategories, id: \.self) { category in
+                                    Text(category).tag(category)
+                                }
                             }
+                            
+                            // Bottone per aggiungere nuova categoria
+                            Button(action: {
+                                showingAddCategory = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Aggiungi nuova categoria")
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     } header: {
                         Text("Categoria")
+                    } footer: {
+                        Text("Seleziona una categoria esistente o creane una nuova")
                     }
                 } else if transactionType == "salary" {
                     Section {
@@ -456,6 +478,18 @@ struct AddTransactionView: View {
                 }
             )
         }
+        .alert("Nuova Categoria", isPresented: $showingAddCategory) {
+            TextField("Nome categoria", text: $newCategoryText)
+            Button("Annulla", role: .cancel) {
+                newCategoryText = ""
+            }
+            Button("Aggiungi") {
+                addNewCategory()
+            }
+            .disabled(newCategoryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        } message: {
+            Text("Inserisci il nome della nuova categoria \(transactionType == "expense" ? "di spesa" : "di entrata")")
+        }
     }
     
     private func setupDefaults() {
@@ -468,8 +502,21 @@ struct AddTransactionView: View {
         if transactionType == "salary" {
             selectedCategory = "💼 Stipendio"
         }
+    }
+    
+    private func addNewCategory() {
+        let categoryName = newCategoryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !categoryName.isEmpty else { return }
         
-        // NON auto-selezionare la categoria per spese e entrate - lascia vuota
+        if transactionType == "expense" {
+            dataManager.addExpenseCategory(categoryName)
+        } else {
+            dataManager.addIncomeCategory(categoryName)
+        }
+        
+        // Seleziona automaticamente la nuova categoria
+        selectedCategory = categoryName
+        newCategoryText = ""
     }
     
     private func saveTransaction() {
@@ -1268,9 +1315,10 @@ struct AccountDetailView: View {
     }
 }
 
-// MARK: - Settings View
+// MARK: - Settings View (versione aggiornata)
 struct SettingsView: View {
     @EnvironmentObject var dataManager: DataManager
+    @State private var showingCategoriesManagement = false
     
     var body: some View {
         NavigationView {
@@ -1286,6 +1334,27 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("App")
+                }
+                
+                Section {
+                    Button(action: {
+                        showingCategoriesManagement = true
+                    }) {
+                        HStack {
+                            Image(systemName: "tag.fill")
+                                .foregroundColor(.purple)
+                            Text("Gestisci Categorie")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .foregroundColor(.primary)
+                } header: {
+                    Text("Personalizzazione")
+                } footer: {
+                    Text("Aggiungi, modifica o elimina le categorie per spese e entrate")
                 }
                 
                 Section {
@@ -1315,6 +1384,15 @@ struct SettingsView: View {
                         Text("\(dataManager.accounts.count)")
                             .foregroundColor(.secondary)
                     }
+                    
+                    HStack {
+                        Image(systemName: "tag.fill")
+                            .foregroundColor(.purple)
+                        Text("Categorie Personalizzate")
+                        Spacer()
+                        Text("\(dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count)")
+                            .foregroundColor(.secondary)
+                    }
                 } header: {
                     Text("Statistiche")
                 }
@@ -1335,6 +1413,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Impostazioni")
+        }
+        .sheet(isPresented: $showingCategoriesManagement) {
+            CategoriesManagementView()
         }
     }
 }
@@ -1375,5 +1456,371 @@ struct EmptyStateView: View {
             }
         }
         .padding(40)
+    }
+}
+
+// MARK: - Categories Management View
+struct CategoriesManagementView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var selectedTab = 0
+    @State private var showingQuickAddExpense = false
+    @State private var showingQuickAddIncome = false
+    @State private var showingDeleteAlert = false
+    @State private var categoryToDelete = ""
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                // Tab Selector
+                Picker("Tipo", selection: $selectedTab) {
+                    Text("Spese").tag(0)
+                    Text("Entrate").tag(1)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding()
+                
+                // Categories List
+                List {
+                    if selectedTab == 0 {
+                        // Expense Categories
+                        Section {
+                            ForEach(dataManager.defaultExpenseCategories, id: \.self) { category in
+                                HStack {
+                                    Text(category)
+                                    Spacer()
+                                    Text("Predefinita")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(Color.blue.opacity(0.1))
+                                        .foregroundColor(.blue)
+                                        .clipShape(Capsule())
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        } header: {
+                            HStack {
+                                Text("Categorie Predefinite")
+                                Spacer()
+                                Text("\(dataManager.defaultExpenseCategories.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        if !dataManager.customExpenseCategories.isEmpty {
+                            Section {
+                                ForEach(dataManager.customExpenseCategories.sorted(), id: \.self) { category in
+                                    HStack {
+                                        Text(category)
+                                        Spacer()
+                                        Button(action: {
+                                            categoryToDelete = category
+                                            showingDeleteAlert = true
+                                        }) {
+                                            Image(systemName: "trash.circle.fill")
+                                                .foregroundColor(.red)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                    .padding(.vertical, 2)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button("Elimina", role: .destructive) {
+                                            dataManager.deleteExpenseCategory(category)
+                                        }
+                                    }
+                                }
+                            } header: {
+                                HStack {
+                                    Text("Categorie Personalizzate")
+                                    Spacer()
+                                    Text("\(dataManager.customExpenseCategories.count)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } footer: {
+                                Text("Scorri verso sinistra per eliminare una categoria personalizzata")
+                            }
+                        }
+                        
+                        Section {
+                            Button(action: {
+                                showingQuickAddExpense = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Aggiungi categoria spesa")
+                                        .foregroundColor(.blue)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                    } else {
+                        // Income Categories
+                        Section {
+                            ForEach(dataManager.defaultIncomeCategories, id: \.self) { category in
+                                HStack {
+                                    Text(category)
+                                    Spacer()
+                                    Text("Predefinita")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(Color.green.opacity(0.1))
+                                        .foregroundColor(.green)
+                                        .clipShape(Capsule())
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        } header: {
+                            HStack {
+                                Text("Categorie Predefinite")
+                                Spacer()
+                                Text("\(dataManager.defaultIncomeCategories.count)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        if !dataManager.customIncomeCategories.isEmpty {
+                            Section {
+                                ForEach(dataManager.customIncomeCategories.sorted(), id: \.self) { category in
+                                    HStack {
+                                        Text(category)
+                                        Spacer()
+                                        Button(action: {
+                                            categoryToDelete = category
+                                            showingDeleteAlert = true
+                                        }) {
+                                            Image(systemName: "trash.circle.fill")
+                                                .foregroundColor(.red)
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                    .padding(.vertical, 2)
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button("Elimina", role: .destructive) {
+                                            dataManager.deleteIncomeCategory(category)
+                                        }
+                                    }
+                                }
+                            } header: {
+                                HStack {
+                                    Text("Categorie Personalizzate")
+                                    Spacer()
+                                    Text("\(dataManager.customIncomeCategories.count)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            } footer: {
+                                Text("Scorri verso sinistra per eliminare una categoria personalizzata")
+                            }
+                        }
+                        
+                        Section {
+                            Button(action: {
+                                showingQuickAddIncome = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "plus.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Aggiungi categoria entrata")
+                                        .foregroundColor(.green)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                }
+                .listStyle(InsetGroupedListStyle())
+            }
+            .navigationTitle("Gestione Categorie")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        if selectedTab == 0 {
+                            showingQuickAddExpense = true
+                        } else {
+                            showingQuickAddIncome = true
+                        }
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingQuickAddExpense) {
+            QuickCategoryAddView(categoryType: "expense")
+        }
+        .sheet(isPresented: $showingQuickAddIncome) {
+            QuickCategoryAddView(categoryType: "income")
+        }
+        .alert("Elimina Categoria", isPresented: $showingDeleteAlert) {
+            Button("Elimina", role: .destructive) {
+                if selectedTab == 0 {
+                    dataManager.deleteExpenseCategory(categoryToDelete)
+                } else {
+                    dataManager.deleteIncomeCategory(categoryToDelete)
+                }
+                categoryToDelete = ""
+            }
+            Button("Annulla", role: .cancel) {
+                categoryToDelete = ""
+            }
+        } message: {
+            Text("Sei sicuro di voler eliminare la categoria '\(categoryToDelete)'? Questa azione non può essere annullata.")
+        }
+    }
+}
+
+// MARK: - Quick Category Add View (versione corretta)
+struct QuickCategoryAddView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @Environment(\.dismiss) private var dismiss
+    
+    let categoryType: String // "expense" o "income"
+    @State private var categoryName = ""
+    @State private var selectedEmoji = "📝"
+    
+    let commonEmojis = ["📝", "💰", "🏠", "🚗", "🍕", "🎬", "👕", "🏥", "📚", "🎁", "💼", "📈", "💸", "🔄", "⚡", "🎮", "☕", "🛒", "💊", "🎯", "🎨", "🔧", "🎪", "⛽"]
+    
+    var title: String {
+        categoryType == "expense" ? "Nuova Categoria Spesa" : "Nuova Categoria Entrata"
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    HStack {
+                        Text("Emoji")
+                        Spacer()
+                        Text(selectedEmoji)
+                            .font(.title2)
+                    }
+                    
+                    // Griglia emoji con ScrollView
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHGrid(rows: Array(repeating: GridItem(.fixed(50)), count: 2), spacing: 8) {
+                            ForEach(Array(commonEmojis.enumerated()), id: \.offset) { index, emoji in
+                                Button(action: {
+                                    selectedEmoji = emoji
+                                }) {
+                                    Text(emoji)
+                                        .font(.title2)
+                                        .frame(width: 45, height: 45)
+                                        .background(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.gray.opacity(0.1))
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
+                                        )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 8)
+                    }
+                    .frame(height: 110) // Altezza fissa per 2 righe
+                    
+                    // Opzione senza emoji
+                    Button(action: {
+                        selectedEmoji = ""
+                    }) {
+                        HStack {
+                            Text("Nessuna emoji")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if selectedEmoji.isEmpty {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                } header: {
+                    Text("Icona (opzionale)")
+                } footer: {
+                    Text("Scorri orizzontalmente per vedere tutte le emoji disponibili")
+                }
+                
+                Section {
+                    TextField("Nome categoria", text: $categoryName)
+                        .textInputAutocapitalization(.words)
+                } header: {
+                    Text("Nome")
+                } footer: {
+                    Text("Esempio: \(categoryType == "expense" ? "Benzina, Gaming, Farmaci" : "Cashback, Rimborsi, Vendite")")
+                }
+                
+                Section {
+                    HStack {
+                        Text("Anteprima:")
+                        Spacer()
+                        Text(previewText)
+                            .foregroundColor(categoryName.isEmpty ? .secondary : .primary)
+                            .fontWeight(.medium)
+                    }
+                } header: {
+                    Text("Risultato")
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Aggiungi") {
+                        addCategory()
+                    }
+                    .disabled(categoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+    
+    private var previewText: String {
+        let name = categoryName.isEmpty ? "Nome categoria" : categoryName
+        if selectedEmoji.isEmpty {
+            return name
+        } else {
+            return "\(selectedEmoji) \(name)"
+        }
+    }
+    
+    private func addCategory() {
+        let trimmedName = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = selectedEmoji.isEmpty ? trimmedName : "\(selectedEmoji) \(trimmedName)"
+        
+        if categoryType == "expense" {
+            dataManager.addExpenseCategory(finalName)
+        } else {
+            dataManager.addIncomeCategory(finalName)
+        }
+        
+        dismiss()
     }
 }

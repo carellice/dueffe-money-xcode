@@ -35,11 +35,13 @@ struct AccountModel: Identifiable {
     var createdAt: Date
 }
 
-// MARK: - Data Manager
+// MARK: - Data Manager (versione con categorie personalizzabili)
 class DataManager: ObservableObject {
     @Published var salvadanai: [SalvadanaiModel] = []
     @Published var transactions: [TransactionModel] = []
     @Published var accounts: [AccountModel] = []
+    @Published var customExpenseCategories: [String] = [] // Nuove categorie spese personalizzate
+    @Published var customIncomeCategories: [String] = []  // Nuove categorie entrate personalizzate
     
     // Computed Properties
     var totalBalance: Double {
@@ -58,17 +60,26 @@ class DataManager: ObservableObject {
         transactions.sorted { $0.date > $1.date }
     }
     
-    // Categorie predefinite
-    let expenseCategories = [
+    // Categorie predefinite (base)
+    let defaultExpenseCategories = [
         "🍕 Cibo", "🚗 Trasporti", "🎬 Intrattenimento",
         "👕 Abbigliamento", "🏥 Salute", "📚 Educazione",
         "🏠 Casa", "💰 Altro"
     ]
     
-    let incomeCategories = [
+    let defaultIncomeCategories = [
         "💼 Stipendio", "💸 Freelance", "🎁 Regalo",
         "💰 Investimenti", "📈 Bonus", "🔄 Altro"
     ]
+    
+    // Categorie complete (predefinite + personalizzate)
+    var expenseCategories: [String] {
+        return defaultExpenseCategories + customExpenseCategories.sorted()
+    }
+    
+    var incomeCategories: [String] {
+        return defaultIncomeCategories + customIncomeCategories.sorted()
+    }
     
     // Colori predefiniti per i salvadanai
     let salvadanaiColors = [
@@ -77,18 +88,64 @@ class DataManager: ObservableObject {
     ]
     
     init() {
-        // App inizia vuota - rimuovi loadSampleData() per un'app completamente pulita
-        // loadSampleData() // Commentato per avere l'app vuota
+        // App inizia vuota
+        loadStoredCategories() // Carica categorie salvate
     }
     
-    // MARK: - Salvadanai Methods (aggiornato)
+    // MARK: - Categories Management
+    func addExpenseCategory(_ category: String) {
+        let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCategory.isEmpty else { return }
+        guard !expenseCategories.contains(trimmedCategory) else { return }
+        
+        customExpenseCategories.append(trimmedCategory)
+        saveCategories()
+    }
+    
+    func addIncomeCategory(_ category: String) {
+        let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCategory.isEmpty else { return }
+        guard !incomeCategories.contains(trimmedCategory) else { return }
+        
+        customIncomeCategories.append(trimmedCategory)
+        saveCategories()
+    }
+    
+    func deleteExpenseCategory(_ category: String) {
+        // Può eliminare solo categorie personalizzate, non quelle predefinite
+        guard !defaultExpenseCategories.contains(category) else { return }
+        customExpenseCategories.removeAll { $0 == category }
+        saveCategories()
+    }
+    
+    func deleteIncomeCategory(_ category: String) {
+        // Può eliminare solo categorie personalizzate, non quelle predefinite
+        guard !defaultIncomeCategories.contains(category) else { return }
+        customIncomeCategories.removeAll { $0 == category }
+        saveCategories()
+    }
+    
+    // MARK: - Categories Persistence
+    private func saveCategories() {
+        UserDefaults.standard.set(customExpenseCategories, forKey: "CustomExpenseCategories")
+        UserDefaults.standard.set(customIncomeCategories, forKey: "CustomIncomeCategories")
+    }
+    
+    private func loadStoredCategories() {
+        customExpenseCategories = UserDefaults.standard.stringArray(forKey: "CustomExpenseCategories") ?? []
+        customIncomeCategories = UserDefaults.standard.stringArray(forKey: "CustomIncomeCategories") ?? []
+    }
+    
+    // MARK: - Existing methods remain the same...
+    
+    // MARK: - Salvadanai Methods
     func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0, isInfinite: Bool = false) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
             type: type,
             currentAmount: initialAmount,
-            targetAmount: isInfinite ? 0 : targetAmount, // Se infinito, target = 0
-            targetDate: isInfinite ? nil : targetDate,   // Se infinito, nessuna scadenza
+            targetAmount: isInfinite ? 0 : targetAmount,
+            targetDate: isInfinite ? nil : targetDate,
             monthlyRefill: monthlyRefill,
             color: color,
             accountName: accountName,
@@ -112,7 +169,7 @@ class DataManager: ObservableObject {
     func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String, salvadanaiName: String? = nil) {
         let newTransaction = TransactionModel(
             amount: amount,
-            descr: descr,  // Cambiato da description a descr
+            descr: descr,
             category: category,
             type: type,
             date: Date(),
@@ -166,12 +223,12 @@ class DataManager: ObservableObject {
     private func updateSalvadanaiBalance(name: String, amount: Double) {
         if let index = salvadanai.firstIndex(where: { $0.name == name }) {
             salvadanai[index].currentAmount += amount
+            // Rimossa la protezione che impediva di andare sotto zero
         }
     }
     
-    // MARK: - Custom Distribution (con importi personalizzati)
+    // MARK: - Distribution Methods
     func distributeIncomeWithCustomAmounts(amount: Double, salvadanaiAmounts: [String: Double], accountName: String, transactionType: String = "salary") {
-        // Prima aggiungi la transazione
         let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
         let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
         
@@ -183,19 +240,17 @@ class DataManager: ObservableObject {
             accountName: accountName
         )
         
-        // Poi distribuisci ai salvadanai con importi personalizzati
         for (salvadanaiName, customAmount) in salvadanaiAmounts {
             if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
                 if customAmount > 0 {
                     salvadanai[index].currentAmount += customAmount
-                    // Sottrai dal conto specificato nel salvadanaio
                     updateAccountBalance(accountName: salvadanai[index].accountName, amount: -customAmount)
                 }
             }
         }
     }
+    
     func distributeIncome(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String, transactionType: String = "salary") {
-        // Prima aggiungi la transazione
         let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
         let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
         
@@ -207,7 +262,6 @@ class DataManager: ObservableObject {
             accountName: accountName
         )
         
-        // Poi distribuisci ai salvadanai selezionati
         for salvadanaiName in selectedSalvadanai {
             if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
                 var amountToAdd: Double = 0
@@ -217,50 +271,15 @@ class DataManager: ObservableObject {
                     let currentAmount = salvadanai[index].currentAmount
                     amountToAdd = max(0, targetAmount - currentAmount)
                 } else {
-                    // Per gli obiettivi, aggiungi un importo ragionevole o quello che serve per completare
                     let remainingToTarget = salvadanai[index].targetAmount - salvadanai[index].currentAmount
                     amountToAdd = min(100, max(0, remainingToTarget))
                 }
                 
                 if amountToAdd > 0 {
                     salvadanai[index].currentAmount += amountToAdd
-                    // Sottrai dal conto specificato nel salvadanaio
                     updateAccountBalance(accountName: salvadanai[index].accountName, amount: -amountToAdd)
                 }
             }
-        }
-    }
-    
-    // MARK: - Sample Data
-    private func loadSampleData() {
-        // Account di esempio
-        addAccount(name: "Conto Principale", initialBalance: 2500.00)
-        addAccount(name: "Carta Prepagata", initialBalance: 150.00)
-        
-        // Salvadanai di esempio
-        addSalvadanaio(name: "Vacanze Estate", type: "objective", targetAmount: 1500, targetDate: Calendar.current.date(byAdding: .month, value: 6, to: Date()), color: "blue", accountName: "Conto Principale", initialAmount: 450.0)
-        addSalvadanaio(name: "Quotidianità", type: "glass", monthlyRefill: 400, color: "green", accountName: "Conto Principale", initialAmount: 280.0)
-        addSalvadanaio(name: "Svago", type: "glass", monthlyRefill: 150, color: "orange", accountName: "Carta Prepagata", initialAmount: 75.0)
-        addSalvadanaio(name: "Nuovo iPhone", type: "objective", targetAmount: 1200, targetDate: Calendar.current.date(byAdding: .month, value: 8, to: Date()), color: "purple", accountName: "Conto Principale", initialAmount: 200.0)
-        
-        // Transazioni di esempio
-        let sampleTransactions = [
-            ("Spesa supermercato", "🍕 Cibo", "expense", 65.50, "Conto Principale", "Quotidianità"),
-            ("Stipendio Gennaio", "💼 Stipendio", "salary", 2200.00, "Conto Principale", nil),
-            ("Cinema", "🎬 Intrattenimento", "expense", 24.00, "Carta Prepagata", "Svago"),
-            ("Carburante", "🚗 Trasporti", "expense", 45.00, "Conto Principale", "Quotidianità"),
-            ("Freelance progetto", "💸 Freelance", "income", 350.00, "Conto Principale", nil)
-        ]
-        
-        for (desc, cat, type, amount, account, salvadanaio) in sampleTransactions {
-            addTransaction(
-                amount: amount,
-                descr: desc,  // Cambiato da description a descr
-                category: cat,
-                type: type,
-                accountName: account,
-                salvadanaiName: salvadanaio
-            )
         }
     }
 }
