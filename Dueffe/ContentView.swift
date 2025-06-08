@@ -225,16 +225,18 @@ struct HomeView: View {
     }
 }
 
-// MARK: - Salvadanaio Home Card
+// MARK: - Salvadanaio Home Card (versione aggiornata)
 struct SalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
     
     var progress: Double {
         if salvadanaio.type == "objective" {
             guard salvadanaio.targetAmount > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
             return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
         } else {
             guard salvadanaio.monthlyRefill > 0 else { return 0 }
+            if salvadanaio.currentAmount < 0 { return 0 }
             return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
         }
     }
@@ -253,17 +255,29 @@ struct SalvadanaiHomeCard: View {
                 
                 Spacer()
                 
-                Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                if salvadanaio.currentAmount < 0 {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                } else {
+                    Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             VStack(alignment: .leading, spacing: 8) {
                 Text("€\(String(format: "%.0f", salvadanaio.currentAmount))")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
                 
-                if salvadanaio.type == "objective" {
+                if salvadanaio.currentAmount < 0 {
+                    Text("In rosso")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .fontWeight(.medium)
+                } else if salvadanaio.type == "objective" {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
                             .font(.caption)
@@ -284,7 +298,11 @@ struct SalvadanaiHomeCard: View {
         .frame(width: 180)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.gray.opacity(0.1))
+                .fill(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.05) : Color.gray.opacity(0.1))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
         )
     }
 }

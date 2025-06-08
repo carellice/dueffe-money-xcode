@@ -164,10 +164,6 @@ class DataManager: ObservableObject {
     private func updateSalvadanaiBalance(name: String, amount: Double) {
         if let index = salvadanai.firstIndex(where: { $0.name == name }) {
             salvadanai[index].currentAmount += amount
-            // Assicurati che non vada sotto zero
-            if salvadanai[index].currentAmount < 0 {
-                salvadanai[index].currentAmount = 0
-            }
         }
     }
     

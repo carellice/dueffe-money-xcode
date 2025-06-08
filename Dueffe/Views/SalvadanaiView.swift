@@ -48,7 +48,7 @@ struct SalvadanaiView: View {
     }
 }
 
-// MARK: - Salvadanaio Card
+// MARK: - Salvadanaio Card (versione aggiornata)
 struct SalvadanaiCard: View {
     let salvadanaio: SalvadanaiModel
     @State private var isPressed = false
@@ -75,22 +75,46 @@ struct SalvadanaiCard: View {
                 
                 Spacer()
                 
-                Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
-                    .font(.title2)
-                    .foregroundColor(Color(salvadanaio.color))
+                // Indica se è in negativo
+                if salvadanaio.currentAmount < 0 {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                } else {
+                    Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                        .font(.title2)
+                        .foregroundColor(Color(salvadanaio.color))
+                }
             }
             
-            // Importo
+            // Importo con gestione negativo
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text("€")
                     .font(.title2)
                     .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .secondary)
                 
                 Text(String(format: "%.2f", salvadanaio.currentAmount))
                     .font(.largeTitle)
                     .fontWeight(.bold)
+                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
                     .contentTransition(.numericText())
+            }
+            
+            // Avviso se in negativo
+            if salvadanaio.currentAmount < 0 {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text("Salvadanaio in rosso")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.red)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.red.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             
             // Progress/Info specifiche
@@ -103,8 +127,12 @@ struct SalvadanaiCard: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.gray.opacity(0.1))
+                .fill(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.05) : Color.gray.opacity(0.1))
                 .shadow(color: Color.black.opacity(isPressed ? 0.1 : 0.05), radius: isPressed ? 2 : 8, x: 0, y: isPressed ? 1 : 4)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(salvadanaio.currentAmount < 0 ? Color.red.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -121,12 +149,15 @@ struct SalvadanaiCard: View {
     }
 }
 
-// MARK: - Objective Progress View
+// MARK: - Objective Progress View (versione aggiornata)
 struct ObjectiveProgressView: View {
     let salvadanaio: SalvadanaiModel
     
     var progress: Double {
         guard salvadanaio.targetAmount > 0 else { return 0 }
+        if salvadanaio.currentAmount < 0 {
+            return 0 // Se è negativo, progresso a zero
+        }
         return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
     }
     
@@ -137,24 +168,26 @@ struct ObjectiveProgressView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // Progress Bar
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Progresso")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            // Progress Bar (solo se non negativo)
+            if salvadanaio.currentAmount >= 0 {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Progresso")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Text("\(Int(progress * 100))%")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(Color(salvadanaio.color))
+                    }
                     
-                    Spacer()
-                    
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(Color(salvadanaio.color))
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
+                        .scaleEffect(y: 1.5)
                 }
-                
-                ProgressView(value: progress)
-                    .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
-                    .scaleEffect(y: 1.5)
             }
             
             // Info obiettivo
@@ -170,7 +203,17 @@ struct ObjectiveProgressView: View {
                 
                 Spacer()
                 
-                if daysRemaining > 0 {
+                if salvadanaio.currentAmount < 0 {
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Da recuperare")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                        Text("€\(String(format: "%.2f", abs(salvadanaio.currentAmount)))")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.red)
+                    }
+                } else if daysRemaining > 0 {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("Giorni rimasti")
                             .font(.caption)
@@ -194,12 +237,15 @@ struct ObjectiveProgressView: View {
     }
 }
 
-// MARK: - Glass Info View
+// MARK: - Glass Info View (versione aggiornata)
 struct GlassInfoView: View {
     let salvadanaio: SalvadanaiModel
     
     var fillPercentage: Double {
         guard salvadanaio.monthlyRefill > 0 else { return 0 }
+        if salvadanaio.currentAmount < 0 {
+            return 0 // Se è negativo, non mostra riempimento
+        }
         return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
     }
     
@@ -222,14 +268,21 @@ struct GlassInfoView: View {
             HStack {
                 // Glass container
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(salvadanaio.color), lineWidth: 2)
+                    .stroke(salvadanaio.currentAmount < 0 ? Color.red : Color(salvadanaio.color), lineWidth: 2)
                     .background(
                         GeometryReader { geometry in
                             VStack {
                                 Spacer()
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color(salvadanaio.color).opacity(0.3))
-                                    .frame(height: geometry.size.height * fillPercentage)
+                                if salvadanaio.currentAmount >= 0 {
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color(salvadanaio.color).opacity(0.3))
+                                        .frame(height: geometry.size.height * fillPercentage)
+                                } else {
+                                    // Pattern per saldo negativo
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.red.opacity(0.2))
+                                        .frame(height: geometry.size.height * 0.2)
+                                }
                             }
                         }
                     )
@@ -237,14 +290,15 @@ struct GlassInfoView: View {
                     .animation(.easeInOut(duration: 0.5), value: fillPercentage)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Disponibile questo mese")
+                    Text(salvadanaio.currentAmount < 0 ? "Saldo negativo" : "Disponibile questo mese")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .secondary)
                     
                     HStack {
                         Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
                             .font(.subheadline)
                             .fontWeight(.semibold)
+                            .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
                         
                         Text("/ €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
                             .font(.caption)
