@@ -333,8 +333,179 @@ struct TransactionSectionHeaderView: View {
     }
 }
 
-// MARK: - Transaction Row View (MODIFICATO)
+// MARK: - Transaction Row View (VERSIONE PULITA E LEGGIBILE)
 struct TransactionRowView: View {
+    let transaction: TransactionModel
+    
+    private var transactionColor: Color {
+        transaction.type == "expense" ? .red : .green
+    }
+    
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return transaction.type == "expense" ? "💸" : "💰"
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Emoji semplice
+            Text(categoryEmoji)
+                .font(.title2)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color.gray.opacity(0.1)))
+            
+            // Contenuto principale
+            VStack(alignment: .leading, spacing: 4) {
+                // Nome transazione
+                Text(transaction.descr)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                // Data
+                Text(transaction.date, style: .date)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                // Salvadanaio/Conto
+                if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
+                    Text("da \(salvadanaiName)")
+                        .font(.subheadline)
+                        .foregroundColor(.orange)
+                        .fontWeight(.medium)
+                } else if transaction.type != "expense" && !transaction.accountName.isEmpty {
+                    Text("su \(transaction.accountName)")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+            }
+            
+            Spacer()
+            
+            // Solo l'importo
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(transactionColor)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+// MARK: - Versione ancora più semplice (OPZIONE B)
+struct SuperSimpleTransactionRowView: View {
+    let transaction: TransactionModel
+    
+    var body: some View {
+        HStack {
+            // Solo emoji o icona
+            if let firstChar = transaction.category.first, firstChar.isEmoji {
+                Text(String(firstChar))
+                    .font(.title2)
+            } else {
+                Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(transaction.type == "expense" ? .red : .green)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                // Nome
+                Text(transaction.descr)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                // Salvadanaio/Conto in piccolo
+                if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
+                    Text("da \(salvadanaiName)")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                } else if transaction.type != "expense" && !transaction.accountName.isEmpty {
+                    Text("su \(transaction.accountName)")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            Spacer()
+            
+            // Importo
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(transaction.type == "expense" ? .red : .green)
+        }
+        .padding()
+    }
+}
+
+// MARK: - Versione con solo essenziale (OPZIONE C)
+struct EssentialTransactionRowView: View {
+    let transaction: TransactionModel
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                // Descrizione
+                Text(transaction.descr)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                // Importo con colore
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(transaction.type == "expense" ? .red : .green)
+            }
+            
+            HStack {
+                // Data a sinistra
+                Text(transaction.date, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                // Salvadanaio/Conto al centro
+                if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
+                    Text("da \(salvadanaiName)")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .fontWeight(.medium)
+                } else if transaction.type != "expense" && !transaction.accountName.isEmpty {
+                    Text("su \(transaction.accountName)")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                
+                Spacer()
+                
+                // Categoria a destra
+                Text(transaction.category)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.gray.opacity(0.05))
+        )
+    }
+}
+
+// MARK: - Alternative: Versione ancora più minimalista
+struct MinimalTransactionRowView: View {
     let transaction: TransactionModel
     @State private var animateAmount = false
     
@@ -346,76 +517,59 @@ struct TransactionRowView: View {
         }
     }
     
-    private var iconName: String {
-        switch transaction.type {
-        case "expense": return "minus.circle.fill"
-        case "salary": return "banknote.fill"
-        default: return "plus.circle.fill"
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
         }
+        return ""
+    }
+    
+    private var cleanCategoryName: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(transaction.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return transaction.category
     }
     
     var body: some View {
         HStack(spacing: 16) {
-            // Icona migliorata con animazione
+            // Emoji o icona categoria
             ZStack {
                 Circle()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [transactionColor, transactionColor.opacity(0.7)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
+                    .fill(transactionColor.opacity(0.1))
                     .frame(width: 48, height: 48)
-                    .shadow(color: transactionColor.opacity(0.3), radius: 6, x: 0, y: 3)
                 
-                Image(systemName: iconName)
-                    .font(.title3)
-                    .foregroundColor(.white)
+                if !categoryEmoji.isEmpty {
+                    Text(categoryEmoji)
+                        .font(.title2)
+                } else {
+                    Image(systemName: transaction.type == "expense" ? "minus.circle" : "plus.circle")
+                        .font(.title2)
+                        .foregroundColor(transactionColor)
+                }
             }
             
-            // Dettagli transazione
-            VStack(alignment: .leading, spacing: 8) {
+            // Contenuto
+            VStack(alignment: .leading, spacing: 4) {
+                // Descrizione principale
                 Text(transaction.descr)
                     .font(.headline)
                     .fontWeight(.medium)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
                 
-                // Tags - MODIFICATO
+                // Info secondarie
                 HStack(spacing: 8) {
-                    TransactionTagView(
-                        text: transaction.category,
-                        color: transactionColor,
-                        icon: getCategoryIcon(transaction.category)
-                    )
-                    
-                    // Mostra conto solo se non è vuoto (per entrate)
-                    if !transaction.accountName.isEmpty {
-                        TransactionTagView(
-                            text: transaction.accountName,
-                            color: .blue,
-                            icon: "building.columns"
-                        )
-                    }
-                    
-                    // Mostra salvadanaio solo se presente (per spese)
-                    if let salvadanaiName = transaction.salvadanaiName {
-                        TransactionTagView(
-                            text: salvadanaiName,
-                            color: .green,
-                            icon: "banknote"
-                        )
-                    }
-                }
-                
-                HStack {
-                    Text(transaction.date, style: .time)
-                        .font(.caption2)
+                    Text(cleanCategoryName)
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    Spacer()
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
-                    Text(getTransactionTypeText())
-                        .font(.caption2)
+                    Text(transaction.date, format: .dateTime.day().month(.abbreviated))
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
@@ -423,26 +577,29 @@ struct TransactionRowView: View {
             Spacer()
             
             // Importo
-            VStack(alignment: .trailing, spacing: 6) {
-                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(transactionColor)
                     .scaleEffect(animateAmount ? 1.05 : 1.0)
                     .animation(.easeInOut(duration: 0.3), value: animateAmount)
                 
-                // Indicatore visivo del tipo
-                Image(systemName: transaction.type == "expense" ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(transactionColor.opacity(0.7))
+                Text(transaction.date, format: .dateTime.hour().minute())
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.02), radius: 4, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.separator, lineWidth: 0.5)
         )
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -453,26 +610,111 @@ struct TransactionRowView: View {
             }
         }
     }
+}
+
+// MARK: - Versione con accento colorato laterale
+struct AccentTransactionRowView: View {
+    let transaction: TransactionModel
+    @State private var animateAmount = false
     
-    private func getCategoryIcon(_ category: String) -> String {
-        // Estrae l'emoji dalla categoria se presente
-        if let firstChar = category.first, firstChar.isEmoji {
-            return ""
-        }
-        
-        // Fallback icons basati sul tipo
+    private var transactionColor: Color {
         switch transaction.type {
-        case "expense": return "cart"
-        case "salary": return "banknote"
-        default: return "plus"
+        case "expense": return .red
+        case "salary": return .blue
+        default: return .green
         }
     }
     
-    private func getTransactionTypeText() -> String {
-        switch transaction.type {
-        case "expense": return "Spesa"
-        case "salary": return "Stipendio"
-        default: return "Entrata"
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    private var cleanCategoryName: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(transaction.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return transaction.category
+    }
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Accento colorato laterale
+            Rectangle()
+                .fill(transactionColor)
+                .frame(width: 4)
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 2)
+                )
+            
+            HStack(spacing: 16) {
+                // Icona/Emoji
+                if !categoryEmoji.isEmpty {
+                    Text(categoryEmoji)
+                        .font(.title2)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(transactionColor.opacity(0.1))
+                        )
+                } else {
+                    Image(systemName: transaction.type == "expense" ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(transactionColor)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(transactionColor.opacity(0.1))
+                        )
+                }
+                
+                // Contenuto principale
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(transaction.descr)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 6) {
+                        Text(cleanCategoryName)
+                            .font(.subheadline)
+                            .foregroundColor(transactionColor)
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                        
+                        Text(transaction.date, format: .dateTime.day().month(.abbreviated).hour().minute())
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                // Importo
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(transactionColor)
+                    .scaleEffect(animateAmount ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 0.3), value: animateAmount)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.04), radius: 6, x: 0, y: 3)
+        )
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                animateAmount = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    animateAmount = false
+                }
+            }
         }
     }
 }
