@@ -129,6 +129,44 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Settings Stat Card
+struct SettingsStatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+}
+
 // MARK: - App Info Card
 struct AppInfoCard: View {
     @State private var animateIcon = false
@@ -312,32 +350,32 @@ struct AppStatisticsCard: View {
             }
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                StatCard(
+                SettingsStatCard(
                     title: "Salvadanai",
                     value: "\(dataManager.salvadanai.count)",
-                    icon: "banknote.circle.fill",
-                    color: .green
+                    icon: "banknote.fill",
+                    color: Color.green
                 )
                 
-                StatCard(
+                SettingsStatCard(
                     title: "Transazioni",
                     value: "\(dataManager.transactions.count)",
                     icon: "creditcard.fill",
-                    color: .orange
+                    color: Color.orange
                 )
                 
-                StatCard(
+                SettingsStatCard(
                     title: "Conti",
                     value: "\(dataManager.accounts.count)",
                     icon: "building.columns.fill",
-                    color: .blue
+                    color: Color.blue
                 )
                 
-                StatCard(
+                SettingsStatCard(
                     title: "Categorie",
                     value: "\(dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count)",
                     icon: "tag.fill",
-                    color: .purple
+                    color: Color.purple
                 )
             }
             
