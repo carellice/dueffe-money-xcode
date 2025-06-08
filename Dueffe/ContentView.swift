@@ -368,17 +368,37 @@ struct HomeView: View {
                                 Spacer()
                                 
                                 VStack(spacing: 16) {
-                                    FloatingActionButton(
-                                        icon: "plus.circle.fill",
-                                        color: .blue,
-                                        action: { showingAddTransaction = true }
-                                    )
+                                    Button(action: { showingAddTransaction = true }) {
+                                        Image(systemName: "plus.circle.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.white)
+                                            .frame(width: 50, height: 50)
+                                            .background(
+                                                Circle()
+                                                    .fill(LinearGradient(
+                                                        gradient: Gradient(colors: [.blue, .blue.opacity(0.8)]),
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ))
+                                                    .shadow(color: .blue.opacity(0.4), radius: 8, x: 0, y: 4)
+                                            )
+                                    }
                                     
-                                    FloatingActionButton(
-                                        icon: "banknote.circle.fill",
-                                        color: .green,
-                                        action: { showingAddSalvadanaio = true }
-                                    )
+                                    Button(action: { showingAddSalvadanaio = true }) {
+                                        Image(systemName: "banknote.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.white)
+                                            .frame(width: 50, height: 50)
+                                            .background(
+                                                Circle()
+                                                    .fill(LinearGradient(
+                                                        gradient: Gradient(colors: [.green, .green.opacity(0.8)]),
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ))
+                                                    .shadow(color: .green.opacity(0.4), radius: 8, x: 0, y: 4)
+                                            )
+                                    }
                                 }
                             }
                             
