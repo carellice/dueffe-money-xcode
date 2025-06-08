@@ -312,10 +312,9 @@ struct ExampleAccountCard: View {
 }
 
 // MARK: - Home View migliorata
+// MARK: - Home View migliorata (SENZA BOTTONI FLUTTUANTI)
 struct HomeView: View {
     @EnvironmentObject var dataManager: DataManager
-    @State private var showingAddTransaction = false
-    @State private var showingAddSalvadanaio = false
     @State private var animateBalance = false
     
     var totalBalance: Double {
@@ -345,61 +344,25 @@ struct HomeView: View {
                     VStack(spacing: 28) {
                         // Header finanziario migliorato
                         VStack(spacing: 24) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Patrimonio Totale")
-                                        .font(.headline)
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Patrimonio Totale")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text("€")
+                                        .font(.title)
+                                        .fontWeight(.medium)
                                         .foregroundColor(.secondary)
-                                    
-                                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                        Text("€")
-                                            .font(.title)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.secondary)
-                                        Text(String(format: "%.2f", totalBalance + totalSavings))
-                                            .font(.largeTitle)
-                                            .fontWeight(.bold)
-                                            .contentTransition(.numericText())
-                                            .scaleEffect(animateBalance ? 1.05 : 1.0)
-                                            .animation(.easeInOut(duration: 0.3), value: animateBalance)
-                                    }
+                                    Text(String(format: "%.2f", totalBalance + totalSavings))
+                                        .font(.largeTitle)
+                                        .fontWeight(.bold)
+                                        .contentTransition(.numericText())
+                                        .scaleEffect(animateBalance ? 1.05 : 1.0)
+                                        .animation(.easeInOut(duration: 0.3), value: animateBalance)
                                 }
-                                
-                                Spacer()
-                                
-                                VStack(spacing: 16) {
-                                    Button(action: { showingAddTransaction = true }) {
-                                        Image(systemName: "plus.circle.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.white)
-                                            .frame(width: 50, height: 50)
-                                            .background(
-                                                Circle()
-                                                    .fill(LinearGradient(
-                                                        gradient: Gradient(colors: [.blue, .blue.opacity(0.8)]),
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ))
-                                                    .shadow(color: .blue.opacity(0.4), radius: 8, x: 0, y: 4)
-                                            )
-                                    }
-                                    
-                                    Button(action: { showingAddSalvadanaio = true }) {
-                                        Image(systemName: "banknote.fill")
-                                            .font(.title2)
-                                            .foregroundColor(.white)
-                                            .frame(width: 50, height: 50)
-                                            .background(
-                                                Circle()
-                                                    .fill(LinearGradient(
-                                                        gradient: Gradient(colors: [.green, .green.opacity(0.8)]),
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ))
-                                                    .shadow(color: .green.opacity(0.4), radius: 8, x: 0, y: 4)
-                                            )
-                                    }
-                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             
                             // Breakdown migliorato
@@ -444,10 +407,14 @@ struct HomeView: View {
                                     Spacer()
                                     
                                     NavigationLink(destination: SalvadanaiView()) {
-                                        Text("Vedi tutti")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.blue)
+                                        HStack {
+                                            Text("Vedi tutti")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                        }
+                                        .foregroundColor(.blue)
                                     }
                                 }
                                 
@@ -479,10 +446,14 @@ struct HomeView: View {
                                     Spacer()
                                     
                                     NavigationLink(destination: TransactionsView()) {
-                                        Text("Vedi tutte")
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.blue)
+                                        HStack {
+                                            Text("Vedi tutte")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                        }
+                                        .foregroundColor(.blue)
                                     }
                                 }
                                 
@@ -495,32 +466,41 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                         }
                         
-                        // Quick Actions migliorato
+                        // Navigazione rapida alle sezioni
                         VStack(alignment: .leading, spacing: 20) {
-                            HStack {
-                                Image(systemName: "bolt.fill")
-                                    .foregroundColor(.orange)
-                                Text("Azioni Rapide")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Navigazione Rapida")
                                     .font(.title2)
                                     .fontWeight(.bold)
+                                Text("Accedi velocemente alle funzioni principali")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
                             .padding(.horizontal, 20)
                             
-                            HStack(spacing: 16) {
-                                ImprovedQuickActionCard(
-                                    title: "Nuova Spesa",
-                                    subtitle: "Registra una spesa",
-                                    icon: "minus.circle.fill",
-                                    colors: [.red, .pink],
-                                    action: { showingAddTransaction = true }
-                                )
-                                
-                                ImprovedQuickActionCard(
-                                    title: "Nuovo Salvadanaio",
-                                    subtitle: "Crea un obiettivo",
+                            VStack(spacing: 12) {
+                                QuickNavigationCard(
+                                    title: "Gestisci Salvadanai",
+                                    subtitle: "Visualizza e modifica i tuoi obiettivi di risparmio",
                                     icon: "banknote.fill",
                                     colors: [.green, .mint],
-                                    action: { showingAddSalvadanaio = true }
+                                    destination: AnyView(SalvadanaiView())
+                                )
+                                
+                                QuickNavigationCard(
+                                    title: "Tutte le Transazioni",
+                                    subtitle: "Consulta lo storico completo delle operazioni",
+                                    icon: "creditcard.fill",
+                                    colors: [.purple, .blue],
+                                    destination: AnyView(TransactionsView())
+                                )
+                                
+                                QuickNavigationCard(
+                                    title: "Gestisci Conti",
+                                    subtitle: "Visualizza e modifica i tuoi conti correnti",
+                                    icon: "building.columns.fill",
+                                    colors: [.blue, .indigo],
+                                    destination: AnyView(AccountsView())
                                 )
                             }
                             .padding(.horizontal, 20)
@@ -540,11 +520,69 @@ struct HomeView: View {
                 // Placeholder per refresh
             }
         }
-        .sheet(isPresented: $showingAddTransaction) {
-            SimpleAddTransactionView()
+    }
+}
+
+// MARK: - Quick Navigation Card
+struct QuickNavigationCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let colors: [Color]
+    let destination: AnyView
+    @State private var isPressed = false
+    
+    var body: some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: 16) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: colors),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 50, height: 50)
+                        .shadow(color: colors.first?.opacity(0.3) ?? .clear, radius: 6, x: 0, y: 3)
+                    
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            )
         }
-        .sheet(isPresented: $showingAddSalvadanaio) {
-            SimpleSalvadanaiFormView()
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }) {
+            // Navigation gestita da NavigationLink
         }
     }
 }
