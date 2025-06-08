@@ -923,7 +923,7 @@ struct CompactStylishSalvadanaiCard: View {
     }
 }
 
-// MARK: - Improved Home Transaction Row
+// MARK: - Improved Home Transaction Row (LAYOUT VERTICALE)
 struct ImprovedHomeTransactionRow: View {
     let transaction: TransactionModel
     
@@ -935,49 +935,93 @@ struct ImprovedHomeTransactionRow: View {
         }
     }
     
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    private var cleanCategoryName: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(transaction.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return transaction.category
+    }
+    
     var body: some View {
         HStack(spacing: 16) {
-            // Icona migliorata
+            // Emoji o icona semplice
             ZStack {
                 Circle()
-                    .fill(transactionColor.opacity(0.1))
+                    .fill(transactionColor.opacity(0.15))
                     .frame(width: 44, height: 44)
                 
-                Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
-                    .font(.title3)
-                    .foregroundColor(transactionColor)
+                if !categoryEmoji.isEmpty {
+                    Text(categoryEmoji)
+                        .font(.title3)
+                } else {
+                    Image(systemName: transaction.type == "expense" ? "minus" : "plus")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(transactionColor)
+                }
             }
             
+            // Contenuto principale con layout verticale
             VStack(alignment: .leading, spacing: 6) {
+                // Prima riga: Descrizione
                 Text(transaction.descr)
                     .font(.headline)
                     .fontWeight(.medium)
+                    .foregroundColor(.primary)
                     .lineLimit(1)
                 
-                HStack(spacing: 8) {
-                    Text(transaction.category)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(transactionColor.opacity(0.1))
-                        .foregroundColor(transactionColor)
-                        .clipShape(Capsule())
-                    
-                    Text("• \(transaction.accountName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                // Seconda riga: Categoria
+                Text(cleanCategoryName)
+                    .font(.subheadline)
+                    .foregroundColor(transactionColor)
+                    .fontWeight(.medium)
+                
+                // Terza riga: Conto/Salvadanaio
+                if transaction.type == "expense" {
+                    if let salvadanaiName = transaction.salvadanaiName {
+                        HStack(spacing: 4) {
+                            Image(systemName: "banknote")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                            Text("da \(salvadanaiName)")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                        }
+                    }
+                } else {
+                    if !transaction.accountName.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "building.columns")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            Text("su \(transaction.accountName)")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .fontWeight(.medium)
+                        }
+                    }
                 }
             }
             
             Spacer()
             
+            // Importo e data/ora insieme
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
                     .font(.headline)
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .foregroundColor(transactionColor)
                 
-                Text(transaction.date, style: .time)
+                // Data e ora sulla stessa riga
+                Text(transaction.date, format: .dateTime.day().month(.abbreviated).hour().minute())
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -986,8 +1030,8 @@ struct ImprovedHomeTransactionRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.8))
-                .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.03), radius: 4, x: 0, y: 2)
         )
     }
 }
