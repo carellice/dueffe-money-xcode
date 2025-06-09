@@ -1144,9 +1144,10 @@ struct AboutAppView: View {
                                 .frame(width: 100, height: 100)
                                 .shadow(color: .blue.opacity(0.3), radius: 20, x: 0, y: 10)
                             
-                            Image(systemName: "app.badge.fill")
-                                .font(.system(size: 50))
-                                .foregroundColor(.white)
+                            Image("AppLogo") // Usa il nome dell'immagine negli assets
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 50, height: 50)
                         }
                         
                         VStack(spacing: 8) {
