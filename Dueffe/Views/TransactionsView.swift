@@ -979,8 +979,7 @@ extension Character {
     }
 }
 
-// MARK: - Simple Add Transaction View (AGGIORNATO CON DISTRIBUZIONE STIPENDIO)
-// MARK: - Simple Add Transaction View (CORRETTO - GESTIONE CHIUSURA SHEET)
+// MARK: - Simple Add Transaction View (CORRETTO - CON SEZIONE SALVADANAIO)
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -1091,36 +1090,60 @@ struct SimpleAddTransactionView: View {
                             }
                         }
                     } header: {
-                        HStack {
-                            Image(systemName: "banknote.fill")
-                                .foregroundColor(.green)
-                            Text("Salvadanaio")
-                        }
-                    } footer: {
-                        if !selectedSalvadanaio.isEmpty {
-                            let selectedSalv = dataManager.salvadanai.first { $0.name == selectedSalvadanaio }
-                            if let salvadanaio = selectedSalv, salvadanaio.currentAmount < amount {
-                                Text("⚠️ Attenzione: il salvadanaio non ha fondi sufficienti. Il saldo diventerà negativo.")
-                                    .foregroundColor(.red)
-                            } else {
-                                Text("I soldi verranno prelevati da questo salvadanaio")
-                                    .foregroundColor(.green)
-                            }
-                        } else {
-                            Text("Scegli da quale salvadanaio prelevare i soldi per questa spesa")
-                        }
+                        Text("Categoria")
                     }
-                } else if transactionType == "expense" && dataManager.salvadanai.isEmpty {
-                    Section {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                            Text("Nessun salvadanaio disponibile")
-                                .foregroundColor(.orange)
+                }
+                
+                // SALVADANAIO (SOLO PER LE SPESE) - SEZIONE CORRETTA
+                if transactionType == "expense" {
+                    if !dataManager.salvadanai.isEmpty {
+                        Section {
+                            Picker("Salvadanaio", selection: $selectedSalvadanaio) {
+                                Text("Seleziona salvadanaio")
+                                    .tag("")
+                                    .foregroundColor(.secondary)
+                                ForEach(dataManager.salvadanai, id: \.name) { salvadanaio in
+                                    HStack {
+                                        Text(salvadanaio.name)
+                                        Spacer()
+                                        Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                            .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
+                                    }
+                                    .tag(salvadanaio.name)
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "banknote.fill")
+                                    .foregroundColor(.green)
+                                Text("Salvadanaio")
+                            }
+                        } footer: {
+                            if !selectedSalvadanaio.isEmpty {
+                                let selectedSalv = dataManager.salvadanai.first { $0.name == selectedSalvadanaio }
+                                if let salvadanaio = selectedSalv, salvadanaio.currentAmount < amount {
+                                    Text("⚠️ Attenzione: il salvadanaio non ha fondi sufficienti. Il saldo diventerà negativo.")
+                                        .foregroundColor(.red)
+                                } else {
+                                    Text("I soldi verranno prelevati da questo salvadanaio")
+                                        .foregroundColor(.green)
+                                }
+                            } else {
+                                Text("Scegli da quale salvadanaio prelevare i soldi per questa spesa")
+                            }
                         }
-                        .padding(.vertical, 8)
-                    } footer: {
-                        Text("Per registrare una spesa devi prima creare almeno un salvadanaio nel tab 'Salvadanai'")
+                    } else {
+                        Section {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Nessun salvadanaio disponibile")
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.vertical, 8)
+                        } footer: {
+                            Text("Per registrare una spesa devi prima creare almeno un salvadanaio nel tab 'Salvadanai'")
+                        }
                     }
                 }
                 
@@ -1187,7 +1210,7 @@ struct SimpleAddTransactionView: View {
                                 )
                                 
                                 DistributionInfoRow(
-                                    icon: "sparkles", // CAMBIATO: icona che esiste sicuramente
+                                    icon: "sparkles",
                                     title: "Distribuzione Automatica",
                                     description: "Algoritmo intelligente basato su priorità e necessità",
                                     color: .orange
