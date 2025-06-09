@@ -414,7 +414,7 @@ struct SalvadanaiCardView: View {
                         
                         // Tipo con icona
                         HStack(spacing: 6) {
-                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "drop.fill")
+                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.9))
                             
@@ -600,7 +600,7 @@ struct SalvadanaiCardView: View {
                         
                         // Info glass
                         HStack {
-                            Image(systemName: "drop.fill")
+                            Image(systemName: "cup.and.saucer.fill")
                                 .font(.caption)
                                 .foregroundColor(getColor(from: salvadanaio.color))
                             
@@ -669,7 +669,7 @@ struct SalvadanaiStatusView: View {
                             .frame(width: 32, height: 32)
                     )
             } else {
-                Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                Image(systemName: salvadanaio.type == "objective" ? "target" : "cup.and.saucer.fill")
                     .font(.title2)
                     .foregroundColor(Color(salvadanaio.color))
                     .background(
@@ -1111,7 +1111,7 @@ struct SimpleSalvadanaiFormView: View {
     
     let salvadanaiTypes = [
         ("objective", "Obiettivo", "target"),
-        ("glass", "Glass", "drop.fill")
+        ("glass", "Glass", "cup.and.saucer.fill")
     ]
     
     var isFormValid: Bool {
@@ -1350,7 +1350,7 @@ struct SimpleSalvadanaiDetailView: View {
                             
                             Spacer()
                             
-                            Image(systemName: salvadanaio.type == "objective" ? "target" : "drop.fill")
+                            Image(systemName: salvadanaio.type == "objective" ? "target" : "cup.and.saucer.fill")
                                 .font(.title)
                                 .foregroundColor(Color(salvadanaio.color))
                         }

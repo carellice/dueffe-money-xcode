@@ -822,7 +822,7 @@ struct CompactStylishSalvadanaiCard: View {
                         .frame(width: 36, height: 36)
                         .shadow(color: Color(salvadanaio.color).opacity(0.4), radius: 6, x: 0, y: 3)
                     
-                    Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "drop.fill")
+                    Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }

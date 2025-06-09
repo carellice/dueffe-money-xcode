@@ -355,7 +355,7 @@ struct QuickDistributionActions: View {
                 QuickActionButton(
                     title: "Solo Glass",
                     subtitle: "Ricarica Glass",
-                    icon: "drop.fill",
+                    icon: "cup.and.saucer.fill",
                     color: .cyan,
                     action: {
                         let glassSalvadanai = availableSalvadanai.filter { $0.type == "glass" }

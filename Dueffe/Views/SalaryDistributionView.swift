@@ -595,7 +595,7 @@ struct AutomaticDistributionFooterView: View {
                 .fontWeight(.medium)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("1. 💧 Ricarica Glass salvadanai")
+                Text("1. 🥤 Ricarica Glass salvadanai")
                     .font(.caption2)
                     .foregroundColor(.secondary)
                 
