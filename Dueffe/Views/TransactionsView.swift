@@ -6,6 +6,8 @@ struct TransactionsView: View {
     @State private var showingAddTransaction = false
     @State private var selectedFilter = "all"
     @State private var searchText = ""
+    @State private var showingDeleteConfirmation = false
+    @State private var transactionToDelete: TransactionModel?
     
     private var availableFilterOptions: [(String, String, String)] {
         var filters: [(String, String, String)] = []
@@ -111,15 +113,14 @@ struct TransactionsView: View {
                                     Section {
                                         ForEach(transactions, id: \.id) { transaction in
                                             TransactionRowView(transaction: transaction)
-                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) { // Cambiato a false per evitare eliminazione accidentale
                                                     Button(action: {
-                                                        withAnimation {
-                                                            dataManager.deleteTransaction(transaction)
-                                                        }
+                                                        transactionToDelete = transaction
+                                                        showingDeleteConfirmation = true
                                                     }) {
                                                         Label("Elimina", systemImage: "trash.fill")
                                                     }
-                                                    .tint(.red) // Questo rende il bottone rosso
+                                                    .tint(.red)
                                                 }
                                         }
                                     } header: {
@@ -146,6 +147,25 @@ struct TransactionsView: View {
                             .foregroundColor(.purple)
                     }
                     .disabled(dataManager.accounts.isEmpty) // Non serve cambiare qui perché controlleremo nel sheet
+                }
+            }
+            .alert("Elimina Transazione", isPresented: $showingDeleteConfirmation) {
+                Button("Elimina", role: .destructive) {
+                    if let transaction = transactionToDelete {
+                        withAnimation {
+                            dataManager.deleteTransaction(transaction)
+                        }
+                    }
+                    transactionToDelete = nil
+                }
+                Button("Annulla", role: .cancel) {
+                    transactionToDelete = nil
+                }
+            } message: {
+                if let transaction = transactionToDelete {
+                    Text("Sei sicuro di voler eliminare '\(transaction.descr)'?\n\nQuesta azione non può essere annullata.")
+                } else {
+                    Text("Sei sicuro di voler eliminare questa transazione?")
                 }
             }
         }
