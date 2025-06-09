@@ -187,11 +187,11 @@
 				};
 			};
 			buildConfigurationList = 90CE97762DF506C300D1874A /* Build configuration list for PBXProject "Dueffe" */;
-			developmentRegion = en;
+			developmentRegion = it;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				en,
 				Base,
+				it,
 			);
 			mainGroup = 90CE97722DF506C300D1874A;
 			minimizedProjectReferenceProxies = 1;
