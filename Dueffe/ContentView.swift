@@ -1,20 +1,425 @@
 import SwiftUI
 
 struct ContentView: View {
+    var body: some View {
+        OnboardingWrapperView()
+    }
+}
+
+struct OnboardingWrapperView: View {
     @StateObject private var dataManager = DataManager()
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     
     var body: some View {
         Group {
-            if dataManager.accounts.isEmpty {
-                // Mostra onboarding se non ci sono conti
+            if !hasSeenOnboarding {
+                // Mostra onboarding completo
+                AppOnboardingView()
+                    .environmentObject(dataManager)
+                    .onAppear {
+                        // Reset per testing - RIMUOVI in produzione
+                        // hasSeenOnboarding = false
+                    }
+            } else if dataManager.accounts.isEmpty {
+                // Mostra creazione primo conto
                 FirstAccountOnboardingView()
                     .environmentObject(dataManager)
             } else {
-                // Mostra l'app normale se c'è almeno un conto
+                // Mostra app normale
                 MainTabView()
                     .environmentObject(dataManager)
             }
         }
+    }
+}
+
+struct AppOnboardingView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var currentPage = 0
+    @State private var animateElements = false
+    
+    let onboardingPages = [
+        OnboardingPage(
+            title: "Benvenuto in Dueffe! 👋",
+            subtitle: "La tua app per il risparmio intelligente",
+            description: "Gestisci i tuoi soldi, crea salvadanai e raggiungi i tuoi obiettivi finanziari con facilità",
+            icon: "star.fill",
+            color: .blue,
+            features: [
+                "💰 Gestione completa dei tuoi soldi",
+                "🎯 Salvadanai intelligenti per ogni obiettivo",
+                "📊 Statistiche dettagliate e intuitive"
+            ]
+        ),
+        OnboardingPage(
+            title: "Crea i tuoi Conti 🏛️",
+            subtitle: "Il punto di partenza",
+            description: "Aggiungi i tuoi conti correnti, carte prepagate e contanti per avere tutto sotto controllo",
+            icon: "building.columns.fill",
+            color: .indigo,
+            features: [
+                "🏦 Conti correnti e carte",
+                "💵 Gestione contanti",
+                "🔄 Trasferimenti tra conti",
+                "📈 Bilancio totale sempre aggiornato"
+            ]
+        ),
+        OnboardingPage(
+            title: "Salvadanai Intelligenti 🎯",
+            subtitle: "Raggiungi i tuoi obiettivi",
+            description: "Crea salvadanai per ogni tuo obiettivo: vacanze, casa, emergenze... Dueffe ti aiuta a risparmiare!",
+            icon: "target",
+            color: .green,
+            features: [
+                "🎯 Obiettivi con scadenza",
+                "🥤 Glass: budget mensili",
+                "♾️ Salvadanai infiniti",
+                "🤖 Distribuzione automatica intelligente"
+            ]
+        ),
+        OnboardingPage(
+            title: "Gestisci le Transazioni 💳",
+            subtitle: "Ogni movimento conta",
+            description: "Registra spese, entrate e stipendi. Distribuisci automaticamente i tuoi guadagni nei salvadanai",
+            icon: "creditcard.fill",
+            color: .purple,
+            features: [
+                "💸 Spese dai salvadanai",
+                "💰 Entrate e stipendi sui conti",
+                "🔄 Distribuzione intelligente",
+                "📊 Statistiche dettagliate"
+            ]
+        ),
+        OnboardingPage(
+            title: "Tutto Pronto! 🚀",
+            subtitle: "Inizia il tuo viaggio verso l'obiettivo",
+            description: "Ora hai tutti gli strumenti per gestire i tuoi soldi in modo intelligente. Iniziamo!",
+            icon: "checkmark.seal.fill",
+            color: .orange,
+            features: [
+                "🎉 Sei pronto per iniziare",
+                "💡 Suggerimenti integrati nell'app",
+                "🏆 Raggiungi i tuoi obiettivi",
+                "🔒 I tuoi dati sono sempre al sicuro"
+            ]
+        )
+    ]
+    
+    var body: some View {
+        // CORRETTO: GeometryReader per full screen
+        GeometryReader { geometry in
+            ZStack {
+                // Background gradient dinamico - FULL SCREEN
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        onboardingPages[currentPage].color.opacity(0.1),
+                        onboardingPages[currentPage].color.opacity(0.05)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea(.all) // AGGIUNTO: ignora tutte le safe area
+                .animation(.easeInOut(duration: 0.8), value: currentPage)
+                
+                VStack(spacing: 0) {
+                    // Header con indicatori di pagina - CORRETTO
+                    HStack {
+                        // Skip button
+                        if currentPage < onboardingPages.count - 1 {
+                            Button("Salta") {
+                                completeOnboarding()
+                            }
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        } else {
+                            Spacer().frame(width: 50)
+                        }
+                        
+                        Spacer()
+                        
+                        // Page indicators
+                        HStack(spacing: 8) {
+                            ForEach(0..<onboardingPages.count, id: \.self) { index in
+                                Circle()
+                                    .fill(index == currentPage ? onboardingPages[currentPage].color : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                                    .scaleEffect(index == currentPage ? 1.2 : 1.0)
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentPage)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Spacer().frame(width: 50)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, geometry.safeAreaInsets.top + 20) // CORRETTO: usa safe area
+                    
+                    // Content - CORRETTO: usa tutto lo spazio disponibile
+                    TabView(selection: $currentPage) {
+                        ForEach(0..<onboardingPages.count, id: \.self) { index in
+                            OnboardingPageView(
+                                page: onboardingPages[index],
+                                isActive: currentPage == index,
+                                animateElements: animateElements
+                            )
+                            .tag(index)
+                        }
+                    }
+                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                    .frame(height: geometry.size.height * 0.75) // CORRETTO: usa 75% dell'altezza
+                    .onChange(of: currentPage) { _ in
+                        triggerAnimation()
+                    }
+                    
+                    // Bottom action - CORRETTO
+                    VStack(spacing: 16) {
+                        if currentPage < onboardingPages.count - 1 {
+                            // Next button
+                            Button(action: {
+                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                    currentPage += 1
+                                }
+                            }) {
+                                HStack {
+                                    Text("Continua")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                    
+                                    Image(systemName: "arrow.right.circle.fill")
+                                        .font(.title2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            onboardingPages[currentPage].color,
+                                            onboardingPages[currentPage].color.opacity(0.8)
+                                        ]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: onboardingPages[currentPage].color.opacity(0.3), radius: 10, x: 0, y: 5)
+                            }
+                            .animation(.easeInOut(duration: 0.3), value: currentPage)
+                        } else {
+                            // Start button
+                            Button(action: {
+                                completeOnboarding()
+                            }) {
+                                HStack {
+                                    Text("Inizia ora!")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                    
+                                    Image(systemName: "arrow.up.circle.fill")
+                                        .font(.title2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [.orange, .red]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: .orange.opacity(0.4), radius: 15, x: 0, y: 8)
+                                .scaleEffect(animateElements ? 1.05 : 1.0)
+                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: animateElements)
+                            }
+                        }
+                        
+                        // Info aggiuntiva
+                        if currentPage == onboardingPages.count - 1 {
+                            Text("🔒 I tuoi dati rimangono sempre sul tuo dispositivo")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .opacity(animateElements ? 1.0 : 0.7)
+                                .animation(.easeInOut(duration: 2.0), value: animateElements)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, geometry.safeAreaInsets.bottom + 20) // CORRETTO: usa safe area bottom
+                }
+            }
+        }
+        .onAppear {
+            triggerAnimation()
+        }
+    }
+    
+    private func triggerAnimation() {
+        animateElements = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.easeOut(duration: 0.8)) {
+                animateElements = true
+            }
+        }
+    }
+    
+    private func completeOnboarding() {
+        withAnimation(.spring()) {
+            hasSeenOnboarding = true
+        }
+    }
+}
+
+// 3. NUOVO: OnboardingPage model
+struct OnboardingPage {
+    let title: String
+    let subtitle: String
+    let description: String
+    let icon: String
+    let color: Color
+    let features: [String]
+}
+
+// 4. NUOVO: OnboardingPageView - Singola pagina
+struct OnboardingPageView: View {
+    let page: OnboardingPage
+    let isActive: Bool
+    let animateElements: Bool
+    
+    var body: some View {
+        VStack(spacing: 24) { // RIDOTTO: meno spacing per far entrare tutto
+            // Icon animata - RIDOTTA
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                page.color.opacity(0.3),
+                                page.color.opacity(0.1),
+                                page.color.opacity(0.05)
+                            ]),
+                            center: .center,
+                            startRadius: 15,
+                            endRadius: 60
+                        )
+                    )
+                    .frame(width: 120, height: 120) // RIDOTTO da 160
+                    .scaleEffect(animateElements ? 1.1 : 0.9)
+                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: animateElements)
+                
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [page.color, page.color.opacity(0.7)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 80, height: 80) // RIDOTTO da 100
+                        .shadow(color: page.color.opacity(0.4), radius: 15, x: 0, y: 8)
+                    
+                    Image(systemName: page.icon)
+                        .font(.system(size: 32, weight: .bold)) // RIDOTTO da 40
+                        .foregroundColor(.white)
+                        .scaleEffect(animateElements ? 1.0 : 0.8)
+                        .animation(.spring(response: 0.8, dampingFraction: 0.6), value: animateElements)
+                }
+            }
+            
+            // Text content - COMPATTATO
+            VStack(spacing: 12) { // RIDOTTO da 16
+                Text(page.title)
+                    .font(.title) // RIDOTTO da largeTitle
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(LinearGradient(
+                        gradient: Gradient(colors: [page.color, page.color.opacity(0.7)]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ))
+                    .opacity(animateElements ? 1.0 : 0.0)
+                    .offset(y: animateElements ? 0 : 20)
+                    .animation(.easeOut(duration: 0.8).delay(0.2), value: animateElements)
+                
+                Text(page.subtitle)
+                    .font(.title3) // RIDOTTO da title2
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .opacity(animateElements ? 1.0 : 0.0)
+                    .offset(y: animateElements ? 0 : 20)
+                    .animation(.easeOut(duration: 0.8).delay(0.4), value: animateElements)
+                
+                Text(page.description)
+                    .font(.subheadline) // RIDOTTO da body
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3) // LIMITATO a 3 righe
+                    .opacity(animateElements ? 1.0 : 0.0)
+                    .offset(y: animateElements ? 0 : 20)
+                    .animation(.easeOut(duration: 0.8).delay(0.6), value: animateElements)
+            }
+            .padding(.horizontal, 24)
+            
+            // Features list - COMPATTATE
+            VStack(spacing: 10) { // RIDOTTO da 16
+                ForEach(Array(page.features.enumerated()), id: \.offset) { index, feature in
+                    OnboardingFeatureRow(
+                        text: feature,
+                        color: page.color,
+                        delay: 0.8 + Double(index) * 0.1,
+                        animateElements: animateElements
+                    )
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity) // AGGIUNTO: occupa tutto lo spazio
+    }
+}
+
+// 5. NUOVO: OnboardingFeatureRow - Singola feature
+struct OnboardingFeatureRow: View {
+    let text: String
+    let color: Color
+    let delay: Double
+    let animateElements: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) { // RIDOTTO da 16
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.1))
+                    .frame(width: 28, height: 28) // RIDOTTO da 32
+                
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold)) // RIDOTTO da 14
+                    .foregroundColor(color)
+            }
+            
+            Text(text)
+                .font(.caption) // RIDOTTO da subheadline
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.leading)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16) // RIDOTTO da 20
+        .padding(.vertical, 8) // RIDOTTO da 12
+        .background(
+            RoundedRectangle(cornerRadius: 12) // RIDOTTO da 16
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(color.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 3) // RIDOTTA ombra
+        )
+        .opacity(animateElements ? 1.0 : 0.0)
+        .offset(x: animateElements ? 0 : 50)
+        .animation(.spring(response: 0.8, dampingFraction: 0.7).delay(delay), value: animateElements)
     }
 }
 
