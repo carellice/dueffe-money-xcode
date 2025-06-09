@@ -979,7 +979,7 @@ extension Character {
     }
 }
 
-// MARK: - Simple Add Transaction View (CORRETTO - CON SEZIONE SALVADANAIO)
+// MARK: - SimpleAddTransactionView AGGIORNATA (TransactionsView.swift)
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -991,6 +991,7 @@ struct SimpleAddTransactionView: View {
     @State private var selectedAccount = ""
     @State private var selectedSalvadanaio = ""
     @State private var showingSalaryDistribution = false
+    @State private var showingIncomeDistribution = false // NUOVO
     
     let transactionTypes = [
         ("expense", "Spesa", "minus.circle"),
@@ -1094,7 +1095,7 @@ struct SimpleAddTransactionView: View {
                     }
                 }
                 
-                // SALVADANAIO (SOLO PER LE SPESE) - SEZIONE CORRETTA
+                // SALVADANAIO (SOLO PER LE SPESE)
                 if transactionType == "expense" {
                     if !dataManager.salvadanai.isEmpty {
                         Section {
@@ -1172,12 +1173,62 @@ struct SimpleAddTransactionView: View {
                         if transactionType == "salary" {
                             Text("Lo stipendio verrà registrato su questo conto e poi potrai distribuirlo tra i salvadanai")
                         } else {
-                            Text("L'entrata verrà aggiunta a questo conto")
+                            Text("L'entrata verrà aggiunta a questo conto e poi potrai distribuirla tra i salvadanai") // AGGIORNATO
                         }
                     }
                 }
                 
-                // NUOVO: Info speciale per stipendi
+                // NUOVO: Info speciale per entrate (SIMILE A STIPENDI)
+                if transactionType == "income" && !dataManager.salvadanai.isEmpty {
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Distribuzione Entrata")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                            }
+                            
+                            Text("Dopo aver salvato l'entrata, potrai distribuirla tra i tuoi salvadanai utilizzando diverse modalità:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                DistributionInfoRow(
+                                    icon: "equal.circle.fill",
+                                    title: "Distribuzione Equa",
+                                    description: "Dividi in parti uguali tra i salvadanai selezionati",
+                                    color: .green
+                                )
+                                
+                                DistributionInfoRow(
+                                    icon: "slider.horizontal.3",
+                                    title: "Distribuzione Personalizzata",
+                                    description: "Specifica importi personalizzati per ogni salvadanaio",
+                                    color: .purple
+                                )
+                                
+                                DistributionInfoRow(
+                                    icon: "sparkles",
+                                    title: "Distribuzione Automatica",
+                                    description: "Algoritmo intelligente basato su priorità e necessità",
+                                    color: .orange
+                                )
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    } header: {
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundColor(.yellow)
+                            Text("Come funziona")
+                        }
+                    }
+                }
+                
+                // AGGIORNATO: Info speciale per stipendi
                 if transactionType == "salary" {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
@@ -1237,12 +1288,12 @@ struct SimpleAddTransactionView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(transactionType == "salary" ? "Continua" : "Salva") {
+                    Button(getButtonText()) { // AGGIORNATO
                         saveTransaction()
                     }
                     .disabled(!isFormValid)
                     .fontWeight(.semibold)
-                    .foregroundColor(isFormValid ? (transactionType == "salary" ? .orange : .blue) : .secondary)
+                    .foregroundColor(isFormValid ? getButtonColor() : .secondary) // AGGIORNATO
                 }
             })
         }
@@ -1254,10 +1305,40 @@ struct SimpleAddTransactionView: View {
                 transactionType: transactionType,
                 selectedAccount: selectedAccount,
                 onComplete: {
-                    // NUOVO: Callback che chiude il sheet principale
                     dismiss()
                 }
             )
+        }
+        .sheet(isPresented: $showingIncomeDistribution) { // NUOVO SHEET
+            SalaryDistributionView(
+                amount: amount,
+                descr: descr,
+                transactionType: transactionType,
+                selectedAccount: selectedAccount,
+                onComplete: {
+                    dismiss()
+                }
+            )
+        }
+    }
+    
+    // NUOVO: Funzione per il testo del bottone
+    private func getButtonText() -> String {
+        if transactionType == "salary" {
+            return "Distribuisci Stipendio"
+        } else if transactionType == "income" && !dataManager.salvadanai.isEmpty {
+            return "Distribuisci Entrata"
+        } else {
+            return "Salva"
+        }
+    }
+    
+    // NUOVO: Funzione per il colore del bottone
+    private func getButtonColor() -> Color {
+        switch transactionType {
+        case "salary": return .blue
+        case "income": return .green
+        default: return .blue
         }
     }
     
@@ -1313,17 +1394,23 @@ struct SimpleAddTransactionView: View {
                 // Altrimenti, mostra la vista di distribuzione
                 showingSalaryDistribution = true
             }
-        } else {
-            // Per entrate normali: usa solo il conto
-            dataManager.addTransaction(
-                amount: amount,
-                descr: descr,
-                category: selectedCategory,
-                type: transactionType,
-                accountName: selectedAccount,
-                salvadanaiName: nil
-            )
-            dismiss()
+        } else if transactionType == "income" {
+            // NUOVO: Per le entrate normali
+            if dataManager.salvadanai.isEmpty {
+                // Se non ci sono salvadanai, registra direttamente l'entrata
+                dataManager.addTransaction(
+                    amount: amount,
+                    descr: descr,
+                    category: selectedCategory,
+                    type: transactionType,
+                    accountName: selectedAccount,
+                    salvadanaiName: nil
+                )
+                dismiss()
+            } else {
+                // Altrimenti, mostra la vista di distribuzione
+                showingIncomeDistribution = true
+            }
         }
     }
 }
