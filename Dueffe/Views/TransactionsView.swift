@@ -395,15 +395,36 @@ struct TransactionRowView: View {
                 
                 // Salvadanaio/Conto
                 if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
-                    Text("da \(salvadanaiName)")
-                        .font(.subheadline)
-                        .foregroundColor(.orange)
-                        .fontWeight(.medium)
-                } else if transaction.type != "expense" && !transaction.accountName.isEmpty {
-                    Text("su \(transaction.accountName)")
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
+                    HStack(spacing: 4) {
+                        Image(systemName: "banknote")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("da \(salvadanaiName)")
+                            .font(.subheadline)
+                            .foregroundColor(.orange)
+                            .fontWeight(.medium)
+                    }
+                } else if transaction.type == "transfer", let salvadanaiName = transaction.salvadanaiName {
+                    // NUOVO: Gestione speciale per i trasferimenti (distribuzioni stipendio)
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        Text("verso \(salvadanaiName)")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .fontWeight(.medium)
+                    }
+                } else if transaction.type != "expense" && transaction.type != "transfer" && !transaction.accountName.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "building.columns")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("su \(transaction.accountName)")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    }
                 }
             }
             
