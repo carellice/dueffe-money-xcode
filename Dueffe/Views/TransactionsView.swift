@@ -384,7 +384,9 @@ struct TransactionRowView: View {
                 Text(transaction.descr)
                     .font(.headline)
                     .foregroundColor(.primary)
-                    .lineLimit(1)
+                    .lineLimit(nil)  // Permette righe multiple
+                    .multilineTextAlignment(.leading)  // Allineamento a sinistra
+                    .fixedSize(horizontal: false, vertical: true)  // Espande in verticale se necessario
                 
                 // Data
                 Text(transaction.date, style: .date)
