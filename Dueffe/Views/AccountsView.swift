@@ -352,50 +352,33 @@ struct EnhancedAccountCard: View {
                 Divider()
                 
                 HStack {
-                    // Ultima transazione
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Ultima attività")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    // Solo numero transazioni centrato
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.bullet.circle.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
                         
-                        if let lastDate = lastTransactionDate {
-                            HStack {
-                                Image(systemName: "clock")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                                Text(lastDate, style: .relative)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            }
-                        } else {
-                            HStack {
-                                Image(systemName: "minus.circle")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                Text("Nessuna transazione")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                        }
+                        Text("\(relatedTransactions.count)")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.blue)
+                        
+                        Text(relatedTransactions.count == 1 ? "transazione" : "transazioni")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                     }
                     
                     Spacer()
                     
-                    // Numero transazioni
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text("Transazioni")
+                    // Data creazione (opzionale, per bilanciare il layout)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Creato")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        HStack {
-                            Text("\(relatedTransactions.count)")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
-                            Image(systemName: "list.bullet")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
+                        Text(account.createdAt, style: .date)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
             }
