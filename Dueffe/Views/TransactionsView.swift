@@ -909,7 +909,8 @@ extension Character {
     }
 }
 
-// MARK: - Simple Add Transaction View (MODIFICATO)
+// MARK: - Simple Add Transaction View (AGGIORNATO CON DISTRIBUZIONE STIPENDIO)
+// MARK: - Simple Add Transaction View (CORRETTO - GESTIONE CHIUSURA SHEET)
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -920,6 +921,7 @@ struct SimpleAddTransactionView: View {
     @State private var transactionType = "expense"
     @State private var selectedAccount = ""
     @State private var selectedSalvadanaio = ""
+    @State private var showingSalaryDistribution = false
     
     let transactionTypes = [
         ("expense", "Spesa", "minus.circle"),
@@ -943,12 +945,17 @@ struct SimpleAddTransactionView: View {
                    !descr.isEmpty &&
                    !selectedSalvadanaio.isEmpty &&
                    !selectedCategory.isEmpty
+        } else if transactionType == "salary" {
+            // Per gli stipendi: serve solo importo, descrizione e conto (la distribuzione avviene dopo)
+            return amount > 0 &&
+                   !descr.isEmpty &&
+                   !selectedAccount.isEmpty
         } else {
-            // Per entrate: serve importo, descrizione e conto
+            // Per entrate normali: serve importo, descrizione, categoria e conto
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedAccount.isEmpty &&
-                   (transactionType == "salary" || !selectedCategory.isEmpty)
+                   !selectedCategory.isEmpty
         }
     }
     
@@ -1002,8 +1009,8 @@ struct SimpleAddTransactionView: View {
                     Text("Dettagli")
                 }
                 
-                // Categoria
-                if transactionType != "salary" && !availableCategories.isEmpty {
+                // Categoria (solo per spese ed entrate normali)
+                if transactionType == "expense" || (transactionType == "income" && !availableCategories.isEmpty) {
                     Section {
                         Picker("Categoria", selection: $selectedCategory) {
                             Text("Seleziona categoria")
@@ -1011,40 +1018,6 @@ struct SimpleAddTransactionView: View {
                                 .foregroundColor(.secondary)
                             ForEach(availableCategories, id: \.self) { category in
                                 Text(category).tag(category)
-                            }
-                        }
-                    } header: {
-                        Text("Categoria")
-                    }
-                } else if transactionType == "salary" {
-                    Section {
-                        HStack {
-                            Text("Categoria")
-                            Spacer()
-                            Text("💼 Stipendio")
-                                .foregroundColor(.secondary)
-                        }
-                    } header: {
-                        Text("Categoria")
-                    }
-                }
-                
-                // NUOVO: Salvadanaio per spese
-                if transactionType == "expense" && !dataManager.salvadanai.isEmpty {
-                    Section {
-                        Picker("Da quale salvadanaio", selection: $selectedSalvadanaio) {
-                            Text("Seleziona salvadanaio").tag("")
-                            ForEach(dataManager.salvadanai, id: \.name) { salvadanaio in
-                                HStack {
-                                    Circle()
-                                        .fill(Color(salvadanaio.color))
-                                        .frame(width: 12, height: 12)
-                                    Text(salvadanaio.name)
-                                    Spacer()
-                                    Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
-                                        .foregroundColor(salvadanaio.currentAmount >= amount ? .green : .red)
-                                }
-                                .tag(salvadanaio.name)
                             }
                         }
                     } header: {
@@ -1081,8 +1054,8 @@ struct SimpleAddTransactionView: View {
                     }
                 }
                 
-                // Account solo per entrate
-                if transactionType != "expense" && !dataManager.accounts.isEmpty {
+                // Account per entrate e stipendi
+                if (transactionType == "income" || transactionType == "salary") && !dataManager.accounts.isEmpty {
                     Section {
                         Picker("A quale conto", selection: $selectedAccount) {
                             Text("Seleziona conto").tag("")
@@ -1103,7 +1076,61 @@ struct SimpleAddTransactionView: View {
                             Text("Conto di destinazione")
                         }
                     } footer: {
-                        Text("L'entrata verrà aggiunta a questo conto")
+                        if transactionType == "salary" {
+                            Text("Lo stipendio verrà registrato su questo conto e poi potrai distribuirlo tra i salvadanai")
+                        } else {
+                            Text("L'entrata verrà aggiunta a questo conto")
+                        }
+                    }
+                }
+                
+                // NUOVO: Info speciale per stipendi
+                if transactionType == "salary" {
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundColor(.blue)
+                                Text("Distribuzione Stipendio")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Text("Dopo aver salvato lo stipendio, potrai distribuirlo tra i tuoi salvadanai utilizzando diverse modalità:")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                DistributionInfoRow(
+                                    icon: "equal.circle.fill",
+                                    title: "Distribuzione Equa",
+                                    description: "Dividi in parti uguali tra i salvadanai selezionati",
+                                    color: .blue
+                                )
+                                
+                                DistributionInfoRow(
+                                    icon: "slider.horizontal.3",
+                                    title: "Distribuzione Personalizzata",
+                                    description: "Specifica importi personalizzati per ogni salvadanaio",
+                                    color: .purple
+                                )
+                                
+                                DistributionInfoRow(
+                                    icon: "sparkles", // CAMBIATO: icona che esiste sicuramente
+                                    title: "Distribuzione Automatica",
+                                    description: "Algoritmo intelligente basato su priorità e necessità",
+                                    color: .orange
+                                )
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    } header: {
+                        HStack {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundColor(.yellow)
+                            Text("Come funziona")
+                        }
                     }
                 }
             }
@@ -1117,14 +1144,28 @@ struct SimpleAddTransactionView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Salva") {
+                    Button(transactionType == "salary" ? "Continua" : "Salva") {
                         saveTransaction()
                     }
                     .disabled(!isFormValid)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isFormValid ? (transactionType == "salary" ? .orange : .blue) : .secondary)
                 }
             })
         }
         .onAppear(perform: setupDefaults)
+        .sheet(isPresented: $showingSalaryDistribution) {
+            SalaryDistributionView(
+                amount: amount,
+                descr: descr,
+                transactionType: transactionType,
+                selectedAccount: selectedAccount,
+                onComplete: {
+                    // NUOVO: Callback che chiude il sheet principale
+                    dismiss()
+                }
+            )
+        }
     }
     
     private func getNavigationTitle() -> String {
@@ -1136,7 +1177,7 @@ struct SimpleAddTransactionView: View {
     }
     
     private func setupDefaults() {
-        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && transactionType != "expense" {
+        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && (transactionType == "income" || transactionType == "salary") {
             selectedAccount = dataManager.accounts.first!.name
         }
         
@@ -1144,7 +1185,7 @@ struct SimpleAddTransactionView: View {
             selectedCategory = "💼 Stipendio"
         }
         
-        // NUOVO: Seleziona automaticamente il primo salvadanaio per le spese
+        // Seleziona automaticamente il primo salvadanaio per le spese
         if selectedSalvadanaio.isEmpty && !dataManager.salvadanai.isEmpty && transactionType == "expense" {
             selectedSalvadanaio = dataManager.salvadanai.first!.name
         }
@@ -1158,11 +1199,29 @@ struct SimpleAddTransactionView: View {
                 descr: descr,
                 category: selectedCategory,
                 type: transactionType,
-                accountName: nil, // Nessun conto per le spese
+                accountName: nil,
                 salvadanaiName: selectedSalvadanaio
             )
+            dismiss()
+        } else if transactionType == "salary" {
+            // Per gli stipendi: mostra la vista di distribuzione
+            if dataManager.salvadanai.isEmpty {
+                // Se non ci sono salvadanai, registra direttamente lo stipendio
+                dataManager.addTransaction(
+                    amount: amount,
+                    descr: descr,
+                    category: selectedCategory,
+                    type: transactionType,
+                    accountName: selectedAccount,
+                    salvadanaiName: nil
+                )
+                dismiss()
+            } else {
+                // Altrimenti, mostra la vista di distribuzione
+                showingSalaryDistribution = true
+            }
         } else {
-            // Per entrate: usa solo il conto
+            // Per entrate normali: usa solo il conto
             dataManager.addTransaction(
                 amount: amount,
                 descr: descr,
@@ -1171,7 +1230,38 @@ struct SimpleAddTransactionView: View {
                 accountName: selectedAccount,
                 salvadanaiName: nil
             )
+            dismiss()
         }
-        dismiss()
+    }
+}
+
+// MARK: - Distribution Info Row
+struct DistributionInfoRow: View {
+    let icon: String
+    let title: String
+    let description: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(color)
+                .frame(width: 20)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                
+                Text(description)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+        }
     }
 }

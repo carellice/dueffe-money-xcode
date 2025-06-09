@@ -16,16 +16,56 @@ struct SalvadanaiModel: Identifiable, Codable {
     var isInfinite: Bool
 }
 
-// MARK: - Transaction Model (MODIFICATO)
+// MARK: - Transaction Model (AGGIORNATO CON SUPPORTO TRASFERIMENTI)
 struct TransactionModel: Identifiable, Codable {
     let id = UUID()
     var amount: Double
     var descr: String
     var category: String
-    var type: String // "expense", "income", "salary"
+    var type: String // "expense", "income", "salary", "transfer"
     var date: Date
     var accountName: String // Può essere vuoto per le spese
     var salvadanaiName: String?
+    
+    // NUOVO: Proprietà computate per migliorare la leggibilità
+    var isTransfer: Bool {
+        return type == "transfer"
+    }
+    
+    var isExpense: Bool {
+        return type == "expense"
+    }
+    
+    var isIncome: Bool {
+        return type == "income" || type == "salary"
+    }
+    
+    var displayColor: Color {
+        switch type {
+        case "expense": return .red
+        case "salary": return .blue
+        case "transfer": return .orange
+        default: return .green
+        }
+    }
+    
+    var displayIcon: String {
+        switch type {
+        case "expense": return "minus.circle.fill"
+        case "salary": return "banknote.fill"
+        case "transfer": return "arrow.left.arrow.right.circle.fill"
+        default: return "plus.circle.fill"
+        }
+    }
+    
+    var displayDescription: String {
+        if isTransfer {
+            if let salvadanaiName = salvadanaiName {
+                return "\(descr): \(accountName) → \(salvadanaiName)"
+            }
+        }
+        return descr
+    }
 }
 
 struct AccountModel: Identifiable, Codable {
@@ -33,6 +73,50 @@ struct AccountModel: Identifiable, Codable {
     var name: String
     var balance: Double
     var createdAt: Date
+}
+
+// MARK: - Distribution Suggestion Model
+struct DistributionSuggestion {
+    let salvadanaiName: String
+    let suggestedAmount: Double
+    let reason: String
+    let priority: Priority
+    
+    enum Priority: Int, CaseIterable {
+        case high = 3
+        case medium = 2
+        case low = 1
+        
+        var color: Color {
+            switch self {
+            case .high: return .red
+            case .medium: return .orange
+            case .low: return .blue
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .high: return "exclamationmark.triangle.fill"
+            case .medium: return "clock.fill"
+            case .low: return "info.circle.fill"
+            }
+        }
+    }
+}
+
+// MARK: - Distribution Validation
+struct DistributionValidation {
+    let isValid: Bool
+    let message: String
+    
+    var color: Color {
+        isValid ? .green : .red
+    }
+    
+    var icon: String {
+        isValid ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+    }
 }
 
 // MARK: - Computed Properties aggiornate per DataManager
@@ -306,11 +390,14 @@ class DataManager: ObservableObject {
         }
     }
     
-    // MARK: - Distribution Methods
+    // MARK: - NUOVI METODI PER DISTRIBUZIONE STIPENDI
+    
+    // NUOVO: Distribuzione con importi personalizzati
     func distributeIncomeWithCustomAmounts(amount: Double, salvadanaiAmounts: [String: Double], accountName: String, transactionType: String = "salary") {
         let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
         let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
         
+        // 1. Aggiungi la transazione principale al conto
         addTransaction(
             amount: amount,
             descr: descriptionText,
@@ -319,46 +406,185 @@ class DataManager: ObservableObject {
             accountName: accountName
         )
         
+        // 2. Distribuisci gli importi personalizzati ai salvadanai
         for (salvadanaiName, customAmount) in salvadanaiAmounts {
             if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
                 if customAmount > 0 {
+                    // Aggiungi l'importo al salvadanaio
                     salvadanai[index].currentAmount += customAmount
+                    
+                    // Sottrai l'importo dal conto di riferimento del salvadanaio
                     updateAccountBalance(accountName: salvadanai[index].accountName, amount: -customAmount)
+                    
+                    // NUOVO: Aggiungi una transazione di trasferimento per tracciabilità
+                    addTransferTransaction(
+                        amount: customAmount,
+                        fromAccount: accountName,
+                        toSalvadanaio: salvadanaiName,
+                        description: "Distribuzione \(descriptionText.lowercased())"
+                    )
                 }
             }
         }
     }
     
-    func distributeIncome(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String, transactionType: String = "salary") {
-        let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
-        let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
-        
-        addTransaction(
+    // NUOVO: Transazione di trasferimento per tracciare i movimenti tra conto e salvadanaio
+    private func addTransferTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
+        let transferTransaction = TransactionModel(
             amount: amount,
-            descr: descriptionText,
-            category: categoryText,
-            type: transactionType,
-            accountName: accountName
+            descr: description,
+            category: "🔄 Trasferimento",
+            type: "transfer", // Nuovo tipo di transazione
+            date: Date(),
+            accountName: fromAccount,
+            salvadanaiName: toSalvadanaio
         )
+        transactions.append(transferTransaction)
+    }
+    
+    // MIGLIORATO: Distribuzione automatica intelligente
+    func distributeIncomeAutomatically(amount: Double, accountName: String, transactionType: String = "salary") {
+        let automaticDistribution = calculateAutomaticDistribution(totalAmount: amount)
         
-        for salvadanaiName in selectedSalvadanai {
-            if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
-                var amountToAdd: Double = 0
+        distributeIncomeWithCustomAmounts(
+            amount: amount,
+            salvadanaiAmounts: automaticDistribution,
+            accountName: accountName,
+            transactionType: transactionType
+        )
+    }
+    
+    // NUOVO: Calcolo distribuzione automatica intelligente
+    func calculateAutomaticDistribution(totalAmount: Double) -> [String: Double] {
+        var distribution: [String: Double] = [:]
+        var remainingAmount = totalAmount
+        
+        // Priorità 1: Glass salvadanai che hanno bisogno di ricarica
+        let glassSalvadanai = salvadanai.filter { $0.type == "glass" }
+            .sorted { $0.currentAmount < $1.currentAmount } // Dal più vuoto al più pieno
+        
+        for salvadanaio in glassSalvadanai {
+            let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
+            if needed > 0 && remainingAmount > 0 {
+                let toAdd = min(needed, remainingAmount)
+                distribution[salvadanaio.name] = toAdd
+                remainingAmount -= toAdd
+            }
+        }
+        
+        // Priorità 2: Obiettivi con scadenza più vicina
+        let objectiveSalvadanai = salvadanai.filter {
+            $0.type == "objective" && !$0.isInfinite && $0.targetDate != nil
+        }.sorted {
+            ($0.targetDate ?? Date.distantFuture) < ($1.targetDate ?? Date.distantFuture)
+        }
+        
+        for salvadanaio in objectiveSalvadanai {
+            if remainingAmount <= 0 { break }
+            
+            let needed = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
+            if needed > 0 {
+                // Calcola giorni rimanenti per determinare l'urgenza
+                let daysRemaining = Calendar.current.dateComponents([.day],
+                    from: Date(),
+                    to: salvadanaio.targetDate ?? Date.distantFuture).day ?? Int.max
                 
-                if salvadanai[index].type == "glass" {
-                    let targetAmount = salvadanai[index].monthlyRefill
-                    let currentAmount = salvadanai[index].currentAmount
-                    amountToAdd = max(0, targetAmount - currentAmount)
+                let urgencyMultiplier: Double
+                if daysRemaining <= 30 {
+                    urgencyMultiplier = 1.5 // Molto urgente
+                } else if daysRemaining <= 90 {
+                    urgencyMultiplier = 1.2 // Urgente
                 } else {
-                    let remainingToTarget = salvadanai[index].targetAmount - salvadanai[index].currentAmount
-                    amountToAdd = min(100, max(0, remainingToTarget))
+                    urgencyMultiplier = 1.0 // Normale
                 }
                 
-                if amountToAdd > 0 {
-                    salvadanai[index].currentAmount += amountToAdd
-                    updateAccountBalance(accountName: salvadanai[index].accountName, amount: -amountToAdd)
+                let baseAllocation = min(150, needed) // Massimo 150€ per obiettivo
+                let allocation = min(baseAllocation * urgencyMultiplier, remainingAmount)
+                
+                if allocation > 0 {
+                    distribution[salvadanaio.name] = (distribution[salvadanaio.name] ?? 0) + allocation
+                    remainingAmount -= allocation
                 }
             }
         }
+        
+        // Priorità 3: Distribuzione del rimanente tra salvadanai infiniti
+        let infiniteSalvadanai = salvadanai.filter { $0.type == "objective" && $0.isInfinite }
+        if !infiniteSalvadanai.isEmpty && remainingAmount > 0 {
+            let perInfinite = remainingAmount / Double(infiniteSalvadanai.count)
+            for salvadanaio in infiniteSalvadanai {
+                distribution[salvadanaio.name] = (distribution[salvadanaio.name] ?? 0) + perInfinite
+            }
+            remainingAmount = 0
+        }
+        
+        // Priorità 4: Se rimane ancora qualcosa, distribuiscilo equamente tra tutti i salvadanai con distribuzione > 0
+        if remainingAmount > 0 && !distribution.isEmpty {
+            let perSelected = remainingAmount / Double(distribution.count)
+            for key in distribution.keys {
+                distribution[key] = (distribution[key] ?? 0) + perSelected
+            }
+        }
+        
+        return distribution
+    }
+    
+    // MIGLIORATO: Distribuzione equa con selezione personalizzata
+    func distributeIncomeEqually(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String, transactionType: String = "salary") {
+        guard !selectedSalvadanai.isEmpty else { return }
+        
+        let perSalvadanaio = amount / Double(selectedSalvadanai.count)
+        let equalDistribution = Dictionary(uniqueKeysWithValues: selectedSalvadanai.map { ($0, perSalvadanaio) })
+        
+        distributeIncomeWithCustomAmounts(
+            amount: amount,
+            salvadanaiAmounts: equalDistribution,
+            accountName: accountName,
+            transactionType: transactionType
+        )
+    }
+    
+    // NUOVO: Suggerimenti per distribuzione ottimale
+    func getDistributionSuggestions(amount: Double) -> [DistributionSuggestion] {
+        var suggestions: [DistributionSuggestion] = []
+        
+        // Suggerimento 1: Glass con ricarica necessaria
+        let glassSalvadanai = salvadanai.filter { $0.type == "glass" }
+        for salvadanaio in glassSalvadanai {
+            let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
+            if needed > 0 {
+                suggestions.append(DistributionSuggestion(
+                    salvadanaiName: salvadanaio.name,
+                    suggestedAmount: min(needed, amount),
+                    reason: "Ricarica Glass necessaria",
+                    priority: .high
+                ))
+            }
+        }
+        
+        // Suggerimento 2: Obiettivi urgenti
+        let urgentObjectives = salvadanai.filter {
+            $0.type == "objective" && !$0.isInfinite && $0.targetDate != nil
+        }.filter { salvadanaio in
+            guard let targetDate = salvadanaio.targetDate else { return false }
+            let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
+            return daysRemaining <= 60 && salvadanaio.currentAmount < salvadanaio.targetAmount
+        }
+        
+        for salvadanaio in urgentObjectives {
+            let needed = salvadanaio.targetAmount - salvadanaio.currentAmount
+            let daysRemaining = Calendar.current.dateComponents([.day],
+                from: Date(),
+                to: salvadanaio.targetDate ?? Date.distantFuture).day ?? 0
+            
+            suggestions.append(DistributionSuggestion(
+                salvadanaiName: salvadanaio.name,
+                suggestedAmount: min(needed, amount * 0.3), // Massimo 30% per obiettivo urgente
+                reason: "Scadenza in \(daysRemaining) giorni",
+                priority: daysRemaining <= 30 ? .high : .medium
+            ))
+        }
+        
+        return suggestions.sorted { $0.priority.rawValue > $1.priority.rawValue }
     }
 }
