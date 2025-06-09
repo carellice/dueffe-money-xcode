@@ -604,7 +604,7 @@ struct SalvadanaiCardView: View {
                                 .font(.caption)
                                 .foregroundColor(getColor(from: salvadanaio.color))
                             
-                            Text("Glass system")
+                            Text("Glass")
                                 .font(.caption)
                                 .foregroundColor(getColor(from: salvadanaio.color))
                                 .fontWeight(.medium)
