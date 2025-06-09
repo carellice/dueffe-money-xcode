@@ -58,7 +58,7 @@ struct TransactionsView: View {
                     } else {
                         VStack(spacing: 0) {
                             // Header con statistiche (MODIFICATO - rimosso bilancio netto)
-                            TransactionsStatsHeaderView(
+                            UltraCompactTransactionsHeader(
                                 totalExpenses: totalExpenses,
                                 totalIncome: totalIncome,
                                 transactionCount: dataManager.transactions.count
@@ -1263,5 +1263,218 @@ struct DistributionInfoRow: View {
             
             Spacer()
         }
+    }
+}
+
+// MARK: - Compact Transactions Stats Header (MOLTO PIÙ COMPATTO)
+struct CompactTransactionsStatsHeader: View {
+    let totalExpenses: Double
+    let totalIncome: Double
+    let transactionCount: Int
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            // Header titolo compatto
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(.purple)
+                    .font(.subheadline)
+                Text("Riepilogo Transazioni")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            
+            // Statistiche in riga orizzontale compatta
+            HStack(spacing: 16) {
+                CompactTransactionStatItem(
+                    title: "Entrate",
+                    amount: totalIncome,
+                    icon: "plus.circle.fill",
+                    color: .green
+                )
+                
+                Divider()
+                    .frame(height: 20)
+                
+                CompactTransactionStatItem(
+                    title: "Spese",
+                    amount: totalExpenses,
+                    icon: "minus.circle.fill",
+                    color: .red
+                )
+                
+                Divider()
+                    .frame(height: 20)
+                
+                CompactTransactionStatItem(
+                    title: "Totali",
+                    amount: Double(transactionCount),
+                    icon: "list.bullet.circle.fill",
+                    color: .blue,
+                    isCount: true
+                )
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12) // Ridotto da 24 a 12
+        .background(
+            RoundedRectangle(cornerRadius: 14) // Ridotto da 20 a 14
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3) // Ridotta ombra
+        )
+    }
+}
+
+// MARK: - Compact Transaction Stat Item
+struct CompactTransactionStatItem: View {
+    let title: String
+    let amount: Double
+    let icon: String
+    let color: Color
+    let isCount: Bool
+    
+    init(title: String, amount: Double, icon: String, color: Color, isCount: Bool = false) {
+        self.title = title
+        self.amount = amount
+        self.icon = icon
+        self.color = color
+        self.isCount = isCount
+    }
+    
+    var body: some View {
+        VStack(spacing: 4) { // Ridotto da 8 a 4
+            Image(systemName: icon)
+                .font(.subheadline) // Ridotto da .title2 a .subheadline
+                .foregroundColor(color)
+            
+            if isCount {
+                Text("\(Int(amount))")
+                    .font(.subheadline) // Ridotto da .headline a .subheadline
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+            } else {
+                Text("€\(String(format: "%.0f", amount))")
+                    .font(.subheadline) // Ridotto da .headline a .subheadline
+                    .fontWeight(.bold)
+                    .foregroundColor(color)
+            }
+            
+            Text(title)
+                .font(.caption2) // Ridotto da .caption a .caption2
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Versione minimale (stile AccountsView)
+struct MinimalTransactionsStatsHeader: View {
+    let totalExpenses: Double
+    let totalIncome: Double
+    let transactionCount: Int
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                // Entrate a sinistra
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Entrate Totali")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("€")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.0f", totalIncome))
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.green)
+                    }
+                }
+                
+                Spacer()
+                
+                // Spese e transazioni a destra
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("€")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.0f", totalExpenses))
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                    }
+                    
+                    Text("\(transactionCount) transazioni")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
+        )
+    }
+}
+
+// MARK: - Versione ultra-compatta (una sola riga)
+struct UltraCompactTransactionsHeader: View {
+    let totalExpenses: Double
+    let totalIncome: Double
+    let transactionCount: Int
+    
+    var body: some View {
+        HStack {
+            // Entrate
+            HStack(spacing: 4) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                Text("€\(String(format: "%.0f", totalIncome))")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+            }
+            
+            Spacer()
+            
+            // Numero transazioni al centro
+            HStack(spacing: 4) {
+                Image(systemName: "list.bullet.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                Text("\(transactionCount)")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+            }
+            
+            Spacer()
+            
+            // Spese
+            HStack(spacing: 4) {
+                Image(systemName: "minus.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                Text("€\(String(format: "%.0f", totalExpenses))")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.red)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.ultraThinMaterial)
+        )
     }
 }
