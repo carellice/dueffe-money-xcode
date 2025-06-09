@@ -354,11 +354,11 @@ struct SalvadanaiCardView: View {
         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
             guard salvadanaio.targetAmount > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
+            return salvadanaio.currentAmount / salvadanaio.targetAmount
         } else if salvadanaio.type == "glass" {
             guard salvadanaio.monthlyRefill > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+            return salvadanaio.currentAmount / salvadanaio.monthlyRefill
         }
         return 0
     }
@@ -545,7 +545,7 @@ struct SalvadanaiCardView: View {
                         }
                         
                         // Progress bar
-                        ProgressView(value: animateProgress ? progress : 0)
+                        ProgressView(value: animateProgress ? min(progress, 1.0) : 0)
                             .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
                             .scaleEffect(y: 2)
                             .animation(.easeOut(duration: 1.5), value: animateProgress)
@@ -593,7 +593,7 @@ struct SalvadanaiCardView: View {
                         }
                         
                         // Progress bar
-                        ProgressView(value: animateProgress ? progress : 0)
+                        ProgressView(value: animateProgress ? min(progress, 1.0) : 0)
                             .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
                             .scaleEffect(y: 2)
                             .animation(.easeOut(duration: 1.5), value: animateProgress)
