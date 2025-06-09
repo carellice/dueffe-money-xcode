@@ -112,11 +112,14 @@ struct TransactionsView: View {
                                         ForEach(transactions, id: \.id) { transaction in
                                             TransactionRowView(transaction: transaction)
                                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                                    Button("Elimina", role: .destructive) {
+                                                    Button(action: {
                                                         withAnimation {
                                                             dataManager.deleteTransaction(transaction)
                                                         }
+                                                    }) {
+                                                        Label("Elimina", systemImage: "trash.fill")
                                                     }
+                                                    .tint(.red) // Questo rende il bottone rosso
                                                 }
                                         }
                                     } header: {
