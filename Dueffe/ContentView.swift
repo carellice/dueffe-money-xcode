@@ -145,18 +145,10 @@ struct FirstAccountOnboardingView: View {
                                             .font(.headline)
                                             .fontWeight(.semibold)
                                     }
-                                    
-                                    HStack {
-                                        Text("€")
-                                            .font(.title2)
-                                            .foregroundColor(.secondary)
-                                            .padding(.leading, 16)
-                                        
-                                        TextField("0,00", value: $initialBalance, format: .currency(code: "EUR"))
+                                    TextField("0,00", value: $initialBalance, format: .currency(code: "EUR"))
                                             .textFieldStyle(ModernTextFieldStyle())
                                             .keyboardType(.decimalPad)
                                             .multilineTextAlignment(.trailing)
-                                    }
                                 }
                             }
                             .padding(28)
@@ -269,16 +261,15 @@ struct ModernTextFieldStyle: TextFieldStyle {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.1))
+                    .fill(.regularMaterial) // Cambiato per dark mode
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                            .stroke(.tertiary, lineWidth: 1) // Cambiato per dark mode
                     )
             )
     }
 }
 
-// MARK: - Example Account Card migliorato
 struct ExampleAccountCard: View {
     let name: String
     let icon: String
@@ -290,13 +281,13 @@ struct ExampleAccountCard: View {
                 .font(.title3)
                 .foregroundColor(color)
                 .frame(width: 32, height: 32)
-                .background(color.opacity(0.1))
+                .background(color.opacity(0.15)) // Aumentata opacità per dark mode
                 .clipShape(Circle())
             
             Text(name)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(.primary)
+                .foregroundColor(.primary) // Cambiato per adattarsi al tema
                 .lineLimit(1)
             
             Spacer()
@@ -305,8 +296,12 @@ struct ExampleAccountCard: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.8))
-                .shadow(color: color.opacity(0.2), radius: 5, x: 0, y: 2)
+                .fill(.regularMaterial) // Cambiato da Color.white per dark mode
+                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.separator, lineWidth: 0.5) // Aggiunto bordo per definizione
         )
     }
 }
