@@ -1,6 +1,7 @@
 import SwiftUI
 
-// MARK: - Enhanced Accounts View
+// MARK: - Enhanced Accounts View (sezione da aggiornare)
+// MARK: - Enhanced Accounts View (aggiornato per rimuovere context menu)
 struct AccountsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddAccount = false
@@ -54,8 +55,10 @@ struct AccountsView: View {
                             ScrollView {
                                 LazyVStack(spacing: 16) {
                                     ForEach(filteredAccounts, id: \.id) { account in
+                                        // MODIFICATO: Usa la nuova card con menu button, rimuovi onTapGesture per i dettagli
                                         EnhancedAccountCard(account: account)
                                             .onTapGesture {
+                                                // Tap sulla card apre i dettagli
                                                 selectedAccount = account
                                             }
                                     }
@@ -243,22 +246,27 @@ struct AccountStatCard: View {
     }
 }
 
-// MARK: - Enhanced Account Card
+// MARK: - Enhanced Account Card con Context Menu
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
+// MARK: - Enhanced Account Card con UN SOLO Menu Button
+// MARK: - Enhanced Account Card con UN SOLO Menu Button
 struct EnhancedAccountCard: View {
     let account: AccountModel
     @EnvironmentObject var dataManager: DataManager
     @State private var isPressed = false
+    @State private var showingDeleteAlert = false
+    @State private var showingEditSheet = false
     
     private var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter { $0.accountName == account.name }
     }
     
-    private var lastTransactionDate: Date? {
-        relatedTransactions.max(by: { $0.date < $1.date })?.date
-    }
-    
     private var accountIcon: String {
-        // Determina l'icona basata sul nome del conto
         let name = account.name.lowercased()
         if name.contains("carta") || name.contains("prepagata") {
             return "creditcard.fill"
@@ -273,7 +281,7 @@ struct EnhancedAccountCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            // Header migliorato
+            // Header con menu button al posto dello status indicator
             HStack(spacing: 16) {
                 ZStack {
                     Circle()
@@ -308,26 +316,36 @@ struct EnhancedAccountCard: View {
                 
                 Spacer()
                 
-                // Status indicator
-                VStack(alignment: .trailing, spacing: 4) {
-                    if account.balance >= 0 {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.green)
-                    } else {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.title2)
-                            .foregroundColor(.red)
+                // UN SOLO menu button al posto dello status indicator
+                Menu {
+                    Button(action: {
+                        showingEditSheet = true
+                    }) {
+                        Label("Modifica Conto", systemImage: "pencil")
                     }
                     
-                    Text(account.balance >= 0 ? "Attivo" : "In rosso")
-                        .font(.caption2)
-                        .foregroundColor(account.balance >= 0 ? .green : .red)
+                    if relatedTransactions.isEmpty {
+                        Divider()
+                        
+                        Button(role: .destructive, action: {
+                            showingDeleteAlert = true
+                        }) {
+                            Label("Elimina Conto", systemImage: "trash")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title2)
                         .fontWeight(.medium)
+                        .foregroundColor(.blue)
+                        .frame(width: 44, height: 44)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Circle())
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             
-            // Saldo migliorato
+            // Saldo
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("€")
@@ -352,7 +370,6 @@ struct EnhancedAccountCard: View {
                 Divider()
                 
                 HStack {
-                    // Solo numero transazioni centrato
                     HStack(spacing: 8) {
                         Image(systemName: "list.bullet.circle.fill")
                             .font(.subheadline)
@@ -370,7 +387,6 @@ struct EnhancedAccountCard: View {
                     
                     Spacer()
                     
-                    // Data creazione (opzionale, per bilanciare il layout)
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Creato")
                             .font(.caption)
@@ -404,6 +420,19 @@ struct EnhancedAccountCard: View {
                     isPressed = false
                 }
             }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            EditAccountView(account: account)
+        }
+        .alert("Elimina Conto", isPresented: $showingDeleteAlert) {
+            Button("Elimina", role: .destructive) {
+                withAnimation {
+                    dataManager.deleteAccount(account)
+                }
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            Text("Sei sicuro di voler eliminare il conto '\(account.name)'? Questa azione non può essere annullata.")
         }
     }
 }
@@ -1101,45 +1130,204 @@ struct EditAccountView: View {
     @EnvironmentObject var dataManager: DataManager
     
     @State private var account: AccountModel
+    @State private var showingDeleteAlert = false
+    @State private var originalBalance: Double
     
     init(account: AccountModel) {
         _account = State(initialValue: account)
+        _originalBalance = State(initialValue: account.balance)
+    }
+    
+    private var hasChanges: Bool {
+        account.name != dataManager.accounts.first(where: { $0.id == account.id })?.name ||
+        account.balance != originalBalance
+    }
+    
+    private var balanceChange: Double {
+        account.balance - originalBalance
+    }
+    
+    private var relatedTransactions: [TransactionModel] {
+        dataManager.transactions.filter { $0.accountName == account.name }
     }
     
     var body: some View {
         NavigationView {
-            Form {
-                Section {
-                    TextField("Nome del conto", text: $account.name)
-                        .textInputAutocapitalization(.words)
-                } header: {
-                    Text("Nome")
-                }
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.indigo.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
-                Section {
-                    HStack {
-                        Text("Saldo attuale")
-                        Spacer()
-                        TextField("0", value: $account.balance, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
+                Form {
+                    // Anteprima del conto
+                    Section {
+                        AccountPreviewCard(
+                            account: account,
+                            balanceChange: balanceChange,
+                            hasChanges: hasChanges
+                        )
                     }
-                } header: {
-                    Text("Saldo")
-                } footer: {
-                    Text("Modifica il saldo attuale del conto. Attenzione: questa modifica influenzerà il bilancio totale.")
-                }
-                
-                Section {
-                    HStack {
-                        Text("Data di creazione")
-                        Spacer()
-                        Text(account.createdAt, style: .date)
-                            .foregroundColor(.secondary)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    
+                    // Modifica nome
+                    Section {
+                        HStack {
+                            Image(systemName: "tag.fill")
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                            
+                            TextField("Nome del conto", text: $account.name)
+                                .textInputAutocapitalization(.words)
+                                .font(.headline)
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "pencil")
+                                .foregroundColor(.blue)
+                            Text("Nome del Conto")
+                        }
+                    } footer: {
+                        if !relatedTransactions.isEmpty {
+                            Text("⚠️ Attenzione: modificare il nome influenzerà \(relatedTransactions.count) transazioni associate")
+                                .foregroundColor(.orange)
+                        }
                     }
-                } header: {
-                    Text("Informazioni")
+                    
+                    // Modifica saldo
+                    Section {
+                        VStack(spacing: 16) {
+                            HStack {
+                                Image(systemName: "eurosign.circle.fill")
+                                    .foregroundColor(.green)
+                                    .frame(width: 24)
+                                
+                                Text("Saldo attuale")
+                                    .font(.headline)
+                                
+                                Spacer()
+                                
+                                TextField("0", value: $account.balance, format: .currency(code: "EUR"))
+                                    .multilineTextAlignment(.trailing)
+                                    .keyboardType(.decimalPad)
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            // Mostra la differenza se c'è stata una modifica
+                            if abs(balanceChange) > 0.01 {
+                                HStack {
+                                    Text("Modifica:")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                    
+                                    Spacer()
+                                    
+                                    Text("\(balanceChange >= 0 ? "+" : "")€\(String(format: "%.2f", balanceChange))")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(balanceChange >= 0 ? .green : .red)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill((balanceChange >= 0 ? Color.green : Color.red).opacity(0.1))
+                                )
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "banknote.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Saldo")
+                        }
+                    } footer: {
+                        Text("Modifica il saldo attuale del conto. Questa modifica influenzerà il bilancio totale e le statistiche dell'app.")
+                    }
+                    
+                    // Informazioni del conto
+                    Section {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(.secondary)
+                                .frame(width: 24)
+                            
+                            Text("Data di creazione")
+                            Spacer()
+                            Text(account.createdAt, style: .date)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "list.bullet.circle")
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                            
+                            Text("Transazioni associate")
+                            Spacer()
+                            Text("\(relatedTransactions.count)")
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundColor(.purple)
+                            Text("Informazioni")
+                        }
+                    }
+                    
+                    // Sezione di eliminazione
+                    if relatedTransactions.isEmpty {
+                        Section {
+                            Button(action: {
+                                showingDeleteAlert = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "trash.fill")
+                                        .foregroundColor(.red)
+                                        .frame(width: 24)
+                                    
+                                    Text("Elimina Conto")
+                                        .foregroundColor(.red)
+                                        .fontWeight(.medium)
+                                    
+                                    Spacer()
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                Text("Zona Pericolosa")
+                            }
+                        } footer: {
+                            Text("Eliminare il conto è un'azione irreversibile.")
+                        }
+                    } else {
+                        Section {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundColor(.orange)
+                                    .frame(width: 24)
+                                
+                                Text("Impossibile eliminare")
+                                    .foregroundColor(.orange)
+                                    .fontWeight(.medium)
+                                
+                                Spacer()
+                            }
+                        } footer: {
+                            Text("Non è possibile eliminare un conto con transazioni associate. Elimina prima tutte le transazioni correlate.")
+                        }
+                    }
                 }
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("Modifica Conto")
             .navigationBarTitleDisplayMode(.inline)
@@ -1152,14 +1340,136 @@ struct EditAccountView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salva") {
-                        if let index = dataManager.accounts.firstIndex(where: { $0.id == account.id }) {
-                            dataManager.accounts[index] = account
-                        }
-                        dismiss()
+                        saveChanges()
                     }
+                    .disabled(!hasChanges || account.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
+                    .foregroundColor(hasChanges ? .blue : .secondary)
                 }
             }
         }
+        .alert("Elimina Conto", isPresented: $showingDeleteAlert) {
+            Button("Elimina", role: .destructive) {
+                dataManager.deleteAccount(account)
+                dismiss()
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            Text("Sei sicuro di voler eliminare il conto '\(account.name)'? Questa azione non può essere annullata.")
+        }
+    }
+    
+    private func saveChanges() {
+        if let index = dataManager.accounts.firstIndex(where: { $0.id == account.id }) {
+            dataManager.accounts[index] = account
+        }
+        dismiss()
+    }
+}
+
+// MARK: - Account Preview Card
+struct AccountPreviewCard: View {
+    let account: AccountModel
+    let balanceChange: Double
+    let hasChanges: Bool
+    
+    private var accountIcon: String {
+        let name = account.name.lowercased()
+        if name.contains("carta") || name.contains("prepagata") {
+            return "creditcard.fill"
+        } else if name.contains("risparmio") {
+            return "banknote.circle.fill"
+        } else if name.contains("contanti") || name.contains("cash") {
+            return "dollarsign.circle.fill"
+        } else {
+            return "building.columns.fill"
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Image(systemName: "eye.fill")
+                    .foregroundColor(.blue)
+                Text("Anteprima")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                
+                if hasChanges {
+                    Text("Modificato")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color.orange.opacity(0.1))
+                        )
+                        .foregroundColor(.orange)
+                }
+            }
+            
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [.blue, .indigo]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 56, height: 56)
+                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: accountIcon)
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(account.name.isEmpty ? "Nome del conto" : account.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(account.name.isEmpty ? .secondary : .primary)
+                        .lineLimit(2)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("€")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                        
+                        Text(String(format: "%.2f", account.balance))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(account.balance >= 0 ? .primary : .red)
+                    }
+                    
+                    if abs(balanceChange) > 0.01 {
+                        HStack {
+                            Text("Variazione:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(balanceChange >= 0 ? "+" : "")€\(String(format: "%.2f", balanceChange))")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(balanceChange >= 0 ? .green : .red)
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(hasChanges ? Color.orange.opacity(0.3) : Color.blue.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        )
     }
 }
 
