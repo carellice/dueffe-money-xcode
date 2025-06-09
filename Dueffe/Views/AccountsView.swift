@@ -271,7 +271,7 @@ struct EnhancedAccountCard: View {
         if name.contains("carta") || name.contains("prepagata") {
             return "creditcard.fill"
         } else if name.contains("risparmio") {
-            return "banknote.circle.fill"
+            return "dollarsign.circle.fill"
         } else if name.contains("contanti") || name.contains("cash") {
             return "dollarsign.circle.fill"
         } else {
@@ -448,7 +448,7 @@ struct EnhancedAddAccountView: View {
     
     let accountTypes = [
         ("checking", "Conto Corrente", "building.columns.fill", Color.blue),
-        ("savings", "Conto Risparmio", "banknote.circle.fill", Color.green),
+        ("savings", "Conto Risparmio", "dollarsign.circle.fill", Color.green),
         ("card", "Carta Prepagata", "creditcard.fill", Color.purple),
         ("cash", "Contanti", "dollarsign.circle.fill", Color.orange)
     ]
@@ -527,7 +527,7 @@ struct EnhancedAddAccountView: View {
                         }
                     } header: {
                         HStack {
-                            Image(systemName: "banknote.circle.fill")
+                            Image(systemName: "dollarsign.circle.fill")
                                 .foregroundColor(.green)
                             Text("Saldo")
                         }
@@ -704,7 +704,7 @@ struct EnhancedAccountDetailView: View {
         if name.contains("carta") || name.contains("prepagata") {
             return "creditcard.fill"
         } else if name.contains("risparmio") {
-            return "banknote.circle.fill"
+            return "dollarsign.circle.fill"
         } else if name.contains("contanti") || name.contains("cash") {
             return "dollarsign.circle.fill"
         } else {
@@ -1242,7 +1242,7 @@ struct EditAccountView: View {
                         }
                     } header: {
                         HStack {
-                            Image(systemName: "banknote.circle.fill")
+                            Image(systemName: "dollarsign.circle.fill")
                                 .foregroundColor(.green)
                             Text("Saldo")
                         }
@@ -1378,7 +1378,7 @@ struct AccountPreviewCard: View {
         if name.contains("carta") || name.contains("prepagata") {
             return "creditcard.fill"
         } else if name.contains("risparmio") {
-            return "banknote.circle.fill"
+            return "dollarsign.circle.fill"
         } else if name.contains("contanti") || name.contains("cash") {
             return "dollarsign.circle.fill"
         } else {

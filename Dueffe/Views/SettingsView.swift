@@ -41,7 +41,7 @@ struct SettingsView: View {
                             isComingSoon: true
                         )
                     } header: {
-                        SectionHeader(icon: "wand.and.stars.fill", title: "Personalizzazione")
+                        SectionHeader(icon: "paintbrush.pointed.fill", title: "Personalizzazione")
                     } footer: {
                         Text("Modifica l'aspetto e il comportamento dell'app secondo le tue preferenze")
                     }
@@ -65,7 +65,7 @@ struct SettingsView: View {
                             isDestructive: true
                         )
                     } header: {
-                        SectionHeader(icon: "server.rack.fill", title: "Dati e Backup")
+                        SectionHeader(icon: "externaldrive.fill", title: "Dati e Backup")
                     } footer: {
                         Text("Gestisci i tuoi dati e crea backup di sicurezza")
                     }
