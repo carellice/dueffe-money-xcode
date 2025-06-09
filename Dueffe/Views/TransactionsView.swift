@@ -7,12 +7,31 @@ struct TransactionsView: View {
     @State private var selectedFilter = "all"
     @State private var searchText = ""
     
-    let filterOptions = [
-        ("all", "Tutte", "list.bullet"),
-        ("expense", "Spese", "minus.circle"),
-        ("income", "Entrate", "plus.circle"),
-        ("salary", "Stipendi", "banknote")
-    ]
+    private var availableFilterOptions: [(String, String, String)] {
+        var filters: [(String, String, String)] = []
+        
+        // Sempre mostra "Tutte" se ci sono transazioni
+        if !dataManager.transactions.isEmpty {
+            filters.append(("all", "Tutte", "list.bullet"))
+        }
+        
+        // Controllo per ogni tipo di transazione
+        let transactionTypes = Set(dataManager.transactions.map { $0.type })
+        
+        if transactionTypes.contains("expense") {
+            filters.append(("expense", "Spese", "minus.circle"))
+        }
+        
+        if transactionTypes.contains("income") {
+            filters.append(("income", "Entrate", "plus.circle"))
+        }
+        
+        if transactionTypes.contains("salary") {
+            filters.append(("salary", "Stipendi", "banknote"))
+        }
+        
+        return filters
+    }
     
     var filteredTransactions: [TransactionModel] {
         var transactions = dataManager.transactions
@@ -69,7 +88,7 @@ struct TransactionsView: View {
                             // Filtri
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
-                                    ForEach(filterOptions, id: \.0) { filter, title, icon in
+                                    ForEach(availableFilterOptions, id: \.0) { filter, title, icon in
                                         TransactionFilterButton(
                                             title: title,
                                             icon: icon,
