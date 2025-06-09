@@ -32,6 +32,11 @@ struct TransactionsView: View {
             filters.append(("salary", "Stipendi", "banknote"))
         }
         
+        // NUOVO: Filtro per le distribuzioni/trasferimenti
+        if transactionTypes.contains("transfer") {
+            filters.append(("transfer", "Distribuzioni", "arrow.left.arrow.right.circle"))
+        }
+        
         return filters
     }
     
