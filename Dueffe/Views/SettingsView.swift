@@ -1,11 +1,14 @@
 import SwiftUI
 
-// MARK: - Enhanced Settings View
+// MARK: - Enhanced Settings View con Cancella Dati
 struct SettingsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingCategoriesManagement = false
     @State private var showingAboutApp = false
     @State private var showingExportData = false
+    @State private var showingDeleteAllAlert = false
+    @State private var showingDeleteConfirmation = false
+    @State private var deleteConfirmationText = ""
     
     var body: some View {
         NavigationView {
@@ -58,7 +61,7 @@ struct SettingsView: View {
                             iconColor: .red,
                             title: "Cancella Tutti i Dati",
                             subtitle: "Rimuovi completamente tutti i dati",
-                            action: { /* Implementation needed */ },
+                            action: { showingDeleteAllAlert = true },
                             isDestructive: true
                         )
                     } header: {
@@ -126,6 +129,44 @@ struct SettingsView: View {
         .sheet(isPresented: $showingExportData) {
             ExportDataView()
         }
+        .alert("Cancella Tutti i Dati", isPresented: $showingDeleteAllAlert) {
+            Button("Annulla", role: .cancel) { }
+            Button("Continua", role: .destructive) {
+                showingDeleteConfirmation = true
+            }
+        } message: {
+            Text("⚠️ ATTENZIONE: Questa azione cancellerà TUTTI i tuoi dati in modo permanente.\n\n• Tutti i salvadanai\n• Tutte le transazioni\n• Tutti i conti\n• Tutte le categorie personalizzate\n\nQuesta azione non può essere annullata!")
+        }
+        .alert("Conferma Cancellazione", isPresented: $showingDeleteConfirmation) {
+            TextField("Scrivi CANCELLA per confermare", text: $deleteConfirmationText)
+            Button("Annulla", role: .cancel) {
+                deleteConfirmationText = ""
+            }
+            Button("CANCELLA TUTTO", role: .destructive) {
+                if deleteConfirmationText.uppercased() == "CANCELLA" {
+                    deleteAllData()
+                }
+                deleteConfirmationText = ""
+            }
+            .disabled(deleteConfirmationText.uppercased() != "CANCELLA")
+        } message: {
+            Text("Per confermare la cancellazione di TUTTI i dati, scrivi 'CANCELLA' nel campo sopra.")
+        }
+    }
+    
+    private func deleteAllData() {
+        withAnimation {
+            // Cancella tutti i dati dal DataManager
+            dataManager.salvadanai.removeAll()
+            dataManager.transactions.removeAll()
+            dataManager.accounts.removeAll()
+            dataManager.customExpenseCategories.removeAll()
+            dataManager.customIncomeCategories.removeAll()
+        }
+        
+        // Mostra feedback di successo
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
     }
 }
 

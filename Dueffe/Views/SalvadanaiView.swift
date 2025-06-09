@@ -1338,62 +1338,7 @@ struct SimpleSalvadanaiDetailView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // Header Card
-                    VStack(spacing: 20) {
-                        HStack {
-                            Circle()
-                                .fill(Color(salvadanaio.color))
-                                .frame(width: 24, height: 24)
-                            
-                            Text(salvadanaio.name)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                            
-                            Spacer()
-                            
-                            Image(systemName: salvadanaio.type == "objective" ? "target" : "cup.and.saucer.fill")
-                                .font(.title)
-                                .foregroundColor(Color(salvadanaio.color))
-                        }
-                        
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("€")
-                                .font(.title)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                            
-                            Text(String(format: "%.2f", salvadanaio.currentAmount))
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                        }
-                        
-                        if salvadanaio.type == "objective" {
-                            if salvadanaio.isInfinite {
-                                Text("Obiettivo infinito")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                VStack(spacing: 8) {
-                                    Text("Obiettivo: €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    if salvadanaio.targetAmount > 0 {
-                                        ProgressView(value: min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0))
-                                            .progressViewStyle(LinearProgressViewStyle(tint: Color(salvadanaio.color)))
-                                    }
-                                }
-                            }
-                        } else {
-                            Text("Glass: €\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.gray.opacity(0.1))
-                    )
+                    SalvadanaiCardView(salvadanaio: salvadanaio)
                     
                     // Transazioni correlate
                     if !relatedTransactions.isEmpty {
@@ -1432,7 +1377,7 @@ struct SimpleSalvadanaiDetailView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Dettagli")
+            .navigationTitle("Dettaglio")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(content: {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -1443,9 +1388,17 @@ struct SimpleSalvadanaiDetailView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Button("Elimina", systemImage: "trash", role: .destructive) {
+                        Button(role: .destructive, action: {
                             showingDeleteAlert = true
+                        }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .tint(.red)
+                                Text("Elimina")
+                                    .tint(.red)
+                            }
                         }
+                        .buttonStyle(PlainButtonStyle())
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }

@@ -119,7 +119,7 @@ struct TransactionsView: View {
                                         ForEach(transactions, id: \.id) { transaction in
                                             TransactionRowView(transaction: transaction)
                                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) { // Cambiato a false per evitare eliminazione accidentale
-                                                    Button(action: {
+                                                    Button(role: .destructive, action: {
                                                         transactionToDelete = transaction
                                                         showingDeleteConfirmation = true
                                                     }) {
