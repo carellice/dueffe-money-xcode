@@ -339,12 +339,15 @@ class DataManager: ObservableObject {
         transactions.append(newTransaction)
         
         if type == "expense" {
-            // MODIFICATO: Per le spese: sottrai SOLO dal salvadanaio
-            // NON più dal conto associato perché i salvadanai non sono più associati
+            // MODIFICATO: Per le spese: sottrai dal salvadanaio E dal conto selezionato
             if let salvadanaiName = salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
             }
-            // RIMOSSO: Sottrazione dal conto associato al salvadanaio
+            
+            // NUOVO: Sottrai anche dal conto selezionato dall'utente
+            if let accountName = accountName {
+                updateAccountBalance(accountName: accountName, amount: -amount)
+            }
         } else {
             // Per entrate e stipendi: aggiungi al conto selezionato (INVARIATO)
             if let accountName = accountName {
@@ -353,17 +356,20 @@ class DataManager: ObservableObject {
         }
     }
 
-
     // MODIFICATO: Metodo per eliminare transazioni
     func deleteTransaction(_ transaction: TransactionModel) {
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
-            // MODIFICATO: Per le spese: ripristina SOLO il saldo del salvadanaio
+            // MODIFICATO: Per le spese: ripristina il saldo del salvadanaio E del conto
             if let salvadanaiName = transaction.salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
             }
-            // RIMOSSO: Ripristino del conto associato
+            
+            // NUOVO: Ripristina anche il conto da cui era stata sottratta la spesa
+            if !transaction.accountName.isEmpty {
+                updateAccountBalance(accountName: transaction.accountName, amount: transaction.amount)
+            }
         } else {
             // Per entrate: ripristina il saldo del conto
             if !transaction.accountName.isEmpty {

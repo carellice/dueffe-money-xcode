@@ -987,6 +987,7 @@ extension Character {
 
 // MARK: - SimpleAddTransactionView AGGIORNATA (TransactionsView.swift)
 // MARK: - SimpleAddTransactionView AGGIORNATA con Trasferimenti (TransactionsView.swift)
+// MARK: - SimpleAddTransactionView COMPLETA - Sostituire in TransactionsView.swift
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -1000,7 +1001,7 @@ struct SimpleAddTransactionView: View {
     @State private var showingSalaryDistribution = false
     @State private var showingIncomeDistribution = false
     
-    // NUOVO: Per i trasferimenti
+    // Per i trasferimenti
     @State private var fromAccount = ""
     @State private var toAccount = ""
     
@@ -1008,7 +1009,7 @@ struct SimpleAddTransactionView: View {
         ("expense", "Spesa", "minus.circle"),
         ("income", "Entrata", "plus.circle"),
         ("salary", "Stipendio", "banknote"),
-        ("transfer", "Trasferimento", "arrow.left.arrow.right") // NUOVO
+        ("transfer", "Trasferimento", "arrow.left.arrow.right")
     ]
     
     var availableCategories: [String] {
@@ -1033,13 +1034,13 @@ struct SimpleAddTransactionView: View {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedSalvadanaio.isEmpty &&
-                   !selectedCategory.isEmpty
+                   !selectedCategory.isEmpty &&
+                   !selectedAccount.isEmpty // RICHIEDE anche il conto
         } else if transactionType == "salary" {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedAccount.isEmpty
         } else if transactionType == "transfer" {
-            // NUOVO: Validazione per trasferimenti
             return amount > 0 &&
                    !descr.isEmpty &&
                    !fromAccount.isEmpty &&
@@ -1114,7 +1115,7 @@ struct SimpleAddTransactionView: View {
                     Text("Dettagli")
                 }
                 
-                // NUOVO: Sezione per trasferimenti tra conti
+                // Sezione per trasferimenti tra conti
                 if transactionType == "transfer" {
                     Section {
                         // Conto di origine
@@ -1266,7 +1267,7 @@ struct SimpleAddTransactionView: View {
                             HStack {
                                 Image(systemName: "banknote.fill")
                                     .foregroundColor(.green)
-                                Text("Salvadanaio")
+                                Text("Salvadanaio (logico)")
                             }
                         } footer: {
                             if !selectedSalvadanaio.isEmpty {
@@ -1275,11 +1276,11 @@ struct SimpleAddTransactionView: View {
                                     Text("⚠️ Attenzione: il salvadanaio non ha fondi sufficienti. Il saldo diventerà negativo.")
                                         .foregroundColor(.red)
                                 } else {
-                                    Text("I soldi verranno prelevati da questo salvadanaio")
+                                    Text("I soldi verranno sottratti logicamente da questo salvadanaio")
                                         .foregroundColor(.green)
                                 }
                             } else {
-                                Text("Scegli da quale salvadanaio prelevare i soldi per questa spesa")
+                                Text("Scegli da quale salvadanaio sottrarre logicamente i soldi per questa spesa")
                             }
                         }
                     } else {
@@ -1294,6 +1295,54 @@ struct SimpleAddTransactionView: View {
                         } footer: {
                             Text("Per registrare una spesa devi prima creare almeno un salvadanaio nel tab 'Salvadanai'")
                         }
+                    }
+                }
+                
+                // CONTO per spese (DA QUALE CONTO TOGLIERE I SOLDI FISICAMENTE)
+                if transactionType == "expense" && !dataManager.accounts.isEmpty {
+                    Section {
+                        Picker("Da quale conto", selection: $selectedAccount) {
+                            Text("Seleziona conto").tag("")
+                            ForEach(dataManager.accounts, id: \.name) { account in
+                                HStack {
+                                    Text(account.name)
+                                    Spacer()
+                                    Text("€\(String(format: "%.2f", account.balance))")
+                                        .foregroundColor(account.balance >= 0 ? .green : .red)
+                                }
+                                .tag(account.name)
+                            }
+                        }
+                        
+                        // Verifica fondi
+                        if !selectedAccount.isEmpty && amount > 0 {
+                            if let selectedAcc = dataManager.accounts.first(where: { $0.name == selectedAccount }) {
+                                HStack {
+                                    if selectedAcc.balance >= amount {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Fondi sufficienti")
+                                            .foregroundColor(.green)
+                                    } else {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.orange)
+                                        Text("Fondi insufficienti. Il conto andrà in rosso.")
+                                            .foregroundColor(.orange)
+                                    }
+                                    Spacer()
+                                }
+                                .font(.caption)
+                                .padding(.top, 4)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "building.columns.fill")
+                                .foregroundColor(.red)
+                            Text("Conto (fisico)")
+                        }
+                    } footer: {
+                        Text("I soldi verranno sottratti fisicamente da questo conto")
                     }
                 }
                 
@@ -1320,14 +1369,14 @@ struct SimpleAddTransactionView: View {
                         }
                     } footer: {
                         if transactionType == "salary" {
-                            Text("Lo stipendio verrà registrato su questo conto e poi potrai distribuirlo tra i salvadanai")
+                            Text("Lo stipendio verrà registrato su questo conto e poi potrai distribuirlo tra i tuoi salvadanai")
                         } else {
                             Text("L'entrata verrà aggiunta a questo conto e poi potrai distribuirla tra i salvadanai")
                         }
                     }
                 }
                 
-                // Info per entrate (INVARIATA)
+                // Info per entrate
                 if transactionType == "income" && !dataManager.salvadanai.isEmpty {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
@@ -1377,7 +1426,7 @@ struct SimpleAddTransactionView: View {
                     }
                 }
                 
-                // Info per stipendi (INVARIATA)
+                // Info per stipendi
                 if transactionType == "salary" {
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
@@ -1515,7 +1564,7 @@ struct SimpleAddTransactionView: View {
             selectedSalvadanaio = dataManager.salvadanai.first!.name
         }
         
-        // NUOVO: Setup per trasferimenti
+        // Setup per trasferimenti
         if transactionType == "transfer" {
             if fromAccount.isEmpty && !dataManager.accounts.isEmpty {
                 fromAccount = dataManager.accounts.first!.name
@@ -1524,17 +1573,22 @@ struct SimpleAddTransactionView: View {
                 toAccount = dataManager.accounts.filter { $0.name != fromAccount }.first?.name ?? ""
             }
         }
+        
+        // NUOVO: Setup default per conto spese
+        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && transactionType == "expense" {
+            selectedAccount = dataManager.accounts.first!.name
+        }
     }
     
     private func saveTransaction() {
         if transactionType == "expense" {
-            // Per le spese: usa solo il salvadanaio
+            // MODIFICATO: Per le spese: passa sia salvadanaio che conto
             dataManager.addTransaction(
                 amount: amount,
                 descr: descr,
                 category: selectedCategory,
                 type: transactionType,
-                accountName: nil,
+                accountName: selectedAccount, // Conto da cui sottrarre fisicamente
                 salvadanaiName: selectedSalvadanaio
             )
             dismiss()
@@ -1569,17 +1623,14 @@ struct SimpleAddTransactionView: View {
                 showingIncomeDistribution = true
             }
         } else if transactionType == "transfer" {
-            // NUOVO: Per i trasferimenti
+            // Per i trasferimenti
             performTransfer()
             dismiss()
         }
     }
     
-    // MODIFICATO: Funzione per eseguire il trasferimento tra conti (SOLO per trasferimenti tra conti, NON per distribuzione salvadanai)
+    // Funzione per eseguire il trasferimento
     private func performTransfer() {
-        // NOTA: Questa funzione è SOLO per trasferimenti diretti tra conti
-        // NON usare per la distribuzione ai salvadanai
-        
         // Aggiorna direttamente l'array accounts
         if let fromIndex = dataManager.accounts.firstIndex(where: { $0.name == fromAccount }) {
             dataManager.accounts[fromIndex].balance -= amount
