@@ -1497,7 +1497,7 @@ struct ImprovedQuickActionCard: View {
     }
 }
 
-// MARK: - Enhanced Wealth Card
+// MARK: - Enhanced Wealth Card (MODIFICATA - rimosso breakdown)
 struct EnhancedWealthCard: View {
     let totalBalance: Double
     let totalSavings: Double
@@ -1592,7 +1592,7 @@ struct EnhancedWealthCard: View {
             }
             
             // Contenuto principale
-            VStack(spacing: 24) {
+            VStack(spacing: 32) { // Aumentato spacing per compensare la rimozione del breakdown
                 // Header con icona animata
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
@@ -1659,30 +1659,7 @@ struct EnhancedWealthCard: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                // Breakdown animato
-                HStack(spacing: 20) {
-                    WealthBreakdownItem(
-                        title: "Conti",
-                        amount: totalBalance,
-                        icon: "building.columns.fill",
-                        color: Color.white.opacity(0.9),
-                        animate: animateBalance
-                    )
-                    
-                    // Separatore animato
-                    Rectangle()
-                        .fill(Color.white.opacity(0.3))
-                        .frame(width: 1, height: 40)
-                        .scaleEffect(y: animateGlow ? 1.2 : 0.8)
-                    
-                    WealthBreakdownItem(
-                        title: "Salvadanai",
-                        amount: totalSavings,
-                        icon: "banknote.fill",
-                        color: Color.white.opacity(0.9),
-                        animate: animateBalance
-                    )
-                }
+                // RIMOSSO: Breakdown animato
             }
             .padding(28)
         }
