@@ -1591,9 +1591,9 @@ struct EnhancedWealthCard: View {
                 }
             }
             
-            // Contenuto principale
-            VStack(spacing: 32) { // Aumentato spacing per compensare la rimozione del breakdown
-                // Header con icona animata
+            // Contenuto principale - CENTRATO VERTICALMENTE
+            VStack(spacing: 0) {
+                // Header con icona animata - rimane in alto
                 HStack {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -1628,14 +1628,15 @@ struct EnhancedWealthCard: View {
                                 }
                             }
                         }
-                        
-                        Spacer()
                     }
                     
                     Spacer()
                 }
                 
-                // Importo principale con effetto wow
+                // Spacer per centrare l'importo
+                Spacer()
+                
+                // Importo principale con effetto wow - CENTRATO
                 VStack(spacing: 12) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("€")
@@ -1659,7 +1660,8 @@ struct EnhancedWealthCard: View {
                         .multilineTextAlignment(.center)
                 }
                 
-                // RIMOSSO: Breakdown animato
+                // Spacer per centrare l'importo
+                Spacer()
             }
             .padding(28)
         }
