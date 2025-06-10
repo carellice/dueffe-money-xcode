@@ -1170,9 +1170,7 @@ struct FirstSalvadanaiOnboardingView: View {
     }
     
     private func saveAllSalvadanai() {
-        let firstAccountName = dataManager.accounts.first?.name ?? ""
-        
-        // Crea tutti i salvadanai nel DataManager
+        // MODIFICATO: Nessun conto di riferimento necessario
         for salvadanaio in createdSalvadanai {
             dataManager.addSalvadanaio(
                 name: salvadanaio.name,
@@ -1181,8 +1179,6 @@ struct FirstSalvadanaiOnboardingView: View {
                 targetDate: salvadanaio.targetDate,
                 monthlyRefill: salvadanaio.monthlyRefill,
                 color: salvadanaio.color,
-                accountName: firstAccountName,
-                initialAmount: 0.0,
                 isInfinite: salvadanaio.isInfinite
             )
         }
@@ -1667,8 +1663,7 @@ struct HomeView: View {
                     VStack(spacing: 28) {
                         // 🌟 NUOVA Enhanced Wealth Card
                         EnhancedWealthCard(
-                            totalBalance: totalBalance,
-                            totalSavings: totalSavings
+                            totalBalance: totalBalance
                         )
                         
                         // Salvadanai Overview migliorato
@@ -2422,15 +2417,14 @@ struct ImprovedQuickActionCard: View {
     }
 }
 
-// MARK: - Enhanced Wealth Card (MODIFICATA - rimosso breakdown)
+// MARK: - Enhanced Wealth Card (MODIFICATA - solo conti)
 struct EnhancedWealthCard: View {
     let totalBalance: Double
-    let totalSavings: Double
     @State private var animateBalance = false
     @State private var animateGlow = false
     
     private var totalWealth: Double {
-        totalBalance + totalSavings
+        totalBalance // MODIFICATO: Solo dai conti, non dai salvadanai
     }
     
     private var wealthStatus: (String, Color, String) {

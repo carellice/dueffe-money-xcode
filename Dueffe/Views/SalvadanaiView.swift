@@ -1105,8 +1105,6 @@ struct SimpleSalvadanaiFormView: View {
     @State private var targetDate = Date()
     @State private var monthlyRefill = 50.0
     @State private var selectedColor = "blue"
-    @State private var selectedAccount = ""
-    @State private var initialAmount = 0.0
     @State private var isInfiniteObjective = false
     
     let salvadanaiTypes = [
@@ -1116,12 +1114,8 @@ struct SimpleSalvadanaiFormView: View {
     
     var isFormValid: Bool {
         if name.isEmpty { return false }
-        if dataManager.accounts.isEmpty { return false }
-        if selectedAccount.isEmpty { return false }
-        
         if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
-        
         return true
     }
     
@@ -1131,14 +1125,6 @@ struct SimpleSalvadanaiFormView: View {
                 Section {
                     TextField("Nome salvadanaio", text: $name)
                         .textInputAutocapitalization(.words)
-                    
-                    HStack {
-                        Text("Saldo iniziale")
-                        Spacer()
-                        TextField("0", value: $initialAmount, format: .currency(code: "EUR"))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.decimalPad)
-                    }
                 } header: {
                     Text("Informazioni di base")
                 }
@@ -1172,41 +1158,8 @@ struct SimpleSalvadanaiFormView: View {
                     Text("Tipo di salvadanaio")
                 }
                 
-                Section {
-                    if dataManager.accounts.isEmpty {
-                        Text("Nessun conto disponibile")
-                            .foregroundColor(.orange)
-                    } else {
-                        Picker("Conto di riferimento", selection: $selectedAccount) {
-                            Text("Seleziona conto")
-                                .tag("")
-                            ForEach(dataManager.accounts, id: \.name) { account in
-                                HStack {
-                                    Text(account.name)
-                                    Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
-                                        .foregroundColor(.secondary)
-                                }
-                                .tag(account.name)
-                            }
-                        }
-                        .pickerStyle(MenuPickerStyle())
-                        
-                        if !selectedAccount.isEmpty {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                Text("Conto selezionato: \(selectedAccount)")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                                Spacer()
-                            }
-                            .padding(.top, 8)
-                        }
-                    }
-                } header: {
-                    Text("Conto di riferimento")
-                }
+                // RIMOSSO: Sezione conto di riferimento
+                // RIMOSSO: Sezione saldo iniziale
                 
                 if selectedType == "objective" {
                     Section {
@@ -1259,6 +1212,25 @@ struct SimpleSalvadanaiFormView: View {
                 } header: {
                     Text("Colore")
                 }
+                
+                // NUOVO: Info su saldo iniziale
+                Section {
+                    HStack {
+                        Image(systemName: "info.circle.fill")
+                            .foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Saldo iniziale: €0,00")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Il salvadanaio inizierà sempre con saldo zero")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("Informazioni")
+                }
             }
             .navigationTitle("Nuovo Salvadanaio")
             .navigationBarTitleDisplayMode(.inline)
@@ -1276,9 +1248,6 @@ struct SimpleSalvadanaiFormView: View {
                     .disabled(!isFormValid)
                 }
             })
-        }
-        .onAppear {
-            setupDefaults()
         }
     }
     
@@ -1299,13 +1268,8 @@ struct SimpleSalvadanaiFormView: View {
         ]
     }
     
-    private func setupDefaults() {
-        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty {
-            selectedAccount = dataManager.accounts.first!.name
-        }
-    }
-    
     private func createSalvadanaio() {
+        // MODIFICATO: Nessun conto di riferimento, sempre saldo 0
         dataManager.addSalvadanaio(
             name: name,
             type: selectedType,
@@ -1313,8 +1277,6 @@ struct SimpleSalvadanaiFormView: View {
             targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
-            accountName: selectedAccount,
-            initialAmount: initialAmount,
             isInfinite: selectedType == "objective" ? isInfiniteObjective : false
         )
         dismiss()

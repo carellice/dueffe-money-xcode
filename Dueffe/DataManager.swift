@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Data Models (con Codable per serializzazione)
+// MARK: - SOSTITUIRE SalvadanaiModel IN DataManager.swift
 struct SalvadanaiModel: Identifiable, Codable {
     let id = UUID()
     var name: String
@@ -11,7 +11,7 @@ struct SalvadanaiModel: Identifiable, Codable {
     var targetDate: Date?
     var monthlyRefill: Double
     var color: String
-    var accountName: String
+    // RIMOSSO: var accountName: String - I salvadanai non sono più associati ai conti
     var createdAt: Date
     var isInfinite: Bool
 }
@@ -299,23 +299,21 @@ class DataManager: ObservableObject {
     }
     
     // MODIFICATO: addSalvadanaio - NON sottrae dal conto quando si imposta un saldo iniziale
-    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0, isInfinite: Bool = false) {
+    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, isInfinite: Bool = false) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
             type: type,
-            currentAmount: initialAmount,
+            currentAmount: 0.0, // SEMPRE 0 - non configurabile
             targetAmount: isInfinite ? 0 : targetAmount,
             targetDate: isInfinite ? nil : targetDate,
             monthlyRefill: monthlyRefill,
             color: color,
-            accountName: accountName,
             createdAt: Date(),
             isInfinite: isInfinite
         )
         salvadanai.append(newSalvadanaio)
         
-        // RIMOSSO: Non sottrae più dal conto selezionato
-        // I salvadanai sono solo "etichette" organizzative
+        // RIMOSSO: Qualsiasi logica di sottrazione da conti
     }
     
     func updateSalvadanaio(_ salvadanaio: SalvadanaiModel) {
@@ -328,7 +326,6 @@ class DataManager: ObservableObject {
         salvadanai.removeAll { $0.id == salvadanaio.id }
     }
     
-    // MODIFICATO: Transaction Methods - OPZIONE B per le spese
     func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String? = nil, salvadanaiName: String? = nil) {
         let newTransaction = TransactionModel(
             amount: amount,
@@ -342,15 +339,12 @@ class DataManager: ObservableObject {
         transactions.append(newTransaction)
         
         if type == "expense" {
-            // OPZIONE B: Per le spese: sottrai dal salvadanaio E dal conto associato
+            // MODIFICATO: Per le spese: sottrai SOLO dal salvadanaio
+            // NON più dal conto associato perché i salvadanai non sono più associati
             if let salvadanaiName = salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
-                
-                // Trova il conto associato al salvadanaio e sottrai anche da lì
-                if let salvadanaio = salvadanai.first(where: { $0.name == salvadanaiName }) {
-                    updateAccountBalance(accountName: salvadanaio.accountName, amount: -amount)
-                }
             }
+            // RIMOSSO: Sottrazione dal conto associato al salvadanaio
         } else {
             // Per entrate e stipendi: aggiungi al conto selezionato (INVARIATO)
             if let accountName = accountName {
@@ -359,20 +353,17 @@ class DataManager: ObservableObject {
         }
     }
 
-    // MODIFICATO: Metodo per eliminare transazioni - OPZIONE B
+
+    // MODIFICATO: Metodo per eliminare transazioni
     func deleteTransaction(_ transaction: TransactionModel) {
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
-            // OPZIONE B: Per le spese: ripristina il saldo del salvadanaio E del conto associato
+            // MODIFICATO: Per le spese: ripristina SOLO il saldo del salvadanaio
             if let salvadanaiName = transaction.salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
-                
-                // Trova il conto associato al salvadanaio e ripristina anche lì
-                if let salvadanaio = salvadanai.first(where: { $0.name == salvadanaiName }) {
-                    updateAccountBalance(accountName: salvadanaio.accountName, amount: transaction.amount)
-                }
             }
+            // RIMOSSO: Ripristino del conto associato
         } else {
             // Per entrate: ripristina il saldo del conto
             if !transaction.accountName.isEmpty {
