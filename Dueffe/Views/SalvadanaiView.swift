@@ -346,13 +346,14 @@ struct StatView: View {
 }
 
 // MARK: - Sostituisci SalvadanaiCardView nel file SalvadanaiView.swift
-
 struct SalvadanaiCardView: View {
     let salvadanaio: SalvadanaiModel
+    @EnvironmentObject var dataManager: DataManager
     @State private var animateProgress = false
     @State private var animateGlow = false
     @State private var animateFloating = false
     @State private var showDetails = false
+    @State private var showTransactionsSheet = false
     
     private var progress: Double {
         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
@@ -365,6 +366,13 @@ struct SalvadanaiCardView: View {
             return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
         }
         return 0
+    }
+    
+    // Transazioni associate a questo salvadanaio
+    private var relatedTransactions: [TransactionModel] {
+        dataManager.transactions.filter { transaction in
+            transaction.salvadanaiName == salvadanaio.name
+        }.sorted { $0.date > $1.date }
     }
     
     // Funzione per convertire string colore in Color
@@ -531,7 +539,7 @@ struct SalvadanaiCardView: View {
                         }
                     }
                     
-                    // Progress bar animata (solo se non infinito e non negativo)
+                    // Progress bar animata (solo se non infinito e non negativo) - CORRETTA
                     if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
                         VStack(spacing: 6) {
                             HStack {
@@ -554,51 +562,54 @@ struct SalvadanaiCardView: View {
                                 }
                             }
                             
-                            // Progress bar con gradiente animato
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.gray.opacity(0.15))
-                                    .frame(height: 8)
-                                
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [
-                                                getColor(from: salvadanaio.color),
-                                                getColor(from: salvadanaio.color).opacity(0.7),
-                                                getColor(from: salvadanaio.color)
-                                            ]),
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: max(0, UIScreen.main.bounds.width * 0.7 * (animateProgress ? progress : 0)), height: 8)
-                                    .shadow(color: getColor(from: salvadanaio.color).opacity(0.4), radius: 3, x: 0, y: 1)
-                                    .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
-                                
-                                // Effetto shimmer sulla progress bar
-                if progress > 0 {
+                            // PROGRESS BAR CORRETTA - Usa GeometryReader per width dinamica
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.gray.opacity(0.15))
+                                        .frame(height: 8)
+                                    
                                     RoundedRectangle(cornerRadius: 6)
                                         .fill(
                                             LinearGradient(
                                                 gradient: Gradient(colors: [
-                                                    Color.clear,
-                                                    Color.white.opacity(0.6),
-                                                    Color.clear
+                                                    getColor(from: salvadanaio.color),
+                                                    getColor(from: salvadanaio.color).opacity(0.7),
+                                                    getColor(from: salvadanaio.color)
                                                 ]),
                                                 startPoint: .leading,
                                                 endPoint: .trailing
                                             )
                                         )
-                                        .frame(width: max(0, UIScreen.main.bounds.width * 0.7 * progress), height: 8)
-                                        .opacity(animateGlow ? 0.8 : 0.0)
-                                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                        .frame(width: max(0, geometry.size.width * (animateProgress ? progress : 0)), height: 8)
+                                        .shadow(color: getColor(from: salvadanaio.color).opacity(0.4), radius: 3, x: 0, y: 1)
+                                        .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
+                                    
+                                    // Effetto shimmer sulla progress bar
+                                    if progress > 0 {
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color.clear,
+                                                        Color.white.opacity(0.6),
+                                                        Color.clear
+                                                    ]),
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: max(0, geometry.size.width * progress), height: 8)
+                                            .opacity(animateGlow ? 0.8 : 0.0)
+                                            .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                    }
                                 }
                             }
+                            .frame(height: 8)
                         }
                     }
                     
-                    // Info dettagliata (condizionale e compatta)
+                    // Info dettagliata (condizionale e compatta) + TRANSAZIONI
                     if showDetails {
                         VStack(spacing: 8) {
                             Divider()
@@ -647,6 +658,88 @@ struct SalvadanaiCardView: View {
                                     }
                                 }
                             }
+                            
+                            // NUOVA SEZIONE: Transazioni correlate
+                            if !relatedTransactions.isEmpty {
+                                VStack(spacing: 8) {
+                                    Divider()
+                                    
+                                    HStack {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "creditcard.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.blue)
+                                            Text("Transazioni Recenti")
+                                                .font(.caption)
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(.blue)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        if relatedTransactions.count > 3 {
+                                            Button(action: {
+                                                showTransactionsSheet = true
+                                            }) {
+                                                HStack(spacing: 4) {
+                                                    Text("Vedi tutte (\(relatedTransactions.count))")
+                                                        .font(.caption2)
+                                                        .fontWeight(.medium)
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.caption2)
+                                                }
+                                                .foregroundColor(.blue)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
+                                        } else {
+                                            Text("\(relatedTransactions.count) totali")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    
+                                    // Mostra ultime 3 transazioni
+                                    VStack(spacing: 6) {
+                                        ForEach(Array(relatedTransactions.prefix(3)), id: \.id) { transaction in
+                                            CompactTransactionRowInCard(transaction: transaction)
+                                        }
+                                        
+                                        if relatedTransactions.count > 3 {
+                                            HStack {
+                                                Image(systemName: "ellipsis")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Text("e altre \(relatedTransactions.count - 3)")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                                Spacer()
+                                                
+                                                Button("Vedi tutte") {
+                                                    showTransactionsSheet = true
+                                                }
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                                .buttonStyle(PlainButtonStyle())
+                                            }
+                                            .padding(.top, 4)
+                                        }
+                                    }
+                                }
+                            } else {
+                                VStack(spacing: 8) {
+                                    Divider()
+                                    
+                                    HStack {
+                                        Image(systemName: "info.circle")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Text("Nessuna transazione ancora")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        Spacer()
+                                    }
+                                }
+                            }
                         }
                         .transition(.asymmetric(
                             insertion: .opacity.combined(with: .move(edge: .top)),
@@ -684,6 +777,329 @@ struct SalvadanaiCardView: View {
                 animateProgress = true
                 animateGlow = true
                 animateFloating = true
+            }
+        }
+        .sheet(isPresented: $showTransactionsSheet) {
+            SalvadanaiTransactionsDetailView(
+                salvadanaio: salvadanaio,
+                transactions: relatedTransactions
+            )
+        }
+    }
+}
+
+// MARK: - Compact Transaction Row per uso all'interno della card
+struct CompactTransactionRowInCard: View {
+    let transaction: TransactionModel
+    
+    private var transactionColor: Color {
+        switch transaction.type {
+        case "expense": return .red
+        case "salary": return .blue
+        case "distribution": return .purple
+        default: return .green
+        }
+    }
+    
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            // Emoji o icona piccola
+            if !categoryEmoji.isEmpty {
+                Text(categoryEmoji)
+                    .font(.caption)
+            } else {
+                Image(systemName: transaction.type == "expense" ? "minus.circle.fill" : "plus.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(transactionColor)
+            }
+            
+            // Descrizione
+            VStack(alignment: .leading, spacing: 1) {
+                Text(transaction.descr)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+                
+                Text(transaction.date, format: .dateTime.day().month(.abbreviated))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            // Importo
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(transactionColor)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(transactionColor.opacity(0.08))
+        )
+    }
+}
+
+// MARK: - Detailed Transaction Row per la vista completa
+struct DetailedTransactionRowView: View {
+    let transaction: TransactionModel
+    
+    private var transactionColor: Color {
+        switch transaction.type {
+        case "expense": return .red
+        case "salary": return .blue
+        case "distribution": return .purple
+        default: return .green
+        }
+    }
+    
+    private var categoryEmoji: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    private var cleanCategoryName: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(transaction.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return transaction.category
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Emoji o icona
+            ZStack {
+                Circle()
+                    .fill(transactionColor.opacity(0.1))
+                    .frame(width: 44, height: 44)
+                
+                if !categoryEmoji.isEmpty {
+                    Text(categoryEmoji)
+                        .font(.title3)
+                } else {
+                    Image(systemName: transaction.type == "expense" ? "minus.circle" : "plus.circle")
+                        .font(.title3)
+                        .foregroundColor(transactionColor)
+                }
+            }
+            
+            // Contenuto principale
+            VStack(alignment: .leading, spacing: 6) {
+                Text(transaction.descr)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                
+                HStack(spacing: 8) {
+                    Text(cleanCategoryName)
+                        .font(.subheadline)
+                        .foregroundColor(transactionColor)
+                        .fontWeight(.medium)
+                    
+                    Text("•")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text(transaction.date, format: .dateTime.hour().minute())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Info aggiuntiva se presente
+                if transaction.type != "expense", !transaction.accountName.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "building.columns")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                        Text("da \(transaction.accountName)")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Importo
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(transactionColor)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Vista completa delle transazioni per il salvadanaio
+struct SalvadanaiTransactionsDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    let salvadanaio: SalvadanaiModel
+    let transactions: [TransactionModel]
+    
+    // Funzione per convertire string colore in Color
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    private var groupedTransactions: [(String, [TransactionModel])] {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.locale = Locale(identifier: "it_IT")
+        
+        let grouped = Dictionary(grouping: transactions) { transaction in
+            formatter.string(from: transaction.date)
+        }
+        
+        return grouped.sorted { $0.key > $1.key }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background con colore del salvadanaio
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        getColor(from: salvadanaio.color).opacity(0.05),
+                        getColor(from: salvadanaio.color).opacity(0.02)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header con info salvadanaio
+                    VStack(spacing: 16) {
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(getColor(from: salvadanaio.color))
+                                .frame(width: 16, height: 16)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(salvadanaio.name)
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                
+                                Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                    .font(.subheadline)
+                                    .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
+                                    .fontWeight(.medium)
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("\(transactions.count)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(getColor(from: salvadanaio.color))
+                                
+                                Text("transazioni")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+                    )
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
+                    
+                    // Lista transazioni
+                    if transactions.isEmpty {
+                        VStack(spacing: 20) {
+                            Spacer()
+                            
+                            Image(systemName: "creditcard")
+                                .font(.system(size: 50))
+                                .foregroundColor(.secondary)
+                            
+                            Text("Nessuna transazione")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                            
+                            Text("Le transazioni associate a questo salvadanaio appariranno qui")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Spacer()
+                        }
+                    } else {
+                        List {
+                            ForEach(groupedTransactions, id: \.0) { dateString, dayTransactions in
+                                Section {
+                                    ForEach(dayTransactions, id: \.id) { transaction in
+                                        DetailedTransactionRowView(transaction: transaction)
+                                    }
+                                } header: {
+                                    HStack {
+                                        Text(dateString)
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(dayTransactions.count)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(
+                                                Capsule()
+                                                    .fill(Color.gray.opacity(0.1))
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                        .listStyle(PlainListStyle())
+                        .background(Color.clear)
+                    }
+                }
+            }
+            .navigationTitle("Transazioni")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
             }
         }
     }
