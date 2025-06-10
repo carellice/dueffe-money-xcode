@@ -49,7 +49,8 @@ struct TransactionModel: Identifiable, Codable {
         case "expense": return .red
         case "salary": return .blue
         case "transfer": return .orange
-        case "distribution": return .purple // Nuovo colore per distribuzioni
+        case "transfer_salvadanai": return .green
+        case "distribution": return .purple
         default: return .green
         }
     }
@@ -59,7 +60,8 @@ struct TransactionModel: Identifiable, Codable {
         case "expense": return "minus.circle.fill"
         case "salary": return "banknote.fill"
         case "transfer": return "arrow.left.arrow.right.circle.fill"
-        case "distribution": return "arrow.branch.circle.fill" // Nuova icona per distribuzioni
+        case "transfer_salvadanai": return "arrow.left.arrow.right.circle.fill"
+        case "distribution": return "arrow.branch.circle.fill"
         default: return "plus.circle.fill"
         }
     }
@@ -356,19 +358,33 @@ class DataManager: ObservableObject {
         }
     }
 
-    // MODIFICATO: Metodo per eliminare transazioni
     func deleteTransaction(_ transaction: TransactionModel) {
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
-            // MODIFICATO: Per le spese: ripristina il saldo del salvadanaio E del conto
+            // Per le spese: ripristina il saldo del salvadanaio E del conto
             if let salvadanaiName = transaction.salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
             }
             
-            // NUOVO: Ripristina anche il conto da cui era stata sottratta la spesa
             if !transaction.accountName.isEmpty {
                 updateAccountBalance(accountName: transaction.accountName, amount: transaction.amount)
+            }
+        } else if transaction.type == "transfer" {
+            // Per trasferimenti tra conti: ripristina entrambi i conti
+            if !transaction.accountName.isEmpty {
+                updateAccountBalance(accountName: transaction.accountName, amount: transaction.amount)
+            }
+            if let toAccount = transaction.salvadanaiName {
+                updateAccountBalance(accountName: toAccount, amount: -transaction.amount)
+            }
+        } else if transaction.type == "transfer_salvadanai" {
+            // Per trasferimenti tra salvadanai: ripristina entrambi i salvadanai
+            if !transaction.accountName.isEmpty {
+                updateSalvadanaiBalance(name: transaction.accountName, amount: transaction.amount)
+            }
+            if let toSalvadanaio = transaction.salvadanaiName {
+                updateSalvadanaiBalance(name: toSalvadanaio, amount: -transaction.amount)
             }
         } else {
             // Per entrate: ripristina il saldo del conto

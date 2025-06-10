@@ -35,10 +35,14 @@ struct TransactionsView: View {
         }
         
         if transactionTypes.contains("transfer") {
-            filters.append(("transfer", "Trasferimenti", "arrow.left.arrow.right.circle"))
+            filters.append(("transfer", "Trasf. Conti", "arrow.left.arrow.right.circle"))
         }
-        
-        // NUOVO: Filtro per le distribuzioni
+
+        // NUOVO: Filtro per trasferimenti tra salvadanai
+        if transactionTypes.contains("transfer_salvadanai") {
+            filters.append(("transfer_salvadanai", "Trasf. Salvadanai", "arrow.left.arrow.right.circle"))
+        }
+
         if transactionTypes.contains("distribution") {
             filters.append(("distribution", "Distribuzioni", "arrow.branch.circle"))
         }
@@ -435,18 +439,39 @@ struct TransactionRowView: View {
                             .foregroundColor(.orange)
                             .fontWeight(.medium)
                     }
-                } else if transaction.type == "transfer", let salvadanaiName = transaction.salvadanaiName {
-                    // NUOVO: Gestione speciale per i trasferimenti (distribuzioni stipendio)
+                } else if transaction.type == "transfer", let toAccount = transaction.salvadanaiName {
+                    // Trasferimenti tra conti
                     HStack(spacing: 4) {
-                        Image(systemName: "arrow.right.circle.fill")
+                        Image(systemName: "building.columns")
                             .font(.caption)
-                            .foregroundColor(.blue)
-                        Text("verso \(salvadanaiName)")
+                            .foregroundColor(.orange)
+                        Text("\(transaction.accountName) → \(toAccount)")
                             .font(.subheadline)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.orange)
                             .fontWeight(.medium)
                     }
-                } else if transaction.type != "expense" && transaction.type != "transfer" && !transaction.accountName.isEmpty {
+                } else if transaction.type == "transfer_salvadanai", let toSalvadanaio = transaction.salvadanaiName {
+                    // NUOVO: Trasferimenti tra salvadanai
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                        Text("\(transaction.accountName) → \(toSalvadanaio)")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    }
+                } else if transaction.type == "distribution", let salvadanaiName = transaction.salvadanaiName {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.branch")
+                            .font(.caption)
+                            .foregroundColor(.purple)
+                        Text("verso \(salvadanaiName)")
+                            .font(.subheadline)
+                            .foregroundColor(.purple)
+                            .fontWeight(.medium)
+                    }
+                } else if transaction.type != "expense" && transaction.type != "transfer" && transaction.type != "transfer_salvadanai" && !transaction.accountName.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "building.columns")
                             .font(.caption)
@@ -985,9 +1010,6 @@ extension Character {
     }
 }
 
-// MARK: - SimpleAddTransactionView AGGIORNATA (TransactionsView.swift)
-// MARK: - SimpleAddTransactionView AGGIORNATA con Trasferimenti (TransactionsView.swift)
-// MARK: - SimpleAddTransactionView COMPLETA - Sostituire in TransactionsView.swift
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -1001,15 +1023,26 @@ struct SimpleAddTransactionView: View {
     @State private var showingSalaryDistribution = false
     @State private var showingIncomeDistribution = false
     
-    // Per i trasferimenti
+    // Per i trasferimenti tra conti
     @State private var fromAccount = ""
     @State private var toAccount = ""
+    
+    // NUOVO: Per i trasferimenti tra salvadanai
+    @State private var fromSalvadanaio = ""
+    @State private var toSalvadanaio = ""
+    @State private var transferType = "account" // "account" o "salvadanaio"
     
     let transactionTypes = [
         ("expense", "Spesa", "minus.circle"),
         ("income", "Entrata", "plus.circle"),
         ("salary", "Stipendio", "banknote"),
         ("transfer", "Trasferimento", "arrow.left.arrow.right")
+    ]
+    
+    // NUOVO: Opzioni per il tipo di trasferimento
+    let transferTypes = [
+        ("account", "Tra Conti", "building.columns"),
+        ("salvadanaio", "Tra Salvadanai", "banknote")
     ]
     
     var availableCategories: [String] {
@@ -1029,23 +1062,40 @@ struct SimpleAddTransactionView: View {
         dataManager.accounts.filter { $0.name != fromAccount }
     }
     
+    // NUOVO: Salvadanai disponibili per trasferimenti
+    var availableFromSalvadanai: [SalvadanaiModel] {
+        dataManager.salvadanai.filter { $0.name != toSalvadanaio }
+    }
+    
+    var availableToSalvadanai: [SalvadanaiModel] {
+        dataManager.salvadanai.filter { $0.name != fromSalvadanaio }
+    }
+    
     var isFormValid: Bool {
         if transactionType == "expense" {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedSalvadanaio.isEmpty &&
                    !selectedCategory.isEmpty &&
-                   !selectedAccount.isEmpty // RICHIEDE anche il conto
+                   !selectedAccount.isEmpty
         } else if transactionType == "salary" {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedAccount.isEmpty
         } else if transactionType == "transfer" {
-            return amount > 0 &&
-                   !descr.isEmpty &&
-                   !fromAccount.isEmpty &&
-                   !toAccount.isEmpty &&
-                   fromAccount != toAccount
+            if transferType == "account" {
+                return amount > 0 &&
+                       !descr.isEmpty &&
+                       !fromAccount.isEmpty &&
+                       !toAccount.isEmpty &&
+                       fromAccount != toAccount
+            } else { // transferType == "salvadanaio"
+                return amount > 0 &&
+                       !descr.isEmpty &&
+                       !fromSalvadanaio.isEmpty &&
+                       !toSalvadanaio.isEmpty &&
+                       fromSalvadanaio != toSalvadanaio
+            }
         } else {
             return amount > 0 &&
                    !descr.isEmpty &&
@@ -1066,7 +1116,9 @@ struct SimpleAddTransactionView: View {
                                 selectedCategory = "💼 Stipendio"
                             } else if type == "transfer" {
                                 selectedCategory = "🔄 Trasferimento"
-                                descr = "Trasferimento tra conti"
+                                descr = getDefaultTransferDescription()
+                                // Reset transfer type to account by default
+                                transferType = "account"
                             } else {
                                 selectedCategory = ""
                                 if type != "transfer" {
@@ -1094,6 +1146,44 @@ struct SimpleAddTransactionView: View {
                     Text("Tipo di transazione")
                 }
                 
+                // NUOVO: Selezione tipo di trasferimento
+                if transactionType == "transfer" {
+                    Section {
+                        ForEach(transferTypes, id: \.0) { type, title, icon in
+                            Button(action: {
+                                transferType = type
+                                descr = getDefaultTransferDescription()
+                                // Reset selections when changing transfer type
+                                resetTransferSelections()
+                            }) {
+                                HStack {
+                                    Image(systemName: icon)
+                                        .frame(width: 24)
+                                        .foregroundColor(transferType == type ? .blue : .secondary)
+                                    Text(title)
+                                    Spacer()
+                                    if transferType == type {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .foregroundColor(transferType == type ? .blue : .primary)
+                        }
+                    } header: {
+                        Text("Tipo di trasferimento")
+                    } footer: {
+                        if transferType == "account" {
+                            Text("Trasferisci denaro fisico da un conto all'altro")
+                        } else {
+                            Text("Sposta denaro logicamente da un salvadanaio all'altro")
+                        }
+                    }
+                }
+                
                 // Dettagli base
                 Section {
                     HStack {
@@ -1116,7 +1206,7 @@ struct SimpleAddTransactionView: View {
                 }
                 
                 // Sezione per trasferimenti tra conti
-                if transactionType == "transfer" {
+                if transactionType == "transfer" && transferType == "account" {
                     Section {
                         // Conto di origine
                         Picker("Da quale conto", selection: $fromAccount) {
@@ -1146,85 +1236,89 @@ struct SimpleAddTransactionView: View {
                             }
                         }
                         
-                        // Anteprima trasferimento
+                        // Anteprima trasferimento conti
                         if !fromAccount.isEmpty && !toAccount.isEmpty && amount > 0 {
-                            VStack(spacing: 12) {
-                                HStack {
-                                    Image(systemName: "info.circle.fill")
-                                        .foregroundColor(.blue)
-                                    Text("Anteprima Trasferimento")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.blue)
-                                }
-                                
-                                VStack(spacing: 8) {
-                                    HStack {
-                                        Text("Da:")
-                                        Text(fromAccount)
-                                            .fontWeight(.semibold)
-                                        Spacer()
-                                        Text("-€\(String(format: "%.2f", amount))")
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.red)
-                                    }
-                                    
-                                    Image(systemName: "arrow.down")
-                                        .foregroundColor(.blue)
-                                    
-                                    HStack {
-                                        Text("A:")
-                                        Text(toAccount)
-                                            .fontWeight(.semibold)
-                                        Spacer()
-                                        Text("+€\(String(format: "%.2f", amount))")
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(Color.blue.opacity(0.1))
-                                )
-                                
-                                // Verifica fondi
-                                if let fromAccountObj = dataManager.accounts.first(where: { $0.name == fromAccount }) {
-                                    if fromAccountObj.balance < amount {
-                                        HStack {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .foregroundColor(.orange)
-                                            Text("Il conto di origine non ha fondi sufficienti. Il saldo diventerà negativo.")
-                                                .font(.caption)
-                                                .foregroundColor(.orange)
-                                        }
-                                    } else {
-                                        HStack {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.green)
-                                            Text("Trasferimento possibile")
-                                                .font(.caption)
-                                                .foregroundColor(.green)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 8)
+                            TransferPreviewCard(
+                                fromName: fromAccount,
+                                toName: toAccount,
+                                amount: amount,
+                                transferType: "conti",
+                                availableFunds: dataManager.accounts.first { $0.name == fromAccount }?.balance ?? 0,
+                                color: .blue
+                            )
                         }
                         
                     } header: {
                         HStack {
                             Image(systemName: "arrow.left.arrow.right.circle.fill")
                                 .foregroundColor(.blue)
-                            Text("Trasferimento")
+                            Text("Trasferimento tra Conti")
                         }
                     } footer: {
                         if dataManager.accounts.count < 2 {
                             Text("⚠️ Hai bisogno di almeno 2 conti per effettuare un trasferimento")
                                 .foregroundColor(.orange)
                         } else {
-                            Text("Trasferisci denaro da un conto all'altro. L'operazione verrà registrata in entrambi i conti.")
+                            Text("Trasferisci denaro fisico da un conto all'altro")
+                        }
+                    }
+                }
+                
+                // NUOVO: Sezione per trasferimenti tra salvadanai
+                if transactionType == "transfer" && transferType == "salvadanaio" {
+                    Section {
+                        // Salvadanaio di origine
+                        Picker("Da quale salvadanaio", selection: $fromSalvadanaio) {
+                            Text("Seleziona salvadanaio di origine").tag("")
+                            ForEach(availableFromSalvadanai, id: \.name) { salvadanaio in
+                                HStack {
+                                    Text(salvadanaio.name)
+                                    Spacer()
+                                    Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                        .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
+                                }
+                                .tag(salvadanaio.name)
+                            }
+                        }
+                        
+                        // Salvadanaio di destinazione
+                        Picker("A quale salvadanaio", selection: $toSalvadanaio) {
+                            Text("Seleziona salvadanaio di destinazione").tag("")
+                            ForEach(availableToSalvadanai, id: \.name) { salvadanaio in
+                                HStack {
+                                    Text(salvadanaio.name)
+                                    Spacer()
+                                    Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                        .foregroundColor(.secondary)
+                                }
+                                .tag(salvadanaio.name)
+                            }
+                        }
+                        
+                        // Anteprima trasferimento salvadanai
+                        if !fromSalvadanaio.isEmpty && !toSalvadanaio.isEmpty && amount > 0 {
+                            TransferPreviewCard(
+                                fromName: fromSalvadanaio,
+                                toName: toSalvadanaio,
+                                amount: amount,
+                                transferType: "salvadanai",
+                                availableFunds: dataManager.salvadanai.first { $0.name == fromSalvadanaio }?.currentAmount ?? 0,
+                                color: .green
+                            )
+                        }
+                        
+                    } header: {
+                        HStack {
+                            Image(systemName: "arrow.left.arrow.right.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Trasferimento tra Salvadanai")
+                        }
+                    } footer: {
+                        if dataManager.salvadanai.count < 2 {
+                            Text("⚠️ Hai bisogno di almeno 2 salvadanai per effettuare un trasferimento")
+                                .foregroundColor(.orange)
+                        } else {
+                            Text("Sposta denaro logicamente da un salvadanaio all'altro. Non modifica i conti fisici.")
                         }
                     }
                 }
@@ -1520,13 +1614,30 @@ struct SimpleAddTransactionView: View {
         }
     }
     
+    // NUOVO: Funzione per ottenere la descrizione di default del trasferimento
+    private func getDefaultTransferDescription() -> String {
+        if transferType == "account" {
+            return fromAccount.isEmpty || toAccount.isEmpty ? "Trasferimento tra conti" : "Trasferimento da \(fromAccount) a \(toAccount)"
+        } else {
+            return fromSalvadanaio.isEmpty || toSalvadanaio.isEmpty ? "Trasferimento tra salvadanai" : "Trasferimento da \(fromSalvadanaio) a \(toSalvadanaio)"
+        }
+    }
+    
+    // NUOVO: Funzione per resettare le selezioni quando si cambia tipo trasferimento
+    private func resetTransferSelections() {
+        fromAccount = ""
+        toAccount = ""
+        fromSalvadanaio = ""
+        toSalvadanaio = ""
+    }
+    
     private func getButtonText() -> String {
         if transactionType == "salary" {
             return "Distribuisci Stipendio"
         } else if transactionType == "income" && !dataManager.salvadanai.isEmpty {
             return "Distribuisci Entrata"
         } else if transactionType == "transfer" {
-            return "Trasferisci"
+            return transferType == "account" ? "Trasferisci tra Conti" : "Trasferisci tra Salvadanai"
         } else {
             return "Salva"
         }
@@ -1536,7 +1647,7 @@ struct SimpleAddTransactionView: View {
         switch transactionType {
         case "salary": return .blue
         case "income": return .green
-        case "transfer": return .orange
+        case "transfer": return transferType == "account" ? .blue : .green
         default: return .blue
         }
     }
@@ -1545,7 +1656,7 @@ struct SimpleAddTransactionView: View {
         switch transactionType {
         case "expense": return "Nuova Spesa"
         case "salary": return "Nuovo Stipendio"
-        case "transfer": return "Trasferimento"
+        case "transfer": return transferType == "account" ? "Trasferimento Conti" : "Trasferimento Salvadanai"
         default: return "Nuova Entrata"
         }
     }
@@ -1564,8 +1675,8 @@ struct SimpleAddTransactionView: View {
             selectedSalvadanaio = dataManager.salvadanai.first!.name
         }
         
-        // Setup per trasferimenti
-        if transactionType == "transfer" {
+        // Setup per trasferimenti tra conti
+        if transactionType == "transfer" && transferType == "account" {
             if fromAccount.isEmpty && !dataManager.accounts.isEmpty {
                 fromAccount = dataManager.accounts.first!.name
             }
@@ -1574,7 +1685,17 @@ struct SimpleAddTransactionView: View {
             }
         }
         
-        // NUOVO: Setup default per conto spese
+        // NUOVO: Setup per trasferimenti tra salvadanai
+        if transactionType == "transfer" && transferType == "salvadanaio" {
+            if fromSalvadanaio.isEmpty && !dataManager.salvadanai.isEmpty {
+                fromSalvadanaio = dataManager.salvadanai.first!.name
+            }
+            if toSalvadanaio.isEmpty && dataManager.salvadanai.count > 1 {
+                toSalvadanaio = dataManager.salvadanai.filter { $0.name != fromSalvadanaio }.first?.name ?? ""
+            }
+        }
+        
+        // Setup default per conto spese
         if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && transactionType == "expense" {
             selectedAccount = dataManager.accounts.first!.name
         }
@@ -1582,18 +1703,16 @@ struct SimpleAddTransactionView: View {
     
     private func saveTransaction() {
         if transactionType == "expense" {
-            // MODIFICATO: Per le spese: passa sia salvadanaio che conto
             dataManager.addTransaction(
                 amount: amount,
                 descr: descr,
                 category: selectedCategory,
                 type: transactionType,
-                accountName: selectedAccount, // Conto da cui sottrarre fisicamente
+                accountName: selectedAccount,
                 salvadanaiName: selectedSalvadanaio
             )
             dismiss()
         } else if transactionType == "salary" {
-            // Per gli stipendi: mostra la vista di distribuzione
             if dataManager.salvadanai.isEmpty {
                 dataManager.addTransaction(
                     amount: amount,
@@ -1608,7 +1727,6 @@ struct SimpleAddTransactionView: View {
                 showingSalaryDistribution = true
             }
         } else if transactionType == "income" {
-            // Per le entrate normali
             if dataManager.salvadanai.isEmpty {
                 dataManager.addTransaction(
                     amount: amount,
@@ -1623,14 +1741,17 @@ struct SimpleAddTransactionView: View {
                 showingIncomeDistribution = true
             }
         } else if transactionType == "transfer" {
-            // Per i trasferimenti
-            performTransfer()
+            if transferType == "account" {
+                performAccountTransfer()
+            } else {
+                performSalvadanaiTransfer()
+            }
             dismiss()
         }
     }
     
-    // Funzione per eseguire il trasferimento
-    private func performTransfer() {
+    // Funzione esistente per trasferimenti tra conti
+    private func performAccountTransfer() {
         // Aggiorna direttamente l'array accounts
         if let fromIndex = dataManager.accounts.firstIndex(where: { $0.name == fromAccount }) {
             dataManager.accounts[fromIndex].balance -= amount
@@ -1645,11 +1766,37 @@ struct SimpleAddTransactionView: View {
         let transferTransaction = TransactionModel(
             amount: amount,
             descr: finalDescription,
-            category: "🔄 Trasferimento",
+            category: "🔄 Trasferimento Conti",
             type: "transfer",
             date: Date(),
             accountName: fromAccount,
             salvadanaiName: toAccount
+        )
+        
+        dataManager.transactions.append(transferTransaction)
+    }
+    
+    // NUOVO: Funzione per trasferimenti tra salvadanai
+    private func performSalvadanaiTransfer() {
+        // Aggiorna i saldi dei salvadanai
+        if let fromIndex = dataManager.salvadanai.firstIndex(where: { $0.name == fromSalvadanaio }) {
+            dataManager.salvadanai[fromIndex].currentAmount -= amount
+        }
+        
+        if let toIndex = dataManager.salvadanai.firstIndex(where: { $0.name == toSalvadanaio }) {
+            dataManager.salvadanai[toIndex].currentAmount += amount
+        }
+        
+        // Registra la transazione
+        let finalDescription = descr.isEmpty ? "Trasferimento da \(fromSalvadanaio) a \(toSalvadanaio)" : descr
+        let transferTransaction = TransactionModel(
+            amount: amount,
+            descr: finalDescription,
+            category: "🔄 Trasferimento Salvadanai",
+            type: "transfer_salvadanai", // Nuovo tipo per distinguere dai trasferimenti tra conti
+            date: Date(),
+            accountName: fromSalvadanaio,
+            salvadanaiName: toSalvadanaio
         )
         
         dataManager.transactions.append(transferTransaction)
@@ -1897,5 +2044,83 @@ struct UltraCompactTransactionsHeader: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(.ultraThinMaterial)
         )
+    }
+}
+
+// MARK: - Transfer Preview Card Component
+struct TransferPreviewCard: View {
+    let fromName: String
+    let toName: String
+    let amount: Double
+    let transferType: String
+    let availableFunds: Double
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(color)
+                Text("Anteprima Trasferimento")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(color)
+            }
+            
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Da:")
+                    Text(fromName)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("-€\(String(format: "%.2f", amount))")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+                }
+                
+                Image(systemName: "arrow.down")
+                    .foregroundColor(color)
+                
+                HStack {
+                    Text("A:")
+                    Text(toName)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Text("+€\(String(format: "%.2f", amount))")
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.1))
+            )
+            
+            // Verifica fondi
+            HStack {
+                if availableFunds >= amount {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Trasferimento possibile")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                } else {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    if transferType == "conti" {
+                        Text("Il conto di origine non ha fondi sufficienti. Il saldo diventerà negativo.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text("Il salvadanaio di origine non ha fondi sufficienti. Il saldo diventerà negativo.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
     }
 }
