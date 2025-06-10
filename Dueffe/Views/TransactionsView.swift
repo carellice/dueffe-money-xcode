@@ -9,6 +9,8 @@ struct TransactionsView: View {
     @State private var showingDeleteConfirmation = false
     @State private var transactionToDelete: TransactionModel?
     
+    // MARK: - AGGIORNARE IN TransactionsView.swift
+
     private var availableFilterOptions: [(String, String, String)] {
         var filters: [(String, String, String)] = []
         
@@ -32,9 +34,13 @@ struct TransactionsView: View {
             filters.append(("salary", "Stipendi", "banknote"))
         }
         
-        // NUOVO: Filtro per le distribuzioni/trasferimenti
         if transactionTypes.contains("transfer") {
-            filters.append(("transfer", "Distribuzioni", "arrow.left.arrow.right.circle"))
+            filters.append(("transfer", "Trasferimenti", "arrow.left.arrow.right.circle"))
+        }
+        
+        // NUOVO: Filtro per le distribuzioni
+        if transactionTypes.contains("distribution") {
+            filters.append(("distribution", "Distribuzioni", "arrow.branch.circle"))
         }
         
         return filters
@@ -1569,8 +1575,11 @@ struct SimpleAddTransactionView: View {
         }
     }
     
-    // NUOVO: Funzione per eseguire il trasferimento
+    // MODIFICATO: Funzione per eseguire il trasferimento tra conti (SOLO per trasferimenti tra conti, NON per distribuzione salvadanai)
     private func performTransfer() {
+        // NOTA: Questa funzione è SOLO per trasferimenti diretti tra conti
+        // NON usare per la distribuzione ai salvadanai
+        
         // Aggiorna direttamente l'array accounts
         if let fromIndex = dataManager.accounts.firstIndex(where: { $0.name == fromAccount }) {
             dataManager.accounts[fromIndex].balance -= amount

@@ -16,20 +16,24 @@ struct SalvadanaiModel: Identifiable, Codable {
     var isInfinite: Bool
 }
 
-// MARK: - Transaction Model (AGGIORNATO CON SUPPORTO TRASFERIMENTI)
+// MARK: - AGGIORNARE TransactionModel IN DataManager.swift
 struct TransactionModel: Identifiable, Codable {
     let id = UUID()
     var amount: Double
     var descr: String
     var category: String
-    var type: String // "expense", "income", "salary", "transfer"
+    var type: String // "expense", "income", "salary", "transfer", "distribution"
     var date: Date
-    var accountName: String // Può essere vuoto per le spese
+    var accountName: String
     var salvadanaiName: String?
     
-    // NUOVO: Proprietà computate per migliorare la leggibilità
+    // AGGIORNATO: Proprietà computate per gestire il nuovo tipo "distribution"
     var isTransfer: Bool {
         return type == "transfer"
+    }
+    
+    var isDistribution: Bool {
+        return type == "distribution"
     }
     
     var isExpense: Bool {
@@ -45,6 +49,7 @@ struct TransactionModel: Identifiable, Codable {
         case "expense": return .red
         case "salary": return .blue
         case "transfer": return .orange
+        case "distribution": return .purple // Nuovo colore per distribuzioni
         default: return .green
         }
     }
@@ -54,6 +59,7 @@ struct TransactionModel: Identifiable, Codable {
         case "expense": return "minus.circle.fill"
         case "salary": return "banknote.fill"
         case "transfer": return "arrow.left.arrow.right.circle.fill"
+        case "distribution": return "arrow.branch.circle.fill" // Nuova icona per distribuzioni
         default: return "plus.circle.fill"
         }
     }
@@ -62,6 +68,10 @@ struct TransactionModel: Identifiable, Codable {
         if isTransfer {
             if let salvadanaiName = salvadanaiName {
                 return "\(descr): \(accountName) → \(salvadanaiName)"
+            }
+        } else if isDistribution {
+            if let salvadanaiName = salvadanaiName {
+                return "\(descr) → \(salvadanaiName)"
             }
         }
         return descr
@@ -288,7 +298,7 @@ class DataManager: ObservableObject {
         // saveCategories() chiamato automaticamente da didSet
     }
     
-    // MARK: - Salvadanai Methods
+    // MODIFICATO: addSalvadanaio - NON sottrae dal conto quando si imposta un saldo iniziale
     func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, accountName: String, initialAmount: Double = 0, isInfinite: Bool = false) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
@@ -304,10 +314,8 @@ class DataManager: ObservableObject {
         )
         salvadanai.append(newSalvadanaio)
         
-        // Se c'è un saldo iniziale, sottrailo dal conto selezionato
-        if initialAmount > 0 {
-            updateAccountBalance(accountName: accountName, amount: -initialAmount)
-        }
+        // RIMOSSO: Non sottrae più dal conto selezionato
+        // I salvadanai sono solo "etichette" organizzative
     }
     
     func updateSalvadanaio(_ salvadanaio: SalvadanaiModel) {
@@ -320,7 +328,7 @@ class DataManager: ObservableObject {
         salvadanai.removeAll { $0.id == salvadanaio.id }
     }
     
-    // MARK: - Transaction Methods (MODIFICATO)
+    // MODIFICATO: Transaction Methods - OPZIONE B per le spese
     func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String? = nil, salvadanaiName: String? = nil) {
         let newTransaction = TransactionModel(
             amount: amount,
@@ -328,32 +336,42 @@ class DataManager: ObservableObject {
             category: category,
             type: type,
             date: Date(),
-            accountName: accountName ?? "", // Per spese sarà vuoto, per entrate avrà il conto
+            accountName: accountName ?? "",
             salvadanaiName: salvadanaiName
         )
         transactions.append(newTransaction)
         
         if type == "expense" {
-            // Per le spese: sottrai SOLO dal salvadanaio
+            // OPZIONE B: Per le spese: sottrai dal salvadanaio E dal conto associato
             if let salvadanaiName = salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
+                
+                // Trova il conto associato al salvadanaio e sottrai anche da lì
+                if let salvadanaio = salvadanai.first(where: { $0.name == salvadanaiName }) {
+                    updateAccountBalance(accountName: salvadanaio.accountName, amount: -amount)
+                }
             }
         } else {
-            // Per entrate e stipendi: aggiungi al conto selezionato
+            // Per entrate e stipendi: aggiungi al conto selezionato (INVARIATO)
             if let accountName = accountName {
                 updateAccountBalance(accountName: accountName, amount: amount)
             }
         }
     }
 
-    // MARK: - Metodo per eliminare transazioni (MODIFICATO)
+    // MODIFICATO: Metodo per eliminare transazioni - OPZIONE B
     func deleteTransaction(_ transaction: TransactionModel) {
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
-            // Per le spese: ripristina il saldo del salvadanaio
+            // OPZIONE B: Per le spese: ripristina il saldo del salvadanaio E del conto associato
             if let salvadanaiName = transaction.salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
+                
+                // Trova il conto associato al salvadanaio e ripristina anche lì
+                if let salvadanaio = salvadanai.first(where: { $0.name == salvadanaiName }) {
+                    updateAccountBalance(accountName: salvadanaio.accountName, amount: transaction.amount)
+                }
             }
         } else {
             // Per entrate: ripristina il saldo del conto
@@ -392,12 +410,12 @@ class DataManager: ObservableObject {
     
     // MARK: - NUOVI METODI PER DISTRIBUZIONE STIPENDI
     
-    // NUOVO: Distribuzione con importi personalizzati
+    // MODIFICATO: Distribuzione con importi personalizzati - NON sottrae dai conti
     func distributeIncomeWithCustomAmounts(amount: Double, salvadanaiAmounts: [String: Double], accountName: String, transactionType: String = "salary") {
         let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
         let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
         
-        // 1. Aggiungi la transazione principale al conto
+        // 1. Aggiungi la transazione principale al conto (INVARIATO)
         addTransaction(
             amount: amount,
             descr: descriptionText,
@@ -410,14 +428,11 @@ class DataManager: ObservableObject {
         for (salvadanaiName, customAmount) in salvadanaiAmounts {
             if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
                 if customAmount > 0 {
-                    // Aggiungi l'importo al salvadanaio
+                    // MODIFICATO: Aggiungi SOLO al salvadanaio, NON sottrarre dal conto
                     salvadanai[index].currentAmount += customAmount
                     
-                    // Sottrai l'importo dal conto di riferimento del salvadanaio
-                    updateAccountBalance(accountName: salvadanai[index].accountName, amount: -customAmount)
-                    
-                    // NUOVO: Aggiungi una transazione di trasferimento per tracciabilità
-                    addTransferTransaction(
+                    // MODIFICATO: Aggiungi una transazione di trasferimento per tracciabilità
+                    addDistributionTransaction(
                         amount: customAmount,
                         fromAccount: accountName,
                         toSalvadanaio: salvadanaiName,
@@ -428,18 +443,19 @@ class DataManager: ObservableObject {
         }
     }
     
-    // NUOVO: Transazione di trasferimento per tracciare i movimenti tra conto e salvadanaio
+    // MODIFICATO: Transazione di trasferimento - NON modifica i saldi dei conti
     private func addTransferTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
         let transferTransaction = TransactionModel(
             amount: amount,
             descr: description,
             category: "🔄 Trasferimento",
-            type: "transfer", // Nuovo tipo di transazione
+            type: "transfer", // Tipo di transazione per tracciabilità
             date: Date(),
             accountName: fromAccount,
             salvadanaiName: toSalvadanaio
         )
         transactions.append(transferTransaction)
+        // NOTA: NON modifica i saldi - è solo per tracciare la distribuzione
     }
     
     // MIGLIORATO: Distribuzione automatica intelligente
@@ -452,6 +468,21 @@ class DataManager: ObservableObject {
             accountName: accountName,
             transactionType: transactionType
         )
+    }
+    
+    // NUOVO: Transazione di distribuzione - NON modifica i saldi dei conti
+    private func addDistributionTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
+        let distributionTransaction = TransactionModel(
+            amount: amount,
+            descr: description,
+            category: "🔄 Distribuzione",
+            type: "distribution", // Nuovo tipo per distinguere dalle vere spese
+            date: Date(),
+            accountName: fromAccount,
+            salvadanaiName: toSalvadanaio
+        )
+        transactions.append(distributionTransaction)
+        // NOTA: NON modifica i saldi dei conti - è solo per tracciare la distribuzione
     }
     
     // NUOVO: Calcolo distribuzione automatica intelligente
