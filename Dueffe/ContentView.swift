@@ -9,6 +9,8 @@ struct ContentView: View {
 struct OnboardingWrapperView: View {
     @StateObject private var dataManager = DataManager()
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("hasCreatedFirstSalvadanaio") private var hasCreatedFirstSalvadanaio = false
+    @AppStorage("hasAddedInitialBalance") private var hasAddedInitialBalance = false
     
     var body: some View {
         Group {
@@ -17,12 +19,18 @@ struct OnboardingWrapperView: View {
                 AppOnboardingView()
                     .environmentObject(dataManager)
                     .onAppear {
-                        // Reset per testing - RIMUOVI in produzione
-                        // hasSeenOnboarding = false
                     }
             } else if dataManager.accounts.isEmpty {
-                // Mostra creazione primo conto
+                // Mostra creazione primo conto (STEP 1)
                 FirstAccountOnboardingView()
+                    .environmentObject(dataManager)
+            } else if !hasCreatedFirstSalvadanaio {
+                // NUOVO: Mostra creazione primo salvadanaio (STEP 2)
+                FirstSalvadanaiOnboardingView()
+                    .environmentObject(dataManager)
+            } else if !hasAddedInitialBalance {
+                // NUOVO: Mostra aggiunta saldo iniziale (STEP 3)
+                InitialBalanceOnboardingView()
                     .environmentObject(dataManager)
             } else {
                 // Mostra app normale
@@ -463,11 +471,10 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - First Account Onboarding migliorato
+// MARK: - First Account Onboarding modificato (STEP 1 di 3)
 struct FirstAccountOnboardingView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var accountName = ""
-    @State private var initialBalance = 0.0
     @State private var showingValidationError = false
     @State private var animateIcon = false
     
@@ -506,7 +513,7 @@ struct FirstAccountOnboardingView: View {
                             }
                             
                             VStack(spacing: 16) {
-                                Text("Benvenuto in Dueffe! 👋")
+                                Text("Primo Passo! 🏦")
                                     .font(.largeTitle)
                                     .fontWeight(.bold)
                                     .multilineTextAlignment(.center)
@@ -516,14 +523,14 @@ struct FirstAccountOnboardingView: View {
                                         endPoint: .trailing
                                     ))
                                 
-                                Text("Per iniziare, aggiungi il tuo primo conto")
+                                Text("Iniziamo creando il tuo primo conto")
                                     .font(.title3)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
                             }
                         }
                         
-                        // Form migliorato
+                        // Form semplificato - SOLO NOME CONTO
                         VStack(spacing: 24) {
                             VStack(spacing: 20) {
                                 // Campo nome conto
@@ -541,19 +548,41 @@ struct FirstAccountOnboardingView: View {
                                         .textInputAutocapitalization(.words)
                                 }
                                 
-                                // Campo saldo
+                                // Info saldo automatico
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
-                                        Image(systemName: "euroSign.circle.fill")
-                                            .foregroundColor(.green)
-                                        Text("Saldo attuale")
+                                        Image(systemName: "info.circle.fill")
+                                            .foregroundColor(.blue)
+                                        Text("Saldo iniziale")
                                             .font(.headline)
                                             .fontWeight(.semibold)
                                     }
-                                    TextField("0,00", value: $initialBalance, format: .currency(code: "EUR"))
-                                            .textFieldStyle(ModernTextFieldStyle())
-                                            .keyboardType(.decimalPad)
-                                            .multilineTextAlignment(.trailing)
+                                    
+                                    HStack {
+                                        Text("€0,00")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.blue)
+                                        
+                                        Spacer()
+                                        
+                                        Text("(impostato automaticamente)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.blue.opacity(0.1))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                                            )
+                                    )
+                                    
+                                    Text("Il saldo verrà impostato dopo aver aggiunto i tuoi salvadanai e il saldo iniziale")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
                             }
                             .padding(28)
@@ -585,13 +614,27 @@ struct FirstAccountOnboardingView: View {
                         
                         Spacer(minLength: 40)
                         
+                        // Progress indicator
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Passo 1 di 3")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            ProgressView(value: 1.0/3.0)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                                .scaleEffect(y: 2)
+                        }
+                        
                         // Bottone migliorato
                         VStack(spacing: 16) {
                             Button(action: {
                                 createFirstAccount()
                             }) {
                                 HStack {
-                                    Text("Crea il mio primo conto")
+                                    Text("Continua")
                                         .font(.headline)
                                         .fontWeight(.semibold)
                                     
@@ -620,7 +663,7 @@ struct FirstAccountOnboardingView: View {
                             .disabled(accountName.isEmpty)
                             .animation(.spring(response: 0.5, dampingFraction: 0.6), value: accountName.isEmpty)
                             
-                            Text("Potrai aggiungere altri conti in seguito")
+                            Text("Successivamente: creerai i tuoi salvadanai")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -650,12 +693,894 @@ struct FirstAccountOnboardingView: View {
             return
         }
         
-        dataManager.addAccount(name: trimmedName, initialBalance: initialBalance)
+        // MODIFICATO: Saldo sempre 0
+        dataManager.addAccount(name: trimmedName, initialBalance: 0.0)
         
         // Animazione di successo
         withAnimation(.spring()) {
-            // L'app si aggiornerà automaticamente mostrando la TabView
+            // L'app si aggiornerà automaticamente mostrando il prossimo step
         }
+    }
+}
+
+// MARK: - First Salvadanaio Onboarding (STEP 2 di 3) - MULTIPLI SALVADANAI
+struct FirstSalvadanaiOnboardingView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @AppStorage("hasCreatedFirstSalvadanaio") private var hasCreatedFirstSalvadanaio = false
+    
+    @State private var name = ""
+    @State private var selectedType = "objective"
+    @State private var targetAmount = 100.0
+    @State private var targetDate = Date()
+    @State private var monthlyRefill = 50.0
+    @State private var selectedColor = "blue"
+    @State private var isInfiniteObjective = false
+    @State private var animateIcon = false
+    
+    // NUOVO: Array per gestire salvadanai creati durante l'onboarding
+    @State private var createdSalvadanai: [OnboardingSalvadanaio] = []
+    
+    // NUOVO: Struct per salvadanai temporanei
+    struct OnboardingSalvadanaio: Identifiable {
+        let id = UUID()
+        let name: String
+        let type: String
+        let targetAmount: Double
+        let targetDate: Date?
+        let monthlyRefill: Double
+        let color: String
+        let isInfinite: Bool
+    }
+    
+    let salvadanaiTypes = [
+        ("objective", "Obiettivo", "target"),
+        ("glass", "Glass", "cup.and.saucer.fill")
+    ]
+    
+    var isFormValid: Bool {
+        if name.isEmpty { return false }
+        if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
+        if selectedType == "glass" && monthlyRefill <= 0 { return false }
+        return true
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.green.opacity(0.1), Color.mint.opacity(0.1)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 40) {
+                        Spacer(minLength: 60)
+                        
+                        // Header
+                        VStack(spacing: 30) {
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [Color.green, Color.mint]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 120, height: 120)
+                                    .shadow(color: .green.opacity(0.3), radius: 20, x: 0, y: 10)
+                                
+                                Image(systemName: "banknote.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white)
+                                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
+                            }
+                            
+                            VStack(spacing: 16) {
+                                Text("Secondo Passo! 💰")
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundStyle(LinearGradient(
+                                        gradient: Gradient(colors: [.green, .mint]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ))
+                                
+                                Text("Crea i tuoi salvadanai")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                
+                                if !createdSalvadanai.isEmpty {
+                                    Text("\(createdSalvadanai.count) salvadanaio\(createdSalvadanai.count == 1 ? "" : "i") creato\(createdSalvadanai.count == 1 ? "" : "i")")
+                                        .font(.subheadline)
+                                        .foregroundColor(.green)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                        }
+                        
+                        // Lista salvadanai creati
+                        if !createdSalvadanai.isEmpty {
+                            VStack(spacing: 16) {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Salvadanai creati")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                }
+                                
+                                VStack(spacing: 12) {
+                                    ForEach(createdSalvadanai) { salvadanaio in
+                                        CreatedSalvadanaiRow(salvadanaio: salvadanaio) {
+                                            removeSalvadanaio(salvadanaio)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(20)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.green.opacity(0.05))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        
+                        // Form per nuovo salvadanaio
+                        VStack(spacing: 24) {
+                            VStack(spacing: 20) {
+                                // Nome salvadanaio
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "tag.fill")
+                                            .foregroundColor(.green)
+                                        Text("Nome del salvadanaio")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    TextField("es. Vacanze Estate, Casa Nuova...", text: $name)
+                                        .textFieldStyle(ModernTextFieldStyle())
+                                        .textInputAutocapitalization(.words)
+                                }
+                                
+                                // Tipo salvadanaio
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "list.bullet.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Tipo di salvadanaio")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    ForEach(salvadanaiTypes, id: \.0) { type, displayName, icon in
+                                        Button(action: {
+                                            selectedType = type
+                                            if type == "glass" {
+                                                isInfiniteObjective = false
+                                            }
+                                        }) {
+                                            HStack {
+                                                Image(systemName: icon)
+                                                    .frame(width: 24)
+                                                    .foregroundColor(selectedType == type ? .green : .secondary)
+                                                Text(displayName)
+                                                Spacer()
+                                                if selectedType == type {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                        .foregroundColor(.green)
+                                                }
+                                            }
+                                            .padding(.vertical, 12)
+                                            .padding(.horizontal, 16)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(selectedType == type ? Color.green.opacity(0.1) : Color.gray.opacity(0.05))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(selectedType == type ? Color.green : Color.clear, lineWidth: 2)
+                                                    )
+                                            )
+                                            .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                        .foregroundColor(selectedType == type ? .green : .primary)
+                                    }
+                                }
+                                
+                                // Dettagli specifici per tipo
+                                if selectedType == "objective" {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        HStack {
+                                            Image(systemName: "target")
+                                                .foregroundColor(.green)
+                                            Text("Dettagli obiettivo")
+                                                .font(.headline)
+                                                .fontWeight(.semibold)
+                                        }
+                                        
+                                        VStack(spacing: 16) {
+                                            Toggle("Obiettivo infinito", isOn: $isInfiniteObjective)
+                                                .toggleStyle(SwitchToggleStyle(tint: .green))
+                                            
+                                            if !isInfiniteObjective {
+                                                VStack(spacing: 12) {
+                                                    HStack {
+                                                        Text("Obiettivo")
+                                                        Spacer()
+                                                        TextField("100", value: $targetAmount, format: .currency(code: "EUR"))
+                                                            .multilineTextAlignment(.trailing)
+                                                            .keyboardType(.decimalPad)
+                                                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                                                            .frame(width: 100)
+                                                    }
+                                                    
+                                                    DatePicker("Scadenza", selection: $targetDate, displayedComponents: .date)
+                                                }
+                                            }
+                                        }
+                                        .padding()
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.green.opacity(0.05))
+                                        )
+                                    }
+                                } else {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        HStack {
+                                            Image(systemName: "cup.and.saucer.fill")
+                                                .foregroundColor(.green)
+                                            Text("Dettagli Glass")
+                                                .font(.headline)
+                                                .fontWeight(.semibold)
+                                        }
+                                        
+                                        HStack {
+                                            Text("Ricarica mensile")
+                                            Spacer()
+                                            TextField("50", value: $monthlyRefill, format: .currency(code: "EUR"))
+                                                .multilineTextAlignment(.trailing)
+                                                .keyboardType(.decimalPad)
+                                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                                .frame(width: 100)
+                                        }
+                                        .padding()
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(Color.green.opacity(0.05))
+                                        )
+                                    }
+                                }
+                                
+                                // Colore
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "paintbrush.fill")
+                                            .foregroundColor(.green)
+                                        Text("Colore")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 16) {
+                                        ForEach(getSalvadanaiColors(), id: \.name) { colorItem in
+                                            Circle()
+                                                .fill(colorItem.color)
+                                                .frame(width: 40, height: 40)
+                                                .overlay(
+                                                    Circle()
+                                                        .stroke(selectedColor == colorItem.name ? Color.primary : Color.clear, lineWidth: 3)
+                                                )
+                                                .onTapGesture {
+                                                    selectedColor = colorItem.name
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 5)
+                            )
+                        }
+                        
+                        // Bottone per aggiungere salvadanaio
+                        Button(action: {
+                            addSalvadanaio()
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title2)
+                                Text(createdSalvadanai.isEmpty ? "Crea primo salvadanaio" : "Aggiungi altro salvadanaio")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                Group {
+                                    if !isFormValid {
+                                        Color.gray
+                                    } else {
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [.green, .mint]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    }
+                                }
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .shadow(color: isFormValid ? .green.opacity(0.3) : .clear, radius: 10, x: 0, y: 5)
+                        }
+                        .disabled(!isFormValid)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isFormValid)
+                        
+                        Spacer(minLength: 40)
+                        
+                        // Progress indicator
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Passo 2 di 3")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            ProgressView(value: 2.0/3.0)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .green))
+                                .scaleEffect(y: 2)
+                        }
+                        
+                        // Bottone continua (solo se ha creato almeno un salvadanaio)
+                        if !createdSalvadanai.isEmpty {
+                            VStack(spacing: 16) {
+                                Button(action: {
+                                    saveAllSalvadanai()
+                                }) {
+                                    HStack {
+                                        Text("Continua")
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                        
+                                        Image(systemName: "arrow.right.circle.fill")
+                                            .font(.title2)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [.blue, .purple]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                                }
+                                
+                                Text("Successivamente: imposterai il saldo iniziale")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else {
+                            VStack(spacing: 16) {
+                                Text("⬆️ Crea almeno un salvadanaio per continuare")
+                                    .font(.subheadline)
+                                    .foregroundColor(.orange)
+                                    .fontWeight(.medium)
+                                    .multilineTextAlignment(.center)
+                                
+                                Text("I salvadanai ti aiutano a organizzare i tuoi risparmi per obiettivi specifici")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                }
+            }
+            .navigationBarHidden(true)
+        }
+        .onAppear {
+            animateIcon = true
+        }
+    }
+    
+    private func getSalvadanaiColors() -> [(name: String, color: Color)] {
+        return [
+            ("blue", Color.blue),
+            ("green", Color.green),
+            ("orange", Color.orange),
+            ("purple", Color.purple),
+            ("pink", Color.pink),
+            ("red", Color.red),
+            ("yellow", Color.yellow),
+            ("indigo", Color.indigo),
+            ("mint", Color.mint),
+            ("teal", Color.teal),
+            ("cyan", Color.cyan),
+            ("brown", Color.brown)
+        ]
+    }
+    
+    private func addSalvadanaio() {
+        let newSalvadanaio = OnboardingSalvadanaio(
+            name: name,
+            type: selectedType,
+            targetAmount: isInfiniteObjective ? 0 : (selectedType == "objective" ? targetAmount : 0),
+            targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
+            monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
+            color: selectedColor,
+            isInfinite: selectedType == "objective" ? isInfiniteObjective : false
+        )
+        
+        withAnimation(.spring()) {
+            createdSalvadanai.append(newSalvadanaio)
+        }
+        
+        // Reset form per il prossimo salvadanaio
+        resetForm()
+    }
+    
+    private func removeSalvadanaio(_ salvadanaio: OnboardingSalvadanaio) {
+        withAnimation(.spring()) {
+            createdSalvadanai.removeAll { $0.id == salvadanaio.id }
+        }
+    }
+    
+    private func resetForm() {
+        name = ""
+        selectedType = "objective"
+        targetAmount = 100.0
+        targetDate = Date()
+        monthlyRefill = 50.0
+        selectedColor = getNextAvailableColor()
+        isInfiniteObjective = false
+    }
+    
+    private func getNextAvailableColor() -> String {
+        let usedColors = Set(createdSalvadanai.map(\.color))
+        let availableColors = getSalvadanaiColors().map(\.name)
+        
+        for color in availableColors {
+            if !usedColors.contains(color) {
+                return color
+            }
+        }
+        
+        // Se tutti i colori sono usati, torna al primo
+        return availableColors.first ?? "blue"
+    }
+    
+    private func saveAllSalvadanai() {
+        let firstAccountName = dataManager.accounts.first?.name ?? ""
+        
+        // Crea tutti i salvadanai nel DataManager
+        for salvadanaio in createdSalvadanai {
+            dataManager.addSalvadanaio(
+                name: salvadanaio.name,
+                type: salvadanaio.type,
+                targetAmount: salvadanaio.targetAmount,
+                targetDate: salvadanaio.targetDate,
+                monthlyRefill: salvadanaio.monthlyRefill,
+                color: salvadanaio.color,
+                accountName: firstAccountName,
+                initialAmount: 0.0,
+                isInfinite: salvadanaio.isInfinite
+            )
+        }
+        
+        withAnimation(.spring()) {
+            hasCreatedFirstSalvadanaio = true
+        }
+    }
+}
+
+// MARK: - Initial Balance Onboarding (STEP 3 di 3)
+struct InitialBalanceOnboardingView: View {
+    @EnvironmentObject var dataManager: DataManager
+    @AppStorage("hasAddedInitialBalance") private var hasAddedInitialBalance = false
+    
+    @State private var amount = 0.0
+    @State private var animateIcon = false
+    @State private var showingDistribution = false
+    
+    var firstAccount: AccountModel? {
+        dataManager.accounts.first
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.orange.opacity(0.1), Color.yellow.opacity(0.1)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 40) {
+                        Spacer(minLength: 60)
+                        
+                        // Header
+                        VStack(spacing: 30) {
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [Color.orange, Color.yellow]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 120, height: 120)
+                                    .shadow(color: .orange.opacity(0.3), radius: 20, x: 0, y: 10)
+                                
+                                Image(systemName: "eurosign.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white)
+                                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
+                            }
+                            
+                            VStack(spacing: 16) {
+                                Text("Ultimo Passo! 🎉")
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundStyle(LinearGradient(
+                                        gradient: Gradient(colors: [.orange, .yellow]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ))
+                                
+                                Text("Imposta il tuo saldo iniziale")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        
+                        // Form semplificato
+                        VStack(spacing: 24) {
+                            VStack(spacing: 20) {
+                                // Info descrizione fissa
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "info.circle.fill")
+                                            .foregroundColor(.orange)
+                                        Text("Descrizione dell'entrata")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Saldo iniziale")
+                                            .font(.title3)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.orange)
+                                        
+                                        Spacer()
+                                        
+                                        Text("(impostato automaticamente)")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding()
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color.orange.opacity(0.1))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                            )
+                                    )
+                                }
+                                
+                                // Campo importo
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "eurosign.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Quanto hai attualmente?")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    VStack(spacing: 16) {
+                                        HStack {
+                                            Text("Importo")
+                                                .font(.subheadline)
+                                            Spacer()
+                                            TextField("0", value: $amount, format: .currency(code: "EUR"))
+                                                .multilineTextAlignment(.trailing)
+                                                .keyboardType(.decimalPad)
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                                .frame(width: 120)
+                                        }
+                                        
+                                        // Info conto destinazione
+                                        if let account = firstAccount {
+                                            HStack {
+                                                Image(systemName: "building.columns.fill")
+                                                    .foregroundColor(.blue)
+                                                Text("Verrà aggiunto a: \(account.name)")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.blue)
+                                                    .fontWeight(.medium)
+                                                Spacer()
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.blue.opacity(0.1))
+                                            )
+                                        }
+                                    }
+                                }
+                                
+                                // Spiegazione
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "lightbulb.fill")
+                                            .foregroundColor(.yellow)
+                                        Text("Come funziona")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("1.")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.orange)
+                                                .frame(width: 20, alignment: .leading)
+                                            
+                                            Text("L'importo verrà registrato come \"Saldo iniziale\" sul tuo conto")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("2.")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.orange)
+                                                .frame(width: 20, alignment: .leading)
+                                            
+                                            Text("Potrai distribuire l'importo tra i tuoi salvadanai come preferisci")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("3.")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.orange)
+                                                .frame(width: 20, alignment: .leading)
+                                            
+                                            Text("L'app sarà pronta per l'uso!")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 5)
+                            )
+                        }
+                        
+                        Spacer(minLength: 40)
+                        
+                        // Progress indicator
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Passo 3 di 3")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            ProgressView(value: 3.0/3.0)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .orange))
+                                .scaleEffect(y: 2)
+                        }
+                        
+                        // Bottone finale
+                        VStack(spacing: 16) {
+                            Button(action: {
+                                showInitialBalanceDistribution()
+                            }) {
+                                HStack {
+                                    Text("Distribuisci Saldo!")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                    
+                                    Image(systemName: "arrow.branch")
+                                        .font(.title2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    Group {
+                                        if amount <= 0 {
+                                            Color.gray
+                                        } else {
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [.orange, .yellow]),
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        }
+                                    }
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: amount > 0 ? .orange.opacity(0.3) : .clear, radius: 10, x: 0, y: 5)
+                            }
+                            .disabled(amount <= 0)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: amount > 0)
+                            
+                            if amount <= 0 {
+                                Button("Salta (inizia con €0)") {
+                                    completeSetupWithoutBalance()
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            }
+                            
+                            Text("🎉 Dopo aver distribuito il saldo, l'app sarà pronta!")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                }
+            }
+            .navigationBarHidden(true)
+        }
+        .onAppear {
+            animateIcon = true
+        }
+        .sheet(isPresented: $showingDistribution) {
+            SalaryDistributionView(
+                amount: amount,
+                descr: "Saldo iniziale",
+                transactionType: "income",
+                selectedAccount: firstAccount?.name ?? "",
+                onComplete: {
+                    // Quando la distribuzione è completata, chiudi l'onboarding
+                    withAnimation(.spring()) {
+                        hasAddedInitialBalance = true
+                    }
+                }
+            )
+        }
+    }
+    
+    private func showInitialBalanceDistribution() {
+        showingDistribution = true
+    }
+    
+    private func completeSetupWithoutBalance() {
+        withAnimation(.spring()) {
+            hasAddedInitialBalance = true
+        }
+    }
+}
+
+// MARK: - Created Salvadanaio Row (da aggiungere al file)
+struct CreatedSalvadanaiRow: View {
+    let salvadanaio: FirstSalvadanaiOnboardingView.OnboardingSalvadanaio
+    let onRemove: () -> Void
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Pallino colorato
+            Circle()
+                .fill(getColor(from: salvadanaio.color))
+                .frame(width: 16, height: 16)
+            
+            // Info salvadanaio
+            VStack(alignment: .leading, spacing: 4) {
+                Text(salvadanaio.name)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.primary)
+                
+                HStack(spacing: 8) {
+                    // Tipo
+                    HStack(spacing: 4) {
+                        Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
+                            .font(.caption)
+                            .foregroundColor(getColor(from: salvadanaio.color))
+                        
+                        Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Infinito" : "Obiettivo") : "Glass")
+                            .font(.caption)
+                            .foregroundColor(getColor(from: salvadanaio.color))
+                            .fontWeight(.medium)
+                    }
+                    
+                    // Dettagli specifici
+                    if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                        Text("• €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else if salvadanaio.type == "glass" {
+                        Text("• €\(String(format: "%.0f", salvadanaio.monthlyRefill))/mese")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            // Bottone rimuovi
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundColor(.red)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(getColor(from: salvadanaio.color).opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 }
 
