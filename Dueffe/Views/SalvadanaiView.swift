@@ -515,7 +515,7 @@ struct SalvadanaiCardView: View {
                         
                         Spacer()
                         
-                        // Info obiettivo compatta
+                        // Info obiettivo compatta con scadenza se presente
                         if !salvadanaio.isInfinite {
                             VStack(alignment: .trailing, spacing: 2) {
                                 if salvadanaio.type == "objective" {
@@ -526,6 +526,29 @@ struct SalvadanaiCardView: View {
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(getColor(from: salvadanaio.color))
+                                    
+                                    // NUOVA: Scadenza nella parte non espansa
+                                    if let targetDate = salvadanaio.targetDate {
+                                        let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
+                                        
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "clock")
+                                                .font(.caption2)
+                                                .foregroundColor(daysRemaining < 30 ? .orange : .secondary)
+                                            
+                                            if daysRemaining > 0 {
+                                                Text("\(daysRemaining)g")
+                                                    .font(.caption2)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(daysRemaining < 30 ? .orange : .secondary)
+                                            } else {
+                                                Text("Scaduto")
+                                                    .font(.caption2)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(.red)
+                                            }
+                                        }
+                                    }
                                 } else {
                                     Text("Glass Mensile")
                                         .font(.caption2)
@@ -612,54 +635,7 @@ struct SalvadanaiCardView: View {
                     // Info dettagliata (condizionale e compatta) + TRANSAZIONI
                     if showDetails {
                         VStack(spacing: 8) {
-                            Divider()
-                            
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    HStack {
-                                        Image(systemName: "calendar")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                        Text("Creato")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Text(salvadanaio.createdAt, style: .date)
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                }
-                                
-                                Spacer()
-                                
-                                if salvadanaio.type == "objective" && !salvadanaio.isInfinite, let targetDate = salvadanaio.targetDate {
-                                    VStack(alignment: .trailing, spacing: 4) {
-                                        HStack {
-                                            Text("Scadenza")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                            Image(systemName: "flag.checkered")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
-                                        
-                                        if daysRemaining > 0 {
-                                            Text("\(daysRemaining) giorni")
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(daysRemaining < 30 ? .orange : .primary)
-                                        } else {
-                                            Text("Scaduto")
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.red)
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // NUOVA SEZIONE: Transazioni correlate
+                            // NUOVA SEZIONE: Transazioni correlate (RIMOSSA data di creazione)
                             if !relatedTransactions.isEmpty {
                                 VStack(spacing: 8) {
                                     Divider()
