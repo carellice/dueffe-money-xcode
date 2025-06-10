@@ -345,20 +345,24 @@ struct StatView: View {
     }
 }
 
-// MARK: - Improved Salvadanai Page Card View
+// MARK: - Sostituisci SalvadanaiCardView nel file SalvadanaiView.swift
+
 struct SalvadanaiCardView: View {
     let salvadanaio: SalvadanaiModel
     @State private var animateProgress = false
+    @State private var animateGlow = false
+    @State private var animateFloating = false
+    @State private var showDetails = false
     
     private var progress: Double {
         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
             guard salvadanaio.targetAmount > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
-            return salvadanaio.currentAmount / salvadanaio.targetAmount
+            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
         } else if salvadanaio.type == "glass" {
             guard salvadanaio.monthlyRefill > 0 else { return 0 }
             if salvadanaio.currentAmount < 0 { return 0 }
-            return salvadanaio.currentAmount / salvadanaio.monthlyRefill
+            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
         }
         return 0
     }
@@ -382,254 +386,444 @@ struct SalvadanaiCardView: View {
         }
     }
     
+    // Status dell'obiettivo
+    private var statusInfo: (String, Color, String) {
+        if salvadanaio.currentAmount < 0 {
+            return ("In Rosso", .red, "exclamationmark.triangle.fill")
+        } else if progress >= 1.0 && !salvadanaio.isInfinite {
+            return ("Completato!", .green, "checkmark.seal.fill")
+        } else if progress >= 0.8 && !salvadanaio.isInfinite {
+            return ("Quasi fatto!", .orange, "flame.fill")
+        } else if salvadanaio.isInfinite {
+            return ("Infinito", getColor(from: salvadanaio.color), "infinity")
+        } else {
+            return ("In corso", getColor(from: salvadanaio.color), "arrow.up.circle.fill")
+        }
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Header colorato - semplificato per infiniti
-            ZStack {
-                if salvadanaio.isInfinite {
-                    // Header semplice per infiniti (niente gradiente)
-                    getColor(from: salvadanaio.color)
-                        .frame(height: 80)
-                } else {
-                    // Header con gradiente per gli altri
+        Button(action: {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                showDetails.toggle()
+            }
+        }) {
+            VStack(spacing: 0) {
+                // Header compatto con gradiente colorato
+                ZStack {
+                    // Background gradiente animato
                     LinearGradient(
                         gradient: Gradient(colors: [
                             getColor(from: salvadanaio.color),
-                            getColor(from: salvadanaio.color).opacity(0.8)
+                            getColor(from: salvadanaio.color).opacity(0.7)
                         ]),
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .frame(height: 80)
-                }
-                
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        // Nome salvadanaio
-                        Text(salvadanaio.name)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        // Tipo con icona
-                        HStack(spacing: 6) {
-                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
-                            
-                            Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Infinito" : "Obiettivo") : "Glass")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white.opacity(0.9))
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Status indicator
-                    if salvadanaio.currentAmount < 0 {
-                        ZStack {
-                            Circle()
-                                .fill(.white.opacity(0.2))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 14))
-                                .foregroundColor(.white)
-                        }
-                    } else if progress >= 1.0 && !salvadanaio.isInfinite {
-                        ZStack {
-                            Circle()
-                                .fill(.white.opacity(0.2))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            
-            // Body con informazioni
-            VStack(alignment: .leading, spacing: 16) {
-                // Importo principale - semplificato per infiniti
-                if salvadanaio.isInfinite {
-                    // Importo semplice per infiniti (niente ombre o effetti)
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("€")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                        
-                        Text(String(format: "%.2f", abs(salvadanaio.currentAmount)))
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                    }
-                } else {
-                    // Importo normale per altri tipi
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("€")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-                        
-                        Text(String(format: "%.2f", abs(salvadanaio.currentAmount)))
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
-                    }
-                }
-                
-                // Info specifiche per tipo
-                if salvadanaio.currentAmount < 0 {
-                    // Warning per saldi negativi
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.red)
-                        Text("Saldo negativo")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.red)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.red.opacity(0.1))
+                    .frame(height: 70)
+                    .overlay(
+                        // Effetto shimmer animato
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                Color.clear,
+                                Color.white.opacity(animateGlow ? 0.3 : 0.1),
+                                Color.clear
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
                     )
-                } else if salvadanaio.isInfinite {
-                    // Info semplice per obiettivi infiniti
-                    VStack(spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "infinity")
-                                .foregroundColor(getColor(from: salvadanaio.color))
-                            Text("Obiettivo senza limiti")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(getColor(from: salvadanaio.color))
+                    
+                    HStack(spacing: 12) {
+                        // Icona tipo animata con floating effect
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.25))
+                                .frame(width: 44, height: 44)
+                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                             
-                            Spacer()
+                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .fontWeight(.semibold)
                         }
+                        .scaleEffect(animateFloating ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateFloating)
                         
-                        // Info data creazione
-                        HStack {
-                            Image(systemName: "calendar")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text("Creato il")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text(salvadanaio.createdAt, style: .date)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                        }
-                    }
-                } else if salvadanaio.type == "objective" {
-                    // Progress per obiettivi
-                    VStack(spacing: 12) {
-                        HStack {
-                            Text("Obiettivo €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(progress * 100))%")
-                                .font(.subheadline)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(salvadanaio.name)
+                                .font(.headline)
                                 .fontWeight(.bold)
-                                .foregroundColor(getColor(from: salvadanaio.color))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            
+                            Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Obiettivo Infinito" : "Obiettivo") : "Glass Mensile")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.9))
+                                .fontWeight(.medium)
                         }
                         
-                        // Progress bar
-                        ProgressView(value: animateProgress ? min(progress, 1.0) : 0)
-                            .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
-                            .scaleEffect(y: 2)
-                            .animation(.easeOut(duration: 1.5), value: animateProgress)
+                        Spacer()
                         
-                        // Info data scadenza
-                        if let targetDate = salvadanaio.targetDate {
-                            let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
-                            HStack {
-                                Image(systemName: "calendar")
-                                    .font(.caption)
+                        // Status badge animato
+                        VStack(spacing: 2) {
+                            Image(systemName: statusInfo.2)
+                                .font(.subheadline)
+                                .foregroundColor(.white)
+                            
+                            Text(statusInfo.0)
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.9))
+                                .fontWeight(.medium)
+                        }
+                        .scaleEffect(statusInfo.0 == "Completato!" ? (animateFloating ? 1.2 : 1.0) : 1.0)
+                        .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateFloating)
+                    }
+                    .padding(.horizontal, 16)
+                }
+                
+                // Body con informazioni compatte
+                VStack(spacing: 12) {
+                    // Importo principale con animazione numerica
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Saldo Attuale")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fontWeight(.medium)
+                            
+                            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                Text("€")
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                if daysRemaining > 0 {
-                                    Text("\(daysRemaining) giorni rimasti")
-                                        .font(.caption)
-                                        .foregroundColor(daysRemaining < 30 ? .orange : .secondary)
+                                Text(String(format: "%.2f", abs(salvadanaio.currentAmount)))
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
+                                    .contentTransition(.numericText())
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // Info obiettivo compatta
+                        if !salvadanaio.isInfinite {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if salvadanaio.type == "objective" {
+                                    Text("Obiettivo")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("€\(String(format: "%.0f", salvadanaio.targetAmount))")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(getColor(from: salvadanaio.color))
                                 } else {
-                                    Text("Scaduto")
+                                    Text("Glass Mensile")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(getColor(from: salvadanaio.color))
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Progress bar animata (solo se non infinito e non negativo)
+                    if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
+                        VStack(spacing: 6) {
+                            HStack {
+                                Text("\(Int(progress * 100))%")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(getColor(from: salvadanaio.color))
+                                
+                                Spacer()
+                                
+                                if progress >= 1.0 {
+                                    Text("🎉 Completato!")
                                         .font(.caption)
-                                        .foregroundColor(.red)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.green)
+                                } else {
+                                    Text("Mancano €\(String(format: "%.0f", (salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill) - salvadanaio.currentAmount))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            // Progress bar con gradiente animato
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.gray.opacity(0.15))
+                                    .frame(height: 8)
+                                
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [
+                                                getColor(from: salvadanaio.color),
+                                                getColor(from: salvadanaio.color).opacity(0.7),
+                                                getColor(from: salvadanaio.color)
+                                            ]),
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(0, UIScreen.main.bounds.width * 0.7 * (animateProgress ? progress : 0)), height: 8)
+                                    .shadow(color: getColor(from: salvadanaio.color).opacity(0.4), radius: 3, x: 0, y: 1)
+                                    .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
+                                
+                                // Effetto shimmer sulla progress bar
+                if progress > 0 {
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    Color.clear,
+                                                    Color.white.opacity(0.6),
+                                                    Color.clear
+                                                ]),
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: max(0, UIScreen.main.bounds.width * 0.7 * progress), height: 8)
+                                        .opacity(animateGlow ? 0.8 : 0.0)
+                                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Info dettagliata (condizionale e compatta)
+                    if showDetails {
+                        VStack(spacing: 8) {
+                            Divider()
+                            
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Image(systemName: "calendar")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                        Text("Creato")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Text(salvadanaio.createdAt, style: .date)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
                                 }
                                 
                                 Spacer()
                                 
-                                Text(targetDate, style: .date)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                if salvadanaio.type == "objective" && !salvadanaio.isInfinite, let targetDate = salvadanaio.targetDate {
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        HStack {
+                                            Text("Scadenza")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Image(systemName: "flag.checkered")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
+                                        
+                                        if daysRemaining > 0 {
+                                            Text("\(daysRemaining) giorni")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(daysRemaining < 30 ? .orange : .primary)
+                                        } else {
+                                            Text("Scaduto")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.red)
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                } else {
-                    // Info per Glass
-                    VStack(spacing: 12) {
-                        HStack {
-                            Text("Ricarica mensile €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(progress * 100))%")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(getColor(from: salvadanaio.color))
-                        }
-                        
-                        // Progress bar
-                        ProgressView(value: animateProgress ? min(progress, 1.0) : 0)
-                            .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
-                            .scaleEffect(y: 2)
-                            .animation(.easeOut(duration: 1.5), value: animateProgress)
-                        
-                        // Info glass
-                        HStack {
-                            Image(systemName: "cup.and.saucer.fill")
-                                .font(.caption)
-                                .foregroundColor(getColor(from: salvadanaio.color))
-                            
-                            Text("Glass")
-                                .font(.caption)
-                                .foregroundColor(getColor(from: salvadanaio.color))
-                                .fontWeight(.medium)
-                            
-                            Spacer()
-                            
-                            Text("Creato il \(salvadanaio.createdAt, style: .date)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .top)),
+                            removal: .opacity.combined(with: .move(edge: .top))
+                        ))
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color(.systemBackground))
             }
-            .padding(20)
-            .background(Color(.systemBackground))
         }
+        .buttonStyle(PlainButtonStyle())
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: salvadanaio.isInfinite ? .black.opacity(0.1) : getColor(from: salvadanaio.color).opacity(0.2), radius: 10, x: 0, y: 5)
+        .shadow(color: getColor(from: salvadanaio.color).opacity(0.2), radius: animateGlow ? 12 : 6, x: 0, y: animateGlow ? 6 : 3)
+        .scaleEffect(showDetails ? 1.02 : 1.0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showDetails)
+        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(getColor(from: salvadanaio.color).opacity(0.3), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            getColor(from: salvadanaio.color).opacity(0.3),
+                            getColor(from: salvadanaio.color).opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
         )
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 animateProgress = true
+                animateGlow = true
+                animateFloating = true
+            }
+        }
+    }
+}
+
+// MARK: - Card Salvadanai Compatta Alternativa (se vuoi ancora più compatta)
+struct MiniSalvadanaiCardView: View {
+    let salvadanaio: SalvadanaiModel
+    @State private var animateValue = false
+    @State private var animateGlow = false
+    
+    private var progress: Double {
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            guard salvadanaio.targetAmount > 0 else { return 0 }
+            return min(max(salvadanaio.currentAmount / salvadanaio.targetAmount, 0), 1.0)
+        } else if salvadanaio.type == "glass" {
+            guard salvadanaio.monthlyRefill > 0 else { return 0 }
+            return min(max(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 0), 1.0)
+        }
+        return 0
+    }
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Indicatore di progresso circolare animato
+            ZStack {
+                Circle()
+                    .stroke(getColor(from: salvadanaio.color).opacity(0.2), lineWidth: 4)
+                    .frame(width: 50, height: 50)
+                
+                Circle()
+                    .trim(from: 0, to: animateValue ? progress : 0)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                getColor(from: salvadanaio.color),
+                                getColor(from: salvadanaio.color).opacity(0.7),
+                                getColor(from: salvadanaio.color)
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .frame(width: 50, height: 50)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 1.5), value: animateValue)
+                
+                // Icona centrale
+                Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
+                    .font(.subheadline)
+                    .foregroundColor(getColor(from: salvadanaio.color))
+                    .fontWeight(.semibold)
+            }
+            
+            // Informazioni compatte
+            VStack(alignment: .leading, spacing: 2) {
+                Text(salvadanaio.name)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("€")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(String(format: "%.2f", abs(salvadanaio.currentAmount)))
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
+                }
+                
+                if !salvadanaio.isInfinite {
+                    Text("di €\(String(format: "%.0f", salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill))")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Infinito")
+                        .font(.caption2)
+                        .foregroundColor(getColor(from: salvadanaio.color))
+                }
+            }
+            
+            Spacer()
+            
+            // Percentuale o status
+            VStack(alignment: .trailing, spacing: 2) {
+                if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
+                    Text("\(Int(progress * 100))%")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(getColor(from: salvadanaio.color))
+                } else if salvadanaio.currentAmount < 0 {
+                    Text("⚠️")
+                        .font(.title3)
+                } else {
+                    Text("∞")
+                        .font(.title3)
+                        .foregroundColor(getColor(from: salvadanaio.color))
+                }
+                
+                Text(salvadanaio.type == "objective" ? "Obiettivo" : "Glass")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(getColor(from: salvadanaio.color).opacity(0.3), lineWidth: 1)
+                )
+        )
+        .shadow(color: getColor(from: salvadanaio.color).opacity(animateGlow ? 0.3 : 0.1), radius: animateGlow ? 8 : 4, x: 0, y: 2)
+        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                animateValue = true
+                animateGlow = true
             }
         }
     }
