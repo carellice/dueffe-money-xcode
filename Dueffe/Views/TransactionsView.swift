@@ -321,113 +321,320 @@ struct TransactionSectionHeaderView: View {
     }
 }
 
-// MARK: - Transaction Row View (VERSIONE PULITA E LEGGIBILE)
+// MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
 struct TransactionRowView: View {
     let transaction: TransactionModel
+    @State private var animateAmount = false
+    @State private var animateGlow = false
+    @State private var animateIcon = false
+    @State private var isPressed = false
+    @State private var showDetails = false
     
     private var transactionColor: Color {
-        transaction.type == "expense" ? .red : .green
+        switch transaction.type {
+        case "expense": return .red
+        case "salary": return .blue
+        case "transfer": return .orange
+        case "transfer_salvadanai": return .purple
+        case "distribution": return .mint
+        default: return .green
+        }
     }
     
     private var categoryEmoji: String {
         if let firstChar = transaction.category.first, firstChar.isEmoji {
             return String(firstChar)
         }
-        return transaction.type == "expense" ? "💸" : "💰"
+        return ""
+    }
+    
+    private var cleanCategoryName: String {
+        if let firstChar = transaction.category.first, firstChar.isEmoji {
+            return String(transaction.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return transaction.category
+    }
+    
+    private var iconName: String {
+        switch transaction.type {
+        case "expense": return "minus.circle.fill"
+        case "salary": return "banknote.fill"
+        case "transfer": return "arrow.left.arrow.right.circle.fill"
+        case "transfer_salvadanai": return "arrow.triangle.swap"
+        case "distribution": return "arrow.branch.circle.fill"
+        default: return "plus.circle.fill"
+        }
+    }
+    
+    private var gradientColors: [Color] {
+        switch transaction.type {
+        case "expense":
+            return [Color.red.opacity(0.8), Color.orange.opacity(0.6)]
+        case "salary":
+            return [Color.blue.opacity(0.8), Color.indigo.opacity(0.6)]
+        case "transfer", "transfer_salvadanai":
+            return [Color.orange.opacity(0.8), Color.yellow.opacity(0.6)]
+        case "distribution":
+            return [Color.mint.opacity(0.8), Color.teal.opacity(0.6)]
+        default:
+            return [Color.green.opacity(0.8), Color.cyan.opacity(0.6)]
+        }
+    }
+    
+    private var sourceDestinationInfo: (String, String) {
+        if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
+            return ("banknote", "da \(salvadanaiName)")
+        } else if transaction.type == "transfer", let toAccount = transaction.salvadanaiName {
+            return ("building.columns", "\(transaction.accountName) → \(toAccount)")
+        } else if transaction.type == "transfer_salvadanai", let toSalvadanaio = transaction.salvadanaiName {
+            return ("arrow.triangle.swap", "\(transaction.accountName) → \(toSalvadanaio)")
+        } else if transaction.type == "distribution", let salvadanaiName = transaction.salvadanaiName {
+            return ("arrow.branch", "verso \(salvadanaiName)")
+        } else if transaction.type != "expense" && !transaction.accountName.isEmpty {
+            return ("building.columns", "su \(transaction.accountName)")
+        } else {
+            return ("", "")
+        }
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Emoji semplice
-            Text(categoryEmoji)
-                .font(.title2)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.gray.opacity(0.1)))
-            
-            // Contenuto principale
-            VStack(alignment: .leading, spacing: 4) {
-                // Nome transazione
-                Text(transaction.descr)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                    .lineLimit(nil)  // Permette righe multiple
-                    .multilineTextAlignment(.leading)  // Allineamento a sinistra
-                    .fixedSize(horizontal: false, vertical: true)  // Espande in verticale se necessario
-                
-                // Data
-                Text(transaction.date, style: .date)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                // Salvadanaio/Conto
-                if transaction.type == "expense", let salvadanaiName = transaction.salvadanaiName {
-                    HStack(spacing: 4) {
-                        Image(systemName: "banknote")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text("da \(salvadanaiName)")
-                            .font(.subheadline)
-                            .foregroundColor(.orange)
-                            .fontWeight(.medium)
-                    }
-                } else if transaction.type == "transfer", let toAccount = transaction.salvadanaiName {
-                    // Trasferimenti tra conti
-                    HStack(spacing: 4) {
-                        Image(systemName: "building.columns")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text("\(transaction.accountName) → \(toAccount)")
-                            .font(.subheadline)
-                            .foregroundColor(.orange)
-                            .fontWeight(.medium)
-                    }
-                } else if transaction.type == "transfer_salvadanai", let toSalvadanaio = transaction.salvadanaiName {
-                    // NUOVO: Trasferimenti tra salvadanai
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                        Text("\(transaction.accountName) → \(toSalvadanaio)")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                            .fontWeight(.medium)
-                    }
-                } else if transaction.type == "distribution", let salvadanaiName = transaction.salvadanaiName {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.branch")
-                            .font(.caption)
-                            .foregroundColor(.purple)
-                        Text("verso \(salvadanaiName)")
-                            .font(.subheadline)
-                            .foregroundColor(.purple)
-                            .fontWeight(.medium)
-                    }
-                } else if transaction.type != "expense" && transaction.type != "transfer" && transaction.type != "transfer_salvadanai" && !transaction.accountName.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "building.columns")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                        Text("su \(transaction.accountName)")
-                            .font(.subheadline)
-                            .foregroundColor(.green)
-                            .fontWeight(.medium)
-                    }
+        Button(action: {
+            if showDetails {
+                // Animazione di chiusura più controllata per evitare overflow
+                withAnimation(.easeOut(duration: 0.35)) {
+                    showDetails = false
+                }
+            } else {
+                // Animazione di apertura
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    showDetails = true
                 }
             }
-            
-            Spacer()
-            
-            // Solo l'importo
-            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.0f", transaction.amount))")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(transactionColor)
+        }) {
+            VStack(spacing: 0) {
+                ZStack {
+                    // Background con gradiente
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: gradientColors),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(
+                            color: transactionColor.opacity(animateGlow ? 0.25 : 0.12),
+                            radius: animateGlow ? 8 : 4,
+                            x: 0,
+                            y: 2
+                        )
+                        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
+                    
+                    // Overlay decorativo leggero
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.15),
+                                    Color.clear
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    
+                    // Contenuto principale
+                    VStack(spacing: 0) {
+                        // Contenuto sempre visibile
+                        HStack(spacing: 16) {
+                            // Icona principale
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.25))
+                                    .frame(width: 44, height: 44)
+                                
+                                if !categoryEmoji.isEmpty {
+                                    Text(categoryEmoji)
+                                        .font(.title3)
+                                        .scaleEffect(animateIcon ? 1.08 : 1.0)
+                                        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
+                                } else {
+                                    Image(systemName: iconName)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundColor(.white)
+                                        .scaleEffect(animateIcon ? 1.08 : 1.0)
+                                        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
+                                }
+                            }
+                            
+                            // Info principale
+                            VStack(alignment: .leading, spacing: 4) {
+                                // Descrizione
+                                Text(transaction.descr)
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .lineLimit(showDetails ? 3 : 1)
+                                    .fixedSize(horizontal: false, vertical: showDetails)
+                                
+                                // Categoria e orario (sempre visibili)
+                                HStack(spacing: 8) {
+                                    Text(cleanCategoryName)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .lineLimit(showDetails ? nil : 1)
+                                        .fixedSize(horizontal: false, vertical: showDetails)
+                                    
+                                    if !showDetails {
+                                        Circle()
+                                            .fill(Color.white.opacity(0.6))
+                                            .frame(width: 3, height: 3)
+                                        
+                                        Text(transaction.date, format: .dateTime.hour().minute())
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.8))
+                                    }
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            // Importo e freccia
+                            VStack(alignment: .trailing, spacing: 6) {
+                                // Importo
+                                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                    Text(transaction.type == "expense" ? "-" : "+")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("€\(String(format: "%.0f", transaction.amount))")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .scaleEffect(animateAmount ? 1.02 : 1.0)
+                                        .shadow(color: .white.opacity(0.3), radius: 2)
+                                }
+                                
+                                // Freccia espansione
+                                Image(systemName: showDetails ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .rotationEffect(.degrees(showDetails ? 180 : 0))
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        
+                        // Contenuto espandibile
+                        if showDetails {
+                            VStack(spacing: 0) {
+                                // Separatore
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 16)
+                                
+                                // Dettagli espansi
+                                VStack(alignment: .leading, spacing: 12) {
+                                    // Data completa
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "calendar")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .frame(width: 20)
+                                        
+                                        Text(transaction.date, format: .dateTime.weekday(.wide).day().month(.wide).year())
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
+                                        
+                                        Spacer()
+                                        
+                                        Text("€\(String(format: "%.2f", transaction.amount))")
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white)
+                                    }
+                                    
+                                    // Tipo transazione
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "tag")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .frame(width: 20)
+                                        
+                                        Text(getTransactionTypeLabel())
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
+                                        
+                                        Spacer()
+                                    }
+                                    
+                                    // Fonte/Destinazione se presente
+                                    if !sourceDestinationInfo.0.isEmpty {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: sourceDestinationInfo.0)
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .frame(width: 20)
+                                            
+                                            Text(sourceDestinationInfo.1)
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
+            }
+        }) {
+            // Long press action
+        }
+        .onAppear {
+            // Animazioni con delay casuali
+            let delay = Double.random(in: 0.1...0.4)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animateAmount = true
+                }
+                withAnimation(.easeInOut(duration: 1.5)) {
+                    animateGlow = true
+                }
+                withAnimation(.easeInOut(duration: 2.0)) {
+                    animateIcon = true
+                }
+            }
+        }
+    }
+    
+    private func getTransactionTypeLabel() -> String {
+        switch transaction.type {
+        case "expense": return "Spesa"
+        case "salary": return "Stipendio"
+        case "transfer": return "Trasferimento tra conti"
+        case "transfer_salvadanai": return "Trasferimento tra salvadanai"
+        case "distribution": return "Distribuzione automatica"
+        default: return "Entrata"
+        }
     }
 }
 
