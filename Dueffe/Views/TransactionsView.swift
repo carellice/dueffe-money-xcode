@@ -103,7 +103,7 @@ struct TransactionsView: View {
                                 }
                                 .padding(.horizontal)
                             }
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 0)
                             
                             // Lista transazioni
                             List {
