@@ -611,9 +611,7 @@ struct FirstAccountOnboardingView: View {
                                 }
                             }
                         }
-                        
-                        Spacer(minLength: 40)
-                        
+                                                
                         // Progress indicator
                         VStack(spacing: 16) {
                             HStack {
@@ -1029,8 +1027,6 @@ struct FirstSalvadanaiOnboardingView: View {
                         .disabled(!isFormValid)
                         .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isFormValid)
                         
-                        Spacer(minLength: 40)
-                        
                         // Progress indicator
                         VStack(spacing: 16) {
                             HStack {
@@ -1393,8 +1389,6 @@ struct InitialBalanceOnboardingView: View {
                                     .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 5)
                             )
                         }
-                        
-                        Spacer(minLength: 40)
                         
                         // Progress indicator
                         VStack(spacing: 16) {

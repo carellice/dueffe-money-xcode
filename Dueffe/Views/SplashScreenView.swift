@@ -140,7 +140,7 @@ struct AnimatedSplashScreen: View {
                             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
                             .scaleEffect(animateTitle ? 1.0 : 0.8)
                             .opacity(animateTitle ? 1.0 : 0.0)
-                            .animation(.spring(response: 1.0, dampingFraction: 0.8).delay(1.2), value: animateTitle
+                            .animation(.spring(response: 1.0, dampingFraction: 0.8).delay(1.2), value: animateTitle)
                     }
                     
                     Spacer()
