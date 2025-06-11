@@ -67,14 +67,6 @@ struct TransactionsView: View {
         return transactions.sorted { $0.date > $1.date }
     }
     
-    var totalExpenses: Double {
-        dataManager.transactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount }
-    }
-    
-    var totalIncome: Double {
-        dataManager.transactions.filter { $0.type != "expense" }.reduce(0) { $0 + $1.amount }
-    }
-    
     var body: some View {
         NavigationView {
             ZStack {
@@ -93,15 +85,6 @@ struct TransactionsView: View {
                         EmptyTransactionsView(action: { showingAddTransaction = true })
                     } else {
                         VStack(spacing: 0) {
-                            // Header con statistiche (MODIFICATO - rimosso bilancio netto)
-                            UltraCompactTransactionsHeader(
-                                totalExpenses: totalExpenses,
-                                totalIncome: totalIncome,
-                                transactionCount: dataManager.transactions.count
-                            )
-                            .padding(.horizontal)
-                            .padding(.bottom, 16)
-                            
                             // Filtri
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
@@ -120,7 +103,7 @@ struct TransactionsView: View {
                                 }
                                 .padding(.horizontal)
                             }
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             
                             // Lista transazioni
                             List {
