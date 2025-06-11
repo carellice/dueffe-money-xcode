@@ -11,7 +11,7 @@ struct SalvadanaiModel: Identifiable, Codable {
     var targetDate: Date?
     var monthlyRefill: Double
     var color: String
-    // RIMOSSO: var accountName: String - I salvadanai non sono più associati ai conti
+    var category: String // NUOVO: Categoria del salvadanaio
     var createdAt: Date
     var isInfinite: Bool
 }
@@ -131,28 +131,7 @@ struct DistributionValidation {
     }
 }
 
-// MARK: - Computed Properties aggiornate per DataManager
-extension DataManager {
-    var totalBalance: Double {
-        accounts.reduce(0) { $0 + $1.balance }
-    }
-    
-    var totalSavings: Double {
-        salvadanai.reduce(0) { $0 + $1.currentAmount }
-    }
-    
-    // NUOVO: Patrimonio totale considerando solo salvadanai positivi per il calcolo disponibile
-    var availableBalance: Double {
-        let positiveSavings = salvadanai.filter { $0.currentAmount > 0 }.reduce(0) { $0 + $1.currentAmount }
-        return totalBalance + positiveSavings
-    }
-    
-    var recentTransactions: [TransactionModel] {
-        transactions.sorted { $0.date > $1.date }
-    }
-}
-
-// MARK: - Data Manager con persistenza
+// MARK: - Data Manager con persistenza (CLASSE PRINCIPALE AGGIORNATA)
 class DataManager: ObservableObject {
     @Published var salvadanai: [SalvadanaiModel] = [] {
         didSet { saveSalvadanai() }
@@ -170,6 +149,11 @@ class DataManager: ObservableObject {
         didSet { saveCategories() }
     }
     
+    // NUOVO: Categorie personalizzate per salvadanai
+    @Published var customSalvadanaiCategories: [String] = [] {
+        didSet { saveSalvadanaiCategories() }
+    }
+    
     // Categorie predefinite (base)
     let defaultExpenseCategories = [
         "🍕 Cibo", "🚗 Trasporti", "🎬 Intrattenimento",
@@ -182,6 +166,18 @@ class DataManager: ObservableObject {
         "💰 Investimenti", "📈 Bonus", "🔄 Altro"
     ]
     
+    // NUOVO: Categorie predefinite per i salvadanai (RIDOTTE)
+    let defaultSalvadanaiCategories = [
+        "🏠 Casa",
+        "✈️ Viaggi",
+        "🚗 Trasporti",
+        "🎓 Educazione",
+        "💊 Salute",
+        "🎮 Hobby",
+        "🔧 Emergenze",
+        "🔄 Altro"
+    ]
+    
     // Categorie complete (predefinite + personalizzate)
     var expenseCategories: [String] {
         return defaultExpenseCategories + customExpenseCategories.sorted()
@@ -189,6 +185,11 @@ class DataManager: ObservableObject {
     
     var incomeCategories: [String] {
         return defaultIncomeCategories + customIncomeCategories.sorted()
+    }
+    
+    // NUOVO: Tutte le categorie salvadanai (predefinite + personalizzate)
+    var allSalvadanaiCategories: [String] {
+        return defaultSalvadanaiCategories + customSalvadanaiCategories.sorted()
     }
     
     // Colori predefiniti per i salvadanai
@@ -203,6 +204,7 @@ class DataManager: ObservableObject {
     private let accountsKey = "SavedAccounts"
     private let customExpenseCategoriesKey = "CustomExpenseCategories"
     private let customIncomeCategoriesKey = "CustomIncomeCategories"
+    private let customSalvadanaiCategoriesKey = "CustomSalvadanaiCategories" // NUOVO
     
     init() {
         loadAllData()
@@ -214,6 +216,7 @@ class DataManager: ObservableObject {
         loadTransactions()
         loadAccounts()
         loadStoredCategories()
+        loadSalvadanaiCategories() // NUOVO
     }
     
     // MARK: - Salvadanai Persistence
@@ -269,6 +272,15 @@ class DataManager: ObservableObject {
         customIncomeCategories = UserDefaults.standard.stringArray(forKey: customIncomeCategoriesKey) ?? []
     }
     
+    // MARK: - NUOVO: Salvadanai Categories Persistence
+    private func saveSalvadanaiCategories() {
+        UserDefaults.standard.set(customSalvadanaiCategories, forKey: customSalvadanaiCategoriesKey)
+    }
+    
+    private func loadSalvadanaiCategories() {
+        customSalvadanaiCategories = UserDefaults.standard.stringArray(forKey: customSalvadanaiCategoriesKey) ?? []
+    }
+    
     // MARK: - Categories Management
     func addExpenseCategory(_ category: String) {
         let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -276,7 +288,6 @@ class DataManager: ObservableObject {
         guard !expenseCategories.contains(trimmedCategory) else { return }
         
         customExpenseCategories.append(trimmedCategory)
-        // saveCategories() chiamato automaticamente da didSet
     }
     
     func addIncomeCategory(_ category: String) {
@@ -285,37 +296,47 @@ class DataManager: ObservableObject {
         guard !incomeCategories.contains(trimmedCategory) else { return }
         
         customIncomeCategories.append(trimmedCategory)
-        // saveCategories() chiamato automaticamente da didSet
     }
     
     func deleteExpenseCategory(_ category: String) {
         guard !defaultExpenseCategories.contains(category) else { return }
         customExpenseCategories.removeAll { $0 == category }
-        // saveCategories() chiamato automaticamente da didSet
     }
     
     func deleteIncomeCategory(_ category: String) {
         guard !defaultIncomeCategories.contains(category) else { return }
         customIncomeCategories.removeAll { $0 == category }
-        // saveCategories() chiamato automaticamente da didSet
     }
     
-    // MODIFICATO: addSalvadanaio - NON sottrae dal conto quando si imposta un saldo iniziale
-    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, isInfinite: Bool = false) {
+    // MARK: - NUOVO: Salvadanai Categories Management
+    func addSalvadanaiCategory(_ category: String) {
+        let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedCategory.isEmpty else { return }
+        guard !allSalvadanaiCategories.contains(trimmedCategory) else { return }
+        
+        customSalvadanaiCategories.append(trimmedCategory)
+    }
+    
+    func deleteSalvadanaiCategory(_ category: String) {
+        guard !defaultSalvadanaiCategories.contains(category) else { return }
+        customSalvadanaiCategories.removeAll { $0 == category }
+    }
+    
+    // MODIFICATO: addSalvadanaio - con categoria
+    func addSalvadanaio(name: String, type: String, targetAmount: Double = 0, targetDate: Date? = nil, monthlyRefill: Double = 0, color: String, category: String, isInfinite: Bool = false) {
         let newSalvadanaio = SalvadanaiModel(
             name: name,
             type: type,
-            currentAmount: 0.0, // SEMPRE 0 - non configurabile
+            currentAmount: 0.0,
             targetAmount: isInfinite ? 0 : targetAmount,
             targetDate: isInfinite ? nil : targetDate,
             monthlyRefill: monthlyRefill,
             color: color,
+            category: category, // NUOVO
             createdAt: Date(),
             isInfinite: isInfinite
         )
         salvadanai.append(newSalvadanaio)
-        
-        // RIMOSSO: Qualsiasi logica di sottrazione da conti
     }
     
     func updateSalvadanaio(_ salvadanaio: SalvadanaiModel) {
@@ -326,6 +347,19 @@ class DataManager: ObservableObject {
     
     func deleteSalvadanaio(_ salvadanaio: SalvadanaiModel) {
         salvadanai.removeAll { $0.id == salvadanaio.id }
+    }
+    
+    // NUOVO: Metodi per gestione categorie salvadanai
+    func getSalvadanaiByCategory(_ category: String) -> [SalvadanaiModel] {
+        if category == "Tutti" {
+            return salvadanai
+        }
+        return salvadanai.filter { $0.category == category }
+    }
+    
+    var usedSalvadanaiCategories: [String] {
+        let used = Set(salvadanai.map { $0.category })
+        return Array(used).sorted()
     }
     
     func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String? = nil, salvadanaiName: String? = nil) {
@@ -341,17 +375,14 @@ class DataManager: ObservableObject {
         transactions.append(newTransaction)
         
         if type == "expense" {
-            // MODIFICATO: Per le spese: sottrai dal salvadanaio E dal conto selezionato
             if let salvadanaiName = salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: -amount)
             }
             
-            // NUOVO: Sottrai anche dal conto selezionato dall'utente
             if let accountName = accountName {
                 updateAccountBalance(accountName: accountName, amount: -amount)
             }
         } else {
-            // Per entrate e stipendi: aggiungi al conto selezionato (INVARIATO)
             if let accountName = accountName {
                 updateAccountBalance(accountName: accountName, amount: amount)
             }
@@ -362,7 +393,6 @@ class DataManager: ObservableObject {
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
-            // Per le spese: ripristina il saldo del salvadanaio E del conto
             if let salvadanaiName = transaction.salvadanaiName {
                 updateSalvadanaiBalance(name: salvadanaiName, amount: transaction.amount)
             }
@@ -371,7 +401,6 @@ class DataManager: ObservableObject {
                 updateAccountBalance(accountName: transaction.accountName, amount: transaction.amount)
             }
         } else if transaction.type == "transfer" {
-            // Per trasferimenti tra conti: ripristina entrambi i conti
             if !transaction.accountName.isEmpty {
                 updateAccountBalance(accountName: transaction.accountName, amount: transaction.amount)
             }
@@ -379,7 +408,6 @@ class DataManager: ObservableObject {
                 updateAccountBalance(accountName: toAccount, amount: -transaction.amount)
             }
         } else if transaction.type == "transfer_salvadanai" {
-            // Per trasferimenti tra salvadanai: ripristina entrambi i salvadanai
             if !transaction.accountName.isEmpty {
                 updateSalvadanaiBalance(name: transaction.accountName, amount: transaction.amount)
             }
@@ -387,7 +415,6 @@ class DataManager: ObservableObject {
                 updateSalvadanaiBalance(name: toSalvadanaio, amount: -transaction.amount)
             }
         } else {
-            // Per entrate: ripristina il saldo del conto
             if !transaction.accountName.isEmpty {
                 updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
             }
@@ -421,14 +448,12 @@ class DataManager: ObservableObject {
         }
     }
     
-    // MARK: - NUOVI METODI PER DISTRIBUZIONE STIPENDI
+    // MARK: - DISTRIBUZIONE STIPENDI
     
-    // MODIFICATO: Distribuzione con importi personalizzati - NON sottrae dai conti
     func distributeIncomeWithCustomAmounts(amount: Double, salvadanaiAmounts: [String: Double], accountName: String, transactionType: String = "salary") {
         let descriptionText = transactionType == "salary" ? "Stipendio" : "Entrata"
         let categoryText = transactionType == "salary" ? "💼 Stipendio" : "💸 Entrata"
         
-        // 1. Aggiungi la transazione principale al conto (INVARIATO)
         addTransaction(
             amount: amount,
             descr: descriptionText,
@@ -437,14 +462,11 @@ class DataManager: ObservableObject {
             accountName: accountName
         )
         
-        // 2. Distribuisci gli importi personalizzati ai salvadanai
         for (salvadanaiName, customAmount) in salvadanaiAmounts {
             if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
                 if customAmount > 0 {
-                    // MODIFICATO: Aggiungi SOLO al salvadanaio, NON sottrarre dal conto
                     salvadanai[index].currentAmount += customAmount
                     
-                    // MODIFICATO: Aggiungi una transazione di trasferimento per tracciabilità
                     addDistributionTransaction(
                         amount: customAmount,
                         fromAccount: accountName,
@@ -456,22 +478,6 @@ class DataManager: ObservableObject {
         }
     }
     
-    // MODIFICATO: Transazione di trasferimento - NON modifica i saldi dei conti
-    private func addTransferTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
-        let transferTransaction = TransactionModel(
-            amount: amount,
-            descr: description,
-            category: "🔄 Trasferimento",
-            type: "transfer", // Tipo di transazione per tracciabilità
-            date: Date(),
-            accountName: fromAccount,
-            salvadanaiName: toSalvadanaio
-        )
-        transactions.append(transferTransaction)
-        // NOTA: NON modifica i saldi - è solo per tracciare la distribuzione
-    }
-    
-    // MIGLIORATO: Distribuzione automatica intelligente
     func distributeIncomeAutomatically(amount: Double, accountName: String, transactionType: String = "salary") {
         let automaticDistribution = calculateAutomaticDistribution(totalAmount: amount)
         
@@ -483,29 +489,25 @@ class DataManager: ObservableObject {
         )
     }
     
-    // NUOVO: Transazione di distribuzione - NON modifica i saldi dei conti
     private func addDistributionTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
         let distributionTransaction = TransactionModel(
             amount: amount,
             descr: description,
             category: "🔄 Distribuzione",
-            type: "distribution", // Nuovo tipo per distinguere dalle vere spese
+            type: "distribution",
             date: Date(),
             accountName: fromAccount,
             salvadanaiName: toSalvadanaio
         )
         transactions.append(distributionTransaction)
-        // NOTA: NON modifica i saldi dei conti - è solo per tracciare la distribuzione
     }
     
-    // NUOVO: Calcolo distribuzione automatica intelligente
     func calculateAutomaticDistribution(totalAmount: Double) -> [String: Double] {
         var distribution: [String: Double] = [:]
         var remainingAmount = totalAmount
         
-        // Priorità 1: Glass salvadanai che hanno bisogno di ricarica
         let glassSalvadanai = salvadanai.filter { $0.type == "glass" }
-            .sorted { $0.currentAmount < $1.currentAmount } // Dal più vuoto al più pieno
+            .sorted { $0.currentAmount < $1.currentAmount }
         
         for salvadanaio in glassSalvadanai {
             let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
@@ -516,7 +518,6 @@ class DataManager: ObservableObject {
             }
         }
         
-        // Priorità 2: Obiettivi con scadenza più vicina
         let objectiveSalvadanai = salvadanai.filter {
             $0.type == "objective" && !$0.isInfinite && $0.targetDate != nil
         }.sorted {
@@ -528,21 +529,20 @@ class DataManager: ObservableObject {
             
             let needed = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
             if needed > 0 {
-                // Calcola giorni rimanenti per determinare l'urgenza
                 let daysRemaining = Calendar.current.dateComponents([.day],
                     from: Date(),
                     to: salvadanaio.targetDate ?? Date.distantFuture).day ?? Int.max
                 
                 let urgencyMultiplier: Double
                 if daysRemaining <= 30 {
-                    urgencyMultiplier = 1.5 // Molto urgente
+                    urgencyMultiplier = 1.5
                 } else if daysRemaining <= 90 {
-                    urgencyMultiplier = 1.2 // Urgente
+                    urgencyMultiplier = 1.2
                 } else {
-                    urgencyMultiplier = 1.0 // Normale
+                    urgencyMultiplier = 1.0
                 }
                 
-                let baseAllocation = min(150, needed) // Massimo 150€ per obiettivo
+                let baseAllocation = min(150, needed)
                 let allocation = min(baseAllocation * urgencyMultiplier, remainingAmount)
                 
                 if allocation > 0 {
@@ -552,7 +552,6 @@ class DataManager: ObservableObject {
             }
         }
         
-        // Priorità 3: Distribuzione del rimanente tra salvadanai infiniti
         let infiniteSalvadanai = salvadanai.filter { $0.type == "objective" && $0.isInfinite }
         if !infiniteSalvadanai.isEmpty && remainingAmount > 0 {
             let perInfinite = remainingAmount / Double(infiniteSalvadanai.count)
@@ -562,7 +561,6 @@ class DataManager: ObservableObject {
             remainingAmount = 0
         }
         
-        // Priorità 4: Se rimane ancora qualcosa, distribuiscilo equamente tra tutti i salvadanai con distribuzione > 0
         if remainingAmount > 0 && !distribution.isEmpty {
             let perSelected = remainingAmount / Double(distribution.count)
             for key in distribution.keys {
@@ -573,7 +571,6 @@ class DataManager: ObservableObject {
         return distribution
     }
     
-    // MIGLIORATO: Distribuzione equa con selezione personalizzata
     func distributeIncomeEqually(amount: Double, toSalvadanai selectedSalvadanai: [String], accountName: String, transactionType: String = "salary") {
         guard !selectedSalvadanai.isEmpty else { return }
         
@@ -588,11 +585,9 @@ class DataManager: ObservableObject {
         )
     }
     
-    // NUOVO: Suggerimenti per distribuzione ottimale
     func getDistributionSuggestions(amount: Double) -> [DistributionSuggestion] {
         var suggestions: [DistributionSuggestion] = []
         
-        // Suggerimento 1: Glass con ricarica necessaria
         let glassSalvadanai = salvadanai.filter { $0.type == "glass" }
         for salvadanaio in glassSalvadanai {
             let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
@@ -606,7 +601,6 @@ class DataManager: ObservableObject {
             }
         }
         
-        // Suggerimento 2: Obiettivi urgenti
         let urgentObjectives = salvadanai.filter {
             $0.type == "objective" && !$0.isInfinite && $0.targetDate != nil
         }.filter { salvadanaio in
@@ -623,12 +617,32 @@ class DataManager: ObservableObject {
             
             suggestions.append(DistributionSuggestion(
                 salvadanaiName: salvadanaio.name,
-                suggestedAmount: min(needed, amount * 0.3), // Massimo 30% per obiettivo urgente
+                suggestedAmount: min(needed, amount * 0.3),
                 reason: "Scadenza in \(daysRemaining) giorni",
                 priority: daysRemaining <= 30 ? .high : .medium
             ))
         }
         
         return suggestions.sorted { $0.priority.rawValue > $1.priority.rawValue }
+    }
+}
+
+// MARK: - Computed Properties per DataManager
+extension DataManager {
+    var totalBalance: Double {
+        accounts.reduce(0) { $0 + $1.balance }
+    }
+    
+    var totalSavings: Double {
+        salvadanai.reduce(0) { $0 + $1.currentAmount }
+    }
+    
+    var availableBalance: Double {
+        let positiveSavings = salvadanai.filter { $0.currentAmount > 0 }.reduce(0) { $0 + $1.currentAmount }
+        return totalBalance + positiveSavings
+    }
+    
+    var recentTransactions: [TransactionModel] {
+        transactions.sorted { $0.date > $1.date }
     }
 }

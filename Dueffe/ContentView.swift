@@ -729,6 +729,7 @@ struct FirstSalvadanaiOnboardingView: View {
         let targetDate: Date?
         let monthlyRefill: Double
         let color: String
+        let category: String // NUOVO: Categoria
         let isInfinite: Bool
     }
     
@@ -1128,6 +1129,7 @@ struct FirstSalvadanaiOnboardingView: View {
             targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
+            category: selectedType == "objective" ? "🎯 Obiettivi" : "🥤 Budget Mensili", // NUOVO: Categoria automatica
             isInfinite: selectedType == "objective" ? isInfiniteObjective : false
         )
         
@@ -1170,7 +1172,6 @@ struct FirstSalvadanaiOnboardingView: View {
     }
     
     private func saveAllSalvadanai() {
-        // MODIFICATO: Nessun conto di riferimento necessario
         for salvadanaio in createdSalvadanai {
             dataManager.addSalvadanaio(
                 name: salvadanaio.name,
@@ -1179,6 +1180,7 @@ struct FirstSalvadanaiOnboardingView: View {
                 targetDate: salvadanaio.targetDate,
                 monthlyRefill: salvadanaio.monthlyRefill,
                 color: salvadanaio.color,
+                category: salvadanaio.category, // NUOVO: Passa la categoria
                 isInfinite: salvadanaio.isInfinite
             )
         }
@@ -1543,6 +1545,11 @@ struct CreatedSalvadanaiRow: View {
                             .foregroundColor(getColor(from: salvadanaio.color))
                             .fontWeight(.medium)
                     }
+                    
+                    // NUOVO: Categoria
+                    Text("• \(salvadanaio.category)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
                     // Dettagli specifici
                     if salvadanaio.type == "objective" && !salvadanaio.isInfinite {

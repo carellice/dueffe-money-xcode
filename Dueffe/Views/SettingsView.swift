@@ -491,14 +491,15 @@ struct StatCard: View {
     }
 }
 
-// MARK: - Enhanced Categories Management View
+// MARK: - Enhanced Categories Management View AGGIORNATA
 struct EnhancedCategoriesManagementView: View {
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedTab = 0
+    @State private var selectedTab = 0 // 0=Spese, 1=Entrate, 2=Salvadanai
     @State private var showingQuickAddExpense = false
     @State private var showingQuickAddIncome = false
+    @State private var showingQuickAddSalvadanaio = false // NUOVO
     @State private var showingDeleteAlert = false
     @State private var categoryToDelete = ""
     @State private var searchText = ""
@@ -519,6 +520,15 @@ struct EnhancedCategoriesManagementView: View {
         }
     }
     
+    // NUOVO: Filtro per categorie salvadanai
+    var filteredSalvadanaiCategories: [String] {
+        if searchText.isEmpty {
+            return dataManager.customSalvadanaiCategories.sorted()
+        } else {
+            return dataManager.customSalvadanaiCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }.sorted()
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -531,19 +541,21 @@ struct EnhancedCategoriesManagementView: View {
                 .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Header con statistiche
+                    // Header con statistiche AGGIORNATO
                     CategoriesStatsHeader(
                         expenseCount: dataManager.defaultExpenseCategories.count + dataManager.customExpenseCategories.count,
                         incomeCount: dataManager.defaultIncomeCategories.count + dataManager.customIncomeCategories.count,
-                        customCount: dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count
+                        salvadanaiCount: dataManager.defaultSalvadanaiCategories.count + dataManager.customSalvadanaiCategories.count, // NUOVO
+                        customCount: dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count + dataManager.customSalvadanaiCategories.count // AGGIORNATO
                     )
                     .padding(.horizontal)
                     .padding(.bottom, 16)
                     
-                    // Tab Selector migliorato
+                    // Tab Selector migliorato AGGIORNATO
                     Picker("Tipo", selection: $selectedTab) {
                         Text("Spese (\(dataManager.expenseCategories.count))").tag(0)
                         Text("Entrate (\(dataManager.incomeCategories.count))").tag(1)
+                        Text("Salvadanai (\(dataManager.allSalvadanaiCategories.count))").tag(2) // NUOVO
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
@@ -552,7 +564,7 @@ struct EnhancedCategoriesManagementView: View {
                     // Categories List
                     List {
                         if selectedTab == 0 {
-                            // Expense Categories
+                            // Expense Categories (INVARIATO)
                             Section {
                                 ForEach(dataManager.defaultExpenseCategories, id: \.self) { category in
                                     CategoryRow(
@@ -599,8 +611,8 @@ struct EnhancedCategoriesManagementView: View {
                                 }
                             }
                             
-                        } else {
-                            // Income Categories
+                        } else if selectedTab == 1 {
+                            // Income Categories (INVARIATO)
                             Section {
                                 ForEach(dataManager.defaultIncomeCategories, id: \.self) { category in
                                     CategoryRow(
@@ -646,18 +658,70 @@ struct EnhancedCategoriesManagementView: View {
                                     Text("Scorri verso sinistra per eliminare una categoria personalizzata")
                                 }
                             }
+                            
+                        } else {
+                            // NUOVO: Salvadanai Categories
+                            Section {
+                                ForEach(dataManager.defaultSalvadanaiCategories, id: \.self) { category in
+                                    CategoryRow(
+                                        category: category,
+                                        isDefault: true,
+                                        color: .orange,
+                                        onDelete: nil
+                                    )
+                                }
+                            } header: {
+                                CategorySectionHeader(
+                                    title: "Categorie Predefinite",
+                                    count: dataManager.defaultSalvadanaiCategories.count,
+                                    color: .blue
+                                )
+                            }
+                            
+                            if !filteredSalvadanaiCategories.isEmpty {
+                                Section {
+                                    ForEach(filteredSalvadanaiCategories, id: \.self) { category in
+                                        CategoryRow(
+                                            category: category,
+                                            isDefault: false,
+                                            color: .orange,
+                                            onDelete: {
+                                                categoryToDelete = category
+                                                showingDeleteAlert = true
+                                            }
+                                        )
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button("Elimina", role: .destructive) {
+                                                dataManager.deleteSalvadanaiCategory(category)
+                                            }
+                                        }
+                                    }
+                                } header: {
+                                    CategorySectionHeader(
+                                        title: "Categorie Personalizzate",
+                                        count: filteredSalvadanaiCategories.count,
+                                        color: .purple
+                                    )
+                                } footer: {
+                                    Text("Scorri verso sinistra per eliminare una categoria personalizzata")
+                                }
+                            }
                         }
                         
-                        // Add Category Section
+                        // Add Category Section AGGIORNATO
                         Section {
                             AddCategoryRow(
-                                title: selectedTab == 0 ? "Aggiungi categoria spesa" : "Aggiungi categoria entrata",
-                                color: selectedTab == 0 ? .red : .green,
+                                title: selectedTab == 0 ? "Aggiungi categoria spesa" :
+                                       selectedTab == 1 ? "Aggiungi categoria entrata" :
+                                       "Aggiungi categoria salvadanaio", // NUOVO
+                                color: selectedTab == 0 ? .red : selectedTab == 1 ? .green : .orange, // AGGIORNATO
                                 action: {
                                     if selectedTab == 0 {
                                         showingQuickAddExpense = true
-                                    } else {
+                                    } else if selectedTab == 1 {
                                         showingQuickAddIncome = true
+                                    } else {
+                                        showingQuickAddSalvadanaio = true // NUOVO
                                     }
                                 }
                             )
@@ -680,12 +744,14 @@ struct EnhancedCategoriesManagementView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     FloatingActionButton(
                         icon: "plus.circle.fill",
-                        color: selectedTab == 0 ? .red : .green,
+                        color: selectedTab == 0 ? .red : selectedTab == 1 ? .green : .orange, // AGGIORNATO
                         action: {
                             if selectedTab == 0 {
                                 showingQuickAddExpense = true
-                            } else {
+                            } else if selectedTab == 1 {
                                 showingQuickAddIncome = true
+                            } else {
+                                showingQuickAddSalvadanaio = true // NUOVO
                             }
                         }
                     )
@@ -698,12 +764,17 @@ struct EnhancedCategoriesManagementView: View {
         .sheet(isPresented: $showingQuickAddIncome) {
             EnhancedQuickCategoryAddView(categoryType: "income")
         }
+        .sheet(isPresented: $showingQuickAddSalvadanaio) { // NUOVO
+            EnhancedQuickCategoryAddView(categoryType: "salvadanaio")
+        }
         .alert("Elimina Categoria", isPresented: $showingDeleteAlert) {
             Button("Elimina", role: .destructive) {
                 if selectedTab == 0 {
                     dataManager.deleteExpenseCategory(categoryToDelete)
-                } else {
+                } else if selectedTab == 1 {
                     dataManager.deleteIncomeCategory(categoryToDelete)
+                } else {
+                    dataManager.deleteSalvadanaiCategory(categoryToDelete) // NUOVO
                 }
                 categoryToDelete = ""
             }
@@ -716,10 +787,11 @@ struct EnhancedCategoriesManagementView: View {
     }
 }
 
-// MARK: - Categories Stats Header
+// MARK: - Categories Stats Header AGGIORNATO
 struct CategoriesStatsHeader: View {
     let expenseCount: Int
     let incomeCount: Int
+    let salvadanaiCount: Int // NUOVO
     let customCount: Int
     
     var body: some View {
@@ -745,6 +817,14 @@ struct CategoriesStatsHeader: View {
                     count: incomeCount,
                     icon: "plus.circle.fill",
                     color: .green
+                )
+                
+                // NUOVO: Statistiche salvadanai
+                CategoryStatItem(
+                    title: "Salvadanai",
+                    count: salvadanaiCount,
+                    icon: "banknote.fill",
+                    color: .orange
                 )
                 
                 CategoryStatItem(
@@ -915,7 +995,7 @@ struct AddCategoryRow: View {
     }
 }
 
-// MARK: - Enhanced Quick Category Add View
+// MARK: - Enhanced Quick Category Add View AGGIORNATO
 struct EnhancedQuickCategoryAddView: View {
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.dismiss) private var dismiss
@@ -925,14 +1005,34 @@ struct EnhancedQuickCategoryAddView: View {
     @State private var selectedEmoji = "📝"
     @State private var useEmoji = true
     
-    let commonEmojis = ["📝", "💰", "🏠", "🚗", "🍕", "🎬", "👕", "🏥", "📚", "🎁", "💼", "📈", "💸", "🔄", "⚡", "🎮", "☕", "🛒", "💊", "🎯", "🎨", "🔧", "🎪", "⛽"]
+    // AGGIORNATO: Emoji per salvadanai
+    let commonEmojis = ["📝", "💰", "🏠", "🚗", "🍕", "🎬", "👕", "🏥", "📚", "🎁", "💼", "📈", "💸", "🔄", "⚡", "🎮", "☕", "🛒", "💊", "🎯", "🎨", "🔧", "🎪", "⛽", "📁", "✈️", "🎓", "🏋️", "🎵", "💒", "🐕", "🌱"]
     
     var title: String {
-        categoryType == "expense" ? "Nuova Categoria Spesa" : "Nuova Categoria Entrata"
+        switch categoryType {
+        case "expense": return "Nuova Categoria Spesa"
+        case "income": return "Nuova Categoria Entrata"
+        case "salvadanaio": return "Nuova Categoria Salvadanaio" // NUOVO
+        default: return "Nuova Categoria"
+        }
     }
     
     var color: Color {
-        categoryType == "expense" ? .red : .green
+        switch categoryType {
+        case "expense": return .red
+        case "income": return .green
+        case "salvadanaio": return .orange // NUOVO
+        default: return .blue
+        }
+    }
+    
+    var exampleText: String {
+        switch categoryType {
+        case "expense": return "Esempio: Benzina, Gaming, Farmaci"
+        case "income": return "Esempio: Cashback, Rimborsi, Vendite"
+        case "salvadanaio": return "Esempio: Sport e Palestra, Matrimonio, Fondo Emergenza" // NUOVO
+        default: return "Esempio: Nuova Categoria"
+        }
     }
     
     var body: some View {
@@ -952,7 +1052,6 @@ struct EnhancedQuickCategoryAddView: View {
                         CategoryPreviewCard(
                             categoryName: categoryName.isEmpty ? "Nome categoria" : categoryName,
                             emoji: useEmoji ? selectedEmoji : "",
-                            color: color,
                             isEmpty: categoryName.isEmpty
                         )
                     }
@@ -971,7 +1070,7 @@ struct EnhancedQuickCategoryAddView: View {
                             Text("Nome")
                         }
                     } footer: {
-                        Text("Esempio: \(categoryType == "expense" ? "Benzina, Gaming, Farmaci" : "Cashback, Rimborsi, Vendite")")
+                        Text(exampleText)
                     }
                     
                     // Emoji toggle
@@ -1039,27 +1138,38 @@ struct EnhancedQuickCategoryAddView: View {
                 }
             }
         }
+        .onAppear {
+            // NUOVO: Emoji di default per salvadanai
+            if categoryType == "salvadanaio" {
+                selectedEmoji = "📁"
+            }
+        }
     }
     
     private func addCategory() {
         let trimmedName = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalName = (useEmoji && !selectedEmoji.isEmpty) ? "\(selectedEmoji) \(trimmedName)" : trimmedName
         
-        if categoryType == "expense" {
+        // AGGIORNATO: Switch per tipo categoria
+        switch categoryType {
+        case "expense":
             dataManager.addExpenseCategory(finalName)
-        } else {
+        case "income":
             dataManager.addIncomeCategory(finalName)
+        case "salvadanaio":
+            dataManager.addSalvadanaiCategory(finalName) // NUOVO
+        default:
+            break
         }
         
         dismiss()
     }
 }
 
-// MARK: - Category Preview Card
+// MARK: - NUOVO: Category Preview Card per Salvadanai
 struct CategoryPreviewCard: View {
     let categoryName: String
     let emoji: String
-    let color: Color
     let isEmpty: Bool
     
     var body: some View {
@@ -1080,16 +1190,16 @@ struct CategoryPreviewCard: View {
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(color.opacity(0.1))
+                                .fill(Color.green.opacity(0.1))
                         )
                 } else {
-                    Image(systemName: "tag.fill")
+                    Image(systemName: "folder.fill")
                         .font(.title2)
-                        .foregroundColor(color)
+                        .foregroundColor(.orange)
                         .frame(width: 40, height: 40)
                         .background(
                             Circle()
-                                .fill(color.opacity(0.1))
+                                .fill(Color.orange.opacity(0.1))
                         )
                 }
                 
@@ -1118,7 +1228,7 @@ struct CategoryPreviewCard: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
                 )
         )
     }

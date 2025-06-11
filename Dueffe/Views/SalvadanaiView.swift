@@ -6,13 +6,39 @@ struct SalvadanaiView: View {
     @State private var showingAddSalvadanaio = false
     @State private var selectedSalvadanaio: SalvadanaiModel?
     @State private var searchText = ""
+    @State private var selectedCategory = "Tutti" // NUOVO: Filtro categoria
     
+    // NUOVO: Categorie disponibili per il filtro
+    private var availableCategories: [String] {
+        var categories = ["Tutti"]
+        let usedCategories = dataManager.usedSalvadanaiCategories
+        categories.append(contentsOf: usedCategories)
+        return categories
+    }
+    
+    // AGGIORNATO: Filtro per categoria e ricerca
     var filteredSalvadanai: [SalvadanaiModel] {
-        if searchText.isEmpty {
-            return dataManager.salvadanai
-        } else {
-            return dataManager.salvadanai.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        var salvadanai = dataManager.salvadanai
+        
+        // Filtro per categoria
+        if selectedCategory != "Tutti" {
+            salvadanai = salvadanai.filter { $0.category == selectedCategory }
         }
+        
+        // Filtro per ricerca
+        if !searchText.isEmpty {
+            salvadanai = salvadanai.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+        
+        return salvadanai
+    }
+    
+    // NUOVO: Conteggio per categoria
+    private func getCategoryCount(_ category: String) -> Int {
+        if category == "Tutti" {
+            return dataManager.salvadanai.count
+        }
+        return dataManager.salvadanai.filter { $0.category == category }.count
     }
     
     var body: some View {
@@ -33,22 +59,80 @@ struct SalvadanaiView: View {
                         EmptySalvadanaiView(action: { showingAddSalvadanaio = true })
                     } else {
                         VStack(spacing: 0) {
-                            // Header con statistiche (MODIFICATO - rimosso totale risparmiato)
+                            // Header con statistiche
                             CompactSalvadanaiStatsView(salvadanai: dataManager.salvadanai)
                                 .padding(.horizontal)
                                 .padding(.bottom, 16)
                             
+                            // NUOVO: Filtri categoria (solo se ci sono categorie)
+                            if availableCategories.count > 1 {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 12) {
+                                        ForEach(availableCategories, id: \.self) { category in
+                                            CategoryFilterButton(
+                                                title: category,
+                                                isSelected: selectedCategory == category,
+                                                count: getCategoryCount(category)
+                                            ) {
+                                                withAnimation(.spring()) {
+                                                    selectedCategory = category
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal)
+                                }
+                                .padding(.vertical, 12)
+                            }
+                            
                             // Lista salvadanai
                             ScrollView {
-                                LazyVStack(spacing: 16) {
-                                    ForEach(filteredSalvadanai, id: \.id) { salvadanaio in
-                                        SalvadanaiCardView(salvadanaio: salvadanaio)
-                                            .onTapGesture {
-                                                selectedSalvadanaio = salvadanaio
+                                if filteredSalvadanai.isEmpty {
+                                    // NUOVO: Vista vuota per filtri
+                                    VStack(spacing: 20) {
+                                        Image(systemName: "magnifyingglass")
+                                            .font(.system(size: 50))
+                                            .foregroundColor(.secondary)
+                                        
+                                        VStack(spacing: 8) {
+                                            Text("Nessun salvadanaio trovato")
+                                                .font(.title3)
+                                                .fontWeight(.semibold)
+                                            
+                                            if selectedCategory != "Tutti" {
+                                                Text("Nessun salvadanaio nella categoria '\(selectedCategory)'")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                                    .multilineTextAlignment(.center)
+                                            } else if !searchText.isEmpty {
+                                                Text("Prova con termini di ricerca diversi")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
                                             }
+                                        }
+                                        
+                                        if selectedCategory != "Tutti" {
+                                            Button("Mostra tutti") {
+                                                withAnimation {
+                                                    selectedCategory = "Tutti"
+                                                }
+                                            }
+                                            .font(.subheadline)
+                                            .foregroundColor(.blue)
+                                        }
                                     }
+                                    .padding(40)
+                                } else {
+                                    LazyVStack(spacing: 16) {
+                                        ForEach(filteredSalvadanai, id: \.id) { salvadanaio in
+                                            SalvadanaiCardView(salvadanaio: salvadanaio)
+                                                .onTapGesture {
+                                                    selectedSalvadanaio = salvadanaio
+                                                }
+                                        }
+                                    }
+                                    .padding()
                                 }
-                                .padding()
                             }
                             .searchable(text: $searchText, prompt: "Cerca salvadanai...")
                         }
@@ -81,6 +165,74 @@ struct SalvadanaiView: View {
         .sheet(item: $selectedSalvadanaio) { salvadanaio in
             SimpleSalvadanaiDetailView(salvadanaio: salvadanaio)
         }
+    }
+}
+
+// MARK: - NUOVO: Category Filter Button
+struct CategoryFilterButton: View {
+    let title: String
+    let isSelected: Bool
+    let count: Int
+    let action: () -> Void
+    
+    // NUOVO: Emoji per categoria
+    private var categoryEmoji: String {
+        if let firstChar = title.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    private var categoryName: String {
+        if let firstChar = title.first, firstChar.isEmoji {
+            return String(title.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return title
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                // Emoji se presente
+                if !categoryEmoji.isEmpty && title != "Tutti" {
+                    Text(categoryEmoji)
+                        .font(.subheadline)
+                } else if title == "Tutti" {
+                    Image(systemName: "list.bullet")
+                        .font(.subheadline)
+                }
+                
+                Text(categoryName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isSelected ? .white : .secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.white.opacity(0.3) : Color.gray.opacity(0.2))
+                        )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ?
+                          LinearGradient(gradient: Gradient(colors: [.green, .mint]), startPoint: .leading, endPoint: .trailing) :
+                          LinearGradient(gradient: Gradient(colors: [Color.gray.opacity(0.15)]), startPoint: .leading, endPoint: .trailing)
+                    )
+                    .shadow(color: isSelected ? .green.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
+            )
+            .foregroundColor(isSelected ? .white : .primary)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
     }
 }
 
@@ -635,10 +787,44 @@ struct SalvadanaiCardView: View {
                     // Info dettagliata (condizionale e compatta) + TRANSAZIONI
                     if showDetails {
                         VStack(spacing: 8) {
-                            // NUOVA SEZIONE: Transazioni correlate (RIMOSSA data di creazione)
+                            // NUOVA SEZIONE: Categoria e Transazioni correlate
                             if !relatedTransactions.isEmpty {
                                 VStack(spacing: 8) {
                                     Divider()
+                                    
+                                    // NUOVO: Mostra categoria del salvadanaio
+                                    HStack {
+                                        HStack(spacing: 6) {
+                                            // Emoji categoria se presente
+                                            if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
+                                                Text(String(firstChar))
+                                                    .font(.caption)
+                                            } else {
+                                                Image(systemName: "folder.fill")
+                                                    .font(.caption)
+                                                    .foregroundColor(.orange)
+                                            }
+                                            
+                                            Text("Categoria:")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            
+                                            // Nome categoria senza emoji
+                                            let categoryName = {
+                                                if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
+                                                    return String(salvadanaio.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+                                                }
+                                                return salvadanaio.category
+                                            }()
+                                            
+                                            Text(categoryName)
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.orange)
+                                        }
+                                        
+                                        Spacer()
+                                    }
                                     
                                     HStack {
                                         HStack(spacing: 6) {
@@ -704,6 +890,40 @@ struct SalvadanaiCardView: View {
                             } else {
                                 VStack(spacing: 8) {
                                     Divider()
+                                    
+                                    // NUOVO: Mostra categoria anche quando non ci sono transazioni
+                                    HStack {
+                                        HStack(spacing: 6) {
+                                            // Emoji categoria se presente
+                                            if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
+                                                Text(String(firstChar))
+                                                    .font(.caption)
+                                            } else {
+                                                Image(systemName: "folder.fill")
+                                                    .font(.caption)
+                                                    .foregroundColor(.orange)
+                                            }
+                                            
+                                            Text("Categoria:")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            
+                                            // Nome categoria senza emoji
+                                            let categoryName = {
+                                                if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
+                                                    return String(salvadanaio.category.dropFirst()).trimmingCharacters(in: .whitespaces)
+                                                }
+                                                return salvadanaio.category
+                                            }()
+                                            
+                                            Text(categoryName)
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.orange)
+                                        }
+                                        
+                                        Spacer()
+                                    }
                                     
                                     HStack {
                                         Image(systemName: "info.circle")
@@ -1680,7 +1900,7 @@ struct SimpleModalView: View {
     }
 }
 
-// MARK: - Simple Salvadanaio Form View
+// MARK: - Simple Salvadanaio Form View con Categoria Semplificata
 struct SimpleSalvadanaiFormView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -1691,6 +1911,7 @@ struct SimpleSalvadanaiFormView: View {
     @State private var targetDate = Date()
     @State private var monthlyRefill = 50.0
     @State private var selectedColor = "blue"
+    @State private var selectedCategory = "" // Categoria selezionata
     @State private var isInfiniteObjective = false
     
     let salvadanaiTypes = [
@@ -1700,6 +1921,7 @@ struct SimpleSalvadanaiFormView: View {
     
     var isFormValid: Bool {
         if name.isEmpty { return false }
+        if selectedCategory.isEmpty { return false } // Categoria obbligatoria
         if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
         return true
@@ -1713,6 +1935,28 @@ struct SimpleSalvadanaiFormView: View {
                         .textInputAutocapitalization(.words)
                 } header: {
                     Text("Informazioni di base")
+                }
+                
+                // SEZIONE CATEGORIA SEMPLIFICATA (come nelle transazioni)
+                Section {
+                    Picker("Categoria", selection: $selectedCategory) {
+                        Text("Seleziona categoria")
+                            .tag("")
+                            .foregroundColor(.secondary)
+                        ForEach(dataManager.allSalvadanaiCategories, id: \.self) { category in
+                            Text(category)
+                                .tag(category)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                } header: {
+                    HStack {
+                        Image(systemName: "folder.fill")
+                            .foregroundColor(.orange)
+                        Text("Categoria")
+                    }
+                } footer: {
+                    Text("Organizza i tuoi salvadanai per categoria. Gestisci le categorie nelle Impostazioni.")
                 }
                 
                 Section {
@@ -1743,9 +1987,6 @@ struct SimpleSalvadanaiFormView: View {
                 } header: {
                     Text("Tipo di salvadanaio")
                 }
-                
-                // RIMOSSO: Sezione conto di riferimento
-                // RIMOSSO: Sezione saldo iniziale
                 
                 if selectedType == "objective" {
                     Section {
@@ -1799,7 +2040,6 @@ struct SimpleSalvadanaiFormView: View {
                     Text("Colore")
                 }
                 
-                // NUOVO: Info su saldo iniziale
                 Section {
                     HStack {
                         Image(systemName: "info.circle.fill")
@@ -1855,7 +2095,6 @@ struct SimpleSalvadanaiFormView: View {
     }
     
     private func createSalvadanaio() {
-        // MODIFICATO: Nessun conto di riferimento, sempre saldo 0
         dataManager.addSalvadanaio(
             name: name,
             type: selectedType,
@@ -1863,9 +2102,328 @@ struct SimpleSalvadanaiFormView: View {
             targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
+            category: selectedCategory,
             isInfinite: selectedType == "objective" ? isInfiniteObjective : false
         )
         dismiss()
+    }
+}
+
+// MARK: - NUOVO: New Category View
+struct NewCategoryView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    
+    let categoryType: String
+    @State private var categoryName = ""
+    @State private var selectedEmoji = "📁"
+    @State private var useEmoji = true
+    
+    let commonEmojis = ["📁", "🏠", "✈️", "🚗", "🎓", "💊", "🎮", "💰", "🎁", "🔧", "💼", "🍽️", "👕", "📱", "🏋️", "🎵", "💒", "🐕", "📚", "🌱", "💡", "⭐", "🎯", "🔮"]
+    
+    var title: String {
+        "Nuova Categoria Salvadanaio"
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.green.opacity(0.05), Color.orange.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                Form {
+                    // Anteprima
+                    Section {
+                        CategoryPreviewCard(
+                            categoryName: categoryName.isEmpty ? "Nome categoria" : categoryName,
+                            emoji: useEmoji ? selectedEmoji : "",
+                            isEmpty: categoryName.isEmpty
+                        )
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    
+                    // Nome categoria
+                    Section {
+                        TextField("Nome categoria", text: $categoryName)
+                            .textInputAutocapitalization(.words)
+                            .font(.headline)
+                    } header: {
+                        HStack {
+                            Image(systemName: "textformat")
+                                .foregroundColor(.green)
+                            Text("Nome")
+                        }
+                    } footer: {
+                        Text("Esempio: Sport e Palestra, Matrimonio, Fondo Emergenza")
+                    }
+                    
+                    // Emoji toggle
+                    Section {
+                        Toggle("Usa emoji", isOn: $useEmoji)
+                            .toggleStyle(SwitchToggleStyle(tint: .green))
+                        
+                        if useEmoji {
+                            // Emoji selector migliorato
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Emoji selezionata: \(selectedEmoji)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                                    ForEach(commonEmojis, id: \.self) { emoji in
+                                        Button(action: {
+                                            selectedEmoji = emoji
+                                        }) {
+                                            Text(emoji)
+                                                .font(.title2)
+                                                .frame(width: 44, height: 44)
+                                                .background(
+                                                    Circle()
+                                                        .fill(selectedEmoji == emoji ? Color.green.opacity(0.2) : Color.gray.opacity(0.1))
+                                                        .overlay(
+                                                            Circle()
+                                                                .stroke(selectedEmoji == emoji ? Color.green : Color.clear, lineWidth: 2)
+                                                        )
+                                                )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "face.smiling.fill")
+                                .foregroundColor(.orange)
+                            Text("Icona (opzionale)")
+                        }
+                    } footer: {
+                        Text(useEmoji ? "Seleziona un'emoji per rendere la categoria più riconoscibile" : "La categoria userà solo testo senza emoji")
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Aggiungi") {
+                        addCategory()
+                    }
+                    .disabled(categoryName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .fontWeight(.semibold)
+                    .foregroundColor(categoryName.isEmpty ? .secondary : .green)
+                }
+            }
+        }
+    }
+    
+    private func addCategory() {
+        let trimmedName = categoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalName = (useEmoji && !selectedEmoji.isEmpty) ? "\(selectedEmoji) \(trimmedName)" : trimmedName
+        
+        dataManager.addSalvadanaiCategory(finalName)
+        dismiss()
+    }
+}
+
+
+// MARK: - NUOVO: Category Picker View
+struct CategoryPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    @Binding var selectedCategory: String
+    let onNewCategory: () -> Void
+    
+    @State private var searchText = ""
+    
+    private var filteredCategories: [String] {
+        let allCategories = dataManager.allSalvadanaiCategories
+        if searchText.isEmpty {
+            return allCategories
+        } else {
+            return allCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                // Search bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Cerca categorie...", text: $searchText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.1))
+                )
+                .padding()
+                
+                List {
+                    // Categorie predefinite
+                    Section {
+                        ForEach(dataManager.defaultSalvadanaiCategories.filter { category in
+                            searchText.isEmpty || category.localizedCaseInsensitiveContains(searchText)
+                        }, id: \.self) { category in
+                            CategoryRowView(
+                                category: category,
+                                isSelected: selectedCategory == category,
+                                isCustom: false
+                            ) {
+                                selectedCategory = category
+                                dismiss()
+                            }
+                        }
+                    } header: {
+                        Text("Categorie Predefinite")
+                    }
+                    
+                    // Categorie personalizzate
+                    if !dataManager.customSalvadanaiCategories.isEmpty {
+                        Section {
+                            ForEach(dataManager.customSalvadanaiCategories.filter { category in
+                                searchText.isEmpty || category.localizedCaseInsensitiveContains(searchText)
+                            }, id: \.self) { category in
+                                CategoryRowView(
+                                    category: category,
+                                    isSelected: selectedCategory == category,
+                                    isCustom: true
+                                ) {
+                                    selectedCategory = category
+                                    dismiss()
+                                }
+                            }
+                        } header: {
+                            Text("Categorie Personalizzate")
+                        }
+                    }
+                    
+                    // Aggiungi nuova categoria
+                    Section {
+                        Button(action: {
+                            onNewCategory()
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Aggiungi nuova categoria")
+                                    .foregroundColor(.green)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .listStyle(InsetGroupedListStyle())
+            }
+            .navigationTitle("Seleziona Categoria")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - NUOVO: Category Row View
+struct CategoryRowView: View {
+    let category: String
+    let isSelected: Bool
+    let isCustom: Bool
+    let action: () -> Void
+    
+    private var categoryEmoji: String {
+        if let firstChar = category.first, firstChar.isEmoji {
+            return String(firstChar)
+        }
+        return ""
+    }
+    
+    private var categoryName: String {
+        if let firstChar = category.first, firstChar.isEmoji {
+            return String(category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return category
+    }
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                // Emoji o icona
+                if !categoryEmoji.isEmpty {
+                    Text(categoryEmoji)
+                        .font(.title3)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.gray.opacity(0.1))
+                        )
+                } else {
+                    Image(systemName: "folder.fill")
+                        .font(.title3)
+                        .foregroundColor(.orange)
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.orange.opacity(0.1))
+                        )
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(categoryName)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    
+                    HStack {
+                        Text(isCustom ? "Personalizzata" : "Predefinita")
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill((isCustom ? Color.purple : Color.blue).opacity(0.1))
+                            )
+                            .foregroundColor(isCustom ? .purple : .blue)
+                        
+                        Spacer()
+                    }
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.green)
+                }
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
