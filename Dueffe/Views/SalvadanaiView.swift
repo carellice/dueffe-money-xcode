@@ -231,34 +231,42 @@ struct CategoryFilterButton: View {
     }
 }
 
-// MARK: - Sostituisci SalvadanaiCardView nel file SalvadanaiView.swift
+// MARK: - Enhanced Salvadanaio Page Card - Accattivante con Gradienti
 struct SalvadanaiCardView: View {
     let salvadanaio: SalvadanaiModel
     @EnvironmentObject var dataManager: DataManager
+    @State private var isExpanded = false
     @State private var animateProgress = false
     @State private var animateGlow = false
-    @State private var animateFloating = false
-    @State private var showDetails = false
-    @State private var showTransactionsSheet = false
+    @State private var animateIcon = false
+    @State private var animateAmount = false
+    @State private var animateCoins = false
+    @State private var isPressed = false
     
     private var progress: Double {
-        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
-            guard salvadanaio.targetAmount > 0 else { return 0 }
-            if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.targetAmount, 1.0)
-        } else if salvadanaio.type == "glass" {
-            guard salvadanaio.monthlyRefill > 0 else { return 0 }
-            if salvadanaio.currentAmount < 0 { return 0 }
-            return min(salvadanaio.currentAmount / salvadanaio.monthlyRefill, 1.0)
+        // Per glass: currentAmount / monthlyRefill
+        if salvadanaio.type == "glass" {
+            let current = salvadanaio.currentAmount
+            let monthly = salvadanaio.monthlyRefill
+            
+            if current > 0 && monthly > 0 {
+                let result = current / monthly
+                return min(result, 1.0)
+            }
         }
+        
+        // Per obiettivi: currentAmount / targetAmount
+        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+            let current = salvadanaio.currentAmount
+            let target = salvadanaio.targetAmount
+            
+            if current > 0 && target > 0 {
+                let result = current / target
+                return min(result, 1.0)
+            }
+        }
+        
         return 0
-    }
-    
-    // Transazioni associate a questo salvadanaio
-    private var relatedTransactions: [TransactionModel] {
-        dataManager.transactions.filter { transaction in
-            transaction.salvadanaiName == salvadanaio.name
-        }.sorted { $0.date > $1.date }
     }
     
     // Funzione per convertire string colore in Color
@@ -280,440 +288,411 @@ struct SalvadanaiCardView: View {
         }
     }
     
-    // Status dell'obiettivo
-    private var statusInfo: (String, Color, String) {
+    private var cardGradient: LinearGradient {
+        let baseColor = getColor(from: salvadanaio.color)
+        
         if salvadanaio.currentAmount < 0 {
-            return ("In Rosso", .red, "exclamationmark.triangle.fill")
+            // Gradiente rosso per saldi negativi
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.red.opacity(0.9),
+                    Color.orange.opacity(0.8),
+                    Color.pink.opacity(0.7)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         } else if progress >= 1.0 && !salvadanaio.isInfinite {
-            return ("Completato!", .green, "checkmark.seal.fill")
-        } else if progress >= 0.8 && !salvadanaio.isInfinite {
-            return ("Quasi fatto!", .orange, "flame.fill")
-        } else if salvadanaio.isInfinite {
-            return ("Infinito", getColor(from: salvadanaio.color), "infinity")
+            // Gradiente dorato per obiettivi completati
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.yellow.opacity(0.9),
+                    Color.orange.opacity(0.8),
+                    baseColor.opacity(0.7)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         } else {
-            return ("In corso", getColor(from: salvadanaio.color), "arrow.up.circle.fill")
+            // Gradiente normale con il colore del salvadanaio
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    baseColor.opacity(0.9),
+                    baseColor.opacity(0.7),
+                    baseColor.opacity(0.8)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    private var statusInfo: (String, String, Color) {
+        if salvadanaio.currentAmount < 0 {
+            return ("⚠️", "In Rosso", .red)
+        } else if progress >= 1.0 && !salvadanaio.isInfinite {
+            return ("🎉", "Completato!", .yellow)
+        } else if progress >= 0.8 && !salvadanaio.isInfinite {
+            return ("🔥", "Quasi Fatto!", .orange)
+        } else if salvadanaio.isInfinite {
+            return ("♾️", "Infinito", getColor(from: salvadanaio.color))
+        } else {
+            return ("💪", "In Corso", getColor(from: salvadanaio.color))
+        }
+    }
+    
+    private var relatedTransactions: [TransactionModel] {
+        dataManager.transactions.filter { transaction in
+            transaction.salvadanaiName == salvadanaio.name
         }
     }
     
     var body: some View {
         Button(action: {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                showDetails.toggle()
+            withAnimation(.easeInOut(duration: 0.4)) {
+                isExpanded.toggle()
             }
         }) {
             VStack(spacing: 0) {
-                // Header compatto con gradiente colorato
                 ZStack {
-                    // Background gradiente animato
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            getColor(from: salvadanaio.color),
-                            getColor(from: salvadanaio.color).opacity(0.7)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .frame(height: 70)
-                    .overlay(
-                        // Effetto shimmer animato
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.clear,
-                                Color.white.opacity(animateGlow ? 0.3 : 0.1),
-                                Color.clear
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
+                    // Background con gradiente animato
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(cardGradient)
+                        .shadow(
+                            color: getColor(from: salvadanaio.color).opacity(animateGlow ? 0.4 : 0.2),
+                            radius: animateGlow ? 12 : 6,
+                            x: 0,
+                            y: animateGlow ? 6 : 3
                         )
-                        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
-                    )
+                        .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateGlow)
                     
-                    HStack(spacing: 12) {
-                        // Icona tipo animata con floating effect
+                    // Overlay decorativo
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(
+                            RadialGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.25),
+                                    Color.clear,
+                                    Color.black.opacity(0.1)
+                                ]),
+                                center: .topTrailing,
+                                startRadius: 20,
+                                endRadius: 120
+                            )
+                        )
+                    
+                    // Elementi decorativi fluttuanti
+                    GeometryReader { geometry in
                         ZStack {
+                            // Elementi decorativi fluttuanti + monete
                             Circle()
-                                .fill(Color.white.opacity(0.25))
-                                .frame(width: 44, height: 44)
-                                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                                .fill(Color.white.opacity(0.15))
+                                .frame(width: 50, height: 50)
+                                .position(x: geometry.size.width * 0.85, y: geometry.size.height * 0.25)
+                                .scaleEffect(animateIcon ? 1.2 : 0.8)
+                                .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateIcon)
                             
-                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-                                .fontWeight(.semibold)
-                        }
-                        .scaleEffect(animateFloating ? 1.1 : 1.0)
-                        .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateFloating)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(salvadanaio.name)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
+                            Circle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(width: 30, height: 30)
+                                .position(x: geometry.size.width * 0.15, y: geometry.size.height * 0.8)
+                                .scaleEffect(animateIcon ? 0.6 : 1.1)
+                                .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateIcon)
                             
-                            Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Obiettivo Infinito" : "Obiettivo") : "Glass Mensile")
+                            // Monete decorative che fluttuano
+                            Image(systemName: "dollarsign.circle.fill")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.9))
-                                .fontWeight(.medium)
-                        }
-                        
-                        Spacer()
-                        
-                        // Status badge animato
-                        VStack(spacing: 2) {
-                            Image(systemName: statusInfo.2)
-                                .font(.subheadline)
-                                .foregroundColor(.white)
+                                .foregroundColor(.white.opacity(0.3))
+                                .position(x: geometry.size.width * 0.8, y: geometry.size.height * 0.6)
+                                .scaleEffect(animateCoins ? 1.2 : 0.8)
+                                .rotationEffect(.degrees(animateCoins ? 15 : -15))
+                                .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateCoins)
                             
-                            Text(statusInfo.0)
+                            Image(systemName: "eurosign.circle")
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.9))
-                                .fontWeight(.medium)
-                        }
-                        .scaleEffect(statusInfo.0 == "Completato!" ? (animateFloating ? 1.2 : 1.0) : 1.0)
-                        .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateFloating)
-                    }
-                    .padding(.horizontal, 16)
-                }
-                
-                // Body con informazioni compatte
-                VStack(spacing: 12) {
-                    // Importo principale con animazione numerica
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Saldo Attuale")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.25))
+                                .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.4)
+                                .scaleEffect(animateCoins ? 0.7 : 1.0)
+                                .rotationEffect(.degrees(animateCoins ? -10 : 10))
+                                .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateCoins)
                             
-                            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                Text("€")
+                            // Stelline per stati speciali
+                            if progress >= 0.8 || salvadanaio.currentAmount < 0 {
+                                Image(systemName: "sparkles")
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                Text(String(format: "%.2f", abs(salvadanaio.currentAmount)))
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
-                                    .contentTransition(.numericText())
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        // Info obiettivo compatta con scadenza se presente
-                        if !salvadanaio.isInfinite {
-                            VStack(alignment: .trailing, spacing: 2) {
-                                if salvadanaio.type == "objective" {
-                                    Text("Obiettivo")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text("€\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(getColor(from: salvadanaio.color))
-                                    
-                                    // NUOVA: Scadenza nella parte non espansa
-                                    if let targetDate = salvadanaio.targetDate {
-                                        let daysRemaining = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
-                                        
-                                        HStack(spacing: 2) {
-                                            Image(systemName: "clock")
-                                                .font(.caption2)
-                                                .foregroundColor(daysRemaining < 30 ? .orange : .secondary)
-                                            
-                                            if daysRemaining > 0 {
-                                                Text("\(daysRemaining)g")
-                                                    .font(.caption2)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(daysRemaining < 30 ? .orange : .secondary)
-                                            } else {
-                                                Text("Scaduto")
-                                                    .font(.caption2)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(.red)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    Text("Glass Mensile")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                    Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill))")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(getColor(from: salvadanaio.color))
-                                }
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .position(x: geometry.size.width * 0.25, y: geometry.size.height * 0.3)
+                                    .scaleEffect(animateGlow ? 1.3 : 0.7)
+                                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
                             }
                         }
                     }
                     
-                    // Progress bar animata (solo se non infinito e non negativo) - CORRETTA
-                    if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
-                        VStack(spacing: 6) {
-                            HStack {
-                                Text("\(Int(progress * 100))%")
-                                    .font(.caption)
+                    // Contenuto principale
+                    VStack(spacing: 0) {
+                        // Contenuto sempre visibile
+                        HStack(spacing: 16) {
+                            // Icona principale animata con salvadanaio
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.25))
+                                    .frame(width: 48, height: 48)
+                                    .blur(radius: animateGlow ? 1 : 0)
+                                
+                                // Icona salvadanaio sempre riconoscibile
+                                Image(systemName: "banknote.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                                    .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
+                                
+                                // Mini icona tipo in overlay
+                                Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity.circle.fill" : "target") : "cup.and.saucer.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.3))
+                                            .frame(width: 16, height: 16)
+                                    )
+                                    .offset(x: 12, y: -12)
+                            }
+                            
+                            // Info principale
+                            VStack(alignment: .leading, spacing: 6) {
+                                // Nome salvadanaio
+                                Text(salvadanaio.name)
+                                    .font(isExpanded ? .headline : .subheadline)
                                     .fontWeight(.bold)
-                                    .foregroundColor(getColor(from: salvadanaio.color))
+                                    .foregroundColor(.white)
+                                    .lineLimit(isExpanded ? 3 : 1)
+                                    .fixedSize(horizontal: false, vertical: isExpanded)
                                 
-                                Spacer()
-                                
-                                if progress >= 1.0 {
-                                    Text("🎉 Completato!")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.green)
-                                } else {
-                                    Text("Mancano €\(String(format: "%.0f", (salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill) - salvadanaio.currentAmount))")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                                // Status e importo compatti
+                                HStack(spacing: 8) {
+                                    // Status badge
+                                    HStack(spacing: 4) {
+                                        Text(statusInfo.0)
+                                            .font(.caption)
+                                            .scaleEffect(statusInfo.0 == "🎉" ? (animateIcon ? 1.2 : 1.0) : 1.0)
+                                            .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateIcon)
+                                        
+                                        Text(statusInfo.1)
+                                            .font(.caption2)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white.opacity(0.9))
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.white.opacity(0.2))
+                                    )
+                                    
+                                    Spacer()
                                 }
                             }
                             
-                            // PROGRESS BAR CORRETTA - Usa GeometryReader per width dinamica
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(Color.gray.opacity(0.15))
-                                        .frame(height: 8)
+                            Spacer()
+                            
+                            // Importo principale
+                            VStack(alignment: .trailing, spacing: 4) {
+                                // Importo
+                                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                                    Text("€")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.8))
                                     
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(
-                                            LinearGradient(
-                                                gradient: Gradient(colors: [
-                                                    getColor(from: salvadanaio.color),
-                                                    getColor(from: salvadanaio.color).opacity(0.7),
-                                                    getColor(from: salvadanaio.color)
-                                                ]),
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .frame(width: max(0, geometry.size.width * (animateProgress ? progress : 0)), height: 8)
-                                        .shadow(color: getColor(from: salvadanaio.color).opacity(0.4), radius: 3, x: 0, y: 1)
-                                        .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
-                                    
-                                    // Effetto shimmer sulla progress bar
-                                    if progress > 0 {
-                                        RoundedRectangle(cornerRadius: 6)
+                                    Text(String(format: "%.0f", abs(salvadanaio.currentAmount)))
+                                        .font(isExpanded ? .title2 : .callout)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .scaleEffect(animateAmount ? 1.05 : 1.0)
+                                        .shadow(color: .white.opacity(0.5), radius: animateGlow ? 4 : 2)
+                                }
+                                
+                                // Freccia espansione
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                            }
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 16)
+                        
+                        // Progress bar sempre visibile (compatta)
+                        if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
+                            VStack(spacing: 8) {
+                                // Progress bar compatta
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        // Background
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.white.opacity(0.2))
+                                            .frame(height: 6)
+                                        
+                                        // Progress fill
+                                        RoundedRectangle(cornerRadius: 4)
                                             .fill(
                                                 LinearGradient(
                                                     gradient: Gradient(colors: [
-                                                        Color.clear,
-                                                        Color.white.opacity(0.6),
-                                                        Color.clear
+                                                        Color.white.opacity(0.9),
+                                                        Color.white.opacity(0.7),
+                                                        Color.white.opacity(0.9)
                                                     ]),
                                                     startPoint: .leading,
                                                     endPoint: .trailing
                                                 )
                                             )
-                                            .frame(width: max(0, geometry.size.width * progress), height: 8)
-                                            .opacity(animateGlow ? 0.8 : 0.0)
-                                            .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                            .frame(width: max(0, geometry.size.width * (animateProgress ? progress : 0)), height: 6)
+                                            .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 1)
+                                            .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
+                                        
+                                        // Shimmer effect
+                                        if progress > 0 {
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(
+                                                    LinearGradient(
+                                                        gradient: Gradient(colors: [
+                                                            Color.clear,
+                                                            Color.white.opacity(0.6),
+                                                            Color.clear
+                                                        ]),
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                                .frame(width: max(0, geometry.size.width * progress), height: 6)
+                                                .opacity(animateGlow ? 0.8 : 0.0)
+                                                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                        }
+                                    }
+                                }
+                                .frame(height: 6)
+                                
+                                // Info progress compatta
+                                HStack {
+                                    Text("\(Int(progress * 100))%")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                    
+                                    Spacer()
+                                    
+                                    if progress >= 1.0 {
+                                        Text("🏆 Completato!")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
+                                    } else {
+                                        Text("di €\(String(format: "%.0f", salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill))")
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.8))
                                     }
                                 }
                             }
-                            .frame(height: 8)
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 16)
                         }
-                    }
-                    
-                    // Info dettagliata (condizionale e compatta) + TRANSAZIONI
-                    if showDetails {
-                        VStack(spacing: 8) {
-                            // NUOVA SEZIONE: Categoria e Transazioni correlate
-                            if !relatedTransactions.isEmpty {
-                                VStack(spacing: 8) {
-                                    Divider()
-                                    
-                                    // NUOVO: Mostra categoria del salvadanaio
-                                    HStack {
-                                        HStack(spacing: 6) {
-                                            // Emoji categoria se presente
-                                            if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
-                                                Text(String(firstChar))
-                                                    .font(.caption)
-                                            } else {
-                                                Image(systemName: "folder.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.orange)
-                                            }
+                        
+                        // Contenuto espandibile
+                        if isExpanded {
+                            VStack(spacing: 0) {
+                                // Separatore
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 18)
+                                
+                                // Dettagli espansi
+                                VStack(alignment: .leading, spacing: 14) {
+                                    // Tipo e data
+                                    HStack(spacing: 12) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "tag")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .frame(width: 20)
                                             
-                                            Text("Categoria:")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            
-                                            // Nome categoria senza emoji
-                                            let categoryName = {
-                                                if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
-                                                    return String(salvadanaio.category.dropFirst()).trimmingCharacters(in: .whitespaces)
-                                                }
-                                                return salvadanaio.category
-                                            }()
-                                            
-                                            Text(categoryName)
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.orange)
+                                            Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Obiettivo Infinito" : "Obiettivo con Target") : "Glass Jar")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.9))
                                         }
                                         
                                         Spacer()
                                     }
                                     
-                                    HStack {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: "creditcard.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.blue)
-                                            Text("Transazioni Recenti")
-                                                .font(.caption)
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.blue)
-                                        }
+                                    // Data creazione
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "calendar")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .frame(width: 20)
                                         
-                                        Spacer()
-                                        
-                                        if relatedTransactions.count > 3 {
-                                            Button(action: {
-                                                showTransactionsSheet = true
-                                            }) {
-                                                HStack(spacing: 4) {
-                                                    Text("Vedi tutte (\(relatedTransactions.count))")
-                                                        .font(.caption2)
-                                                        .fontWeight(.medium)
-                                                    Image(systemName: "chevron.right")
-                                                        .font(.caption2)
-                                                }
-                                                .foregroundColor(.blue)
-                                            }
-                                            .buttonStyle(PlainButtonStyle())
-                                        } else {
-                                            Text("\(relatedTransactions.count) totali")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    
-                                    // Mostra ultime 3 transazioni
-                                    VStack(spacing: 6) {
-                                        ForEach(Array(relatedTransactions.prefix(3)), id: \.id) { transaction in
-                                            CompactTransactionRowInCard(transaction: transaction)
-                                        }
-                                        
-                                        if relatedTransactions.count > 3 {
-                                            HStack {
-                                                Image(systemName: "ellipsis")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                                Text("e altre \(relatedTransactions.count - 3)")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                                Spacer()
-                                                
-                                                Button("Vedi tutte") {
-                                                    showTransactionsSheet = true
-                                                }
-                                                .font(.caption2)
-                                                .foregroundColor(.blue)
-                                                .buttonStyle(PlainButtonStyle())
-                                            }
-                                            .padding(.top, 4)
-                                        }
-                                    }
-                                }
-                            } else {
-                                VStack(spacing: 8) {
-                                    Divider()
-                                    
-                                    // NUOVO: Mostra categoria anche quando non ci sono transazioni
-                                    HStack {
-                                        HStack(spacing: 6) {
-                                            // Emoji categoria se presente
-                                            if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
-                                                Text(String(firstChar))
-                                                    .font(.caption)
-                                            } else {
-                                                Image(systemName: "folder.fill")
-                                                    .font(.caption)
-                                                    .foregroundColor(.orange)
-                                            }
-                                            
-                                            Text("Categoria:")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            
-                                            // Nome categoria senza emoji
-                                            let categoryName = {
-                                                if let firstChar = salvadanaio.category.first, firstChar.isEmoji {
-                                                    return String(salvadanaio.category.dropFirst()).trimmingCharacters(in: .whitespaces)
-                                                }
-                                                return salvadanaio.category
-                                            }()
-                                            
-                                            Text(categoryName)
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.orange)
-                                        }
+                                        Text("Creato il \(salvadanaio.createdAt, format: .dateTime.day().month(.wide).year())")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
                                         
                                         Spacer()
                                     }
                                     
-                                    HStack {
-                                        Image(systemName: "info.circle")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Text("Nessuna transazione ancora")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
+                                    // Transazioni correlate
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "list.bullet")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .frame(width: 20)
+                                        
+                                        Text("\(relatedTransactions.count) transazioni collegate")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
+                                        
                                         Spacer()
                                     }
                                 }
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 16)
                             }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .top)),
-                            removal: .opacity.combined(with: .move(edge: .top))
-                        ))
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
             }
         }
         .buttonStyle(PlainButtonStyle())
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: getColor(from: salvadanaio.color).opacity(0.2), radius: animateGlow ? 12 : 6, x: 0, y: animateGlow ? 6 : 3)
-        .scaleEffect(showDetails ? 1.02 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showDetails)
-        .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            getColor(from: salvadanaio.color).opacity(0.3),
-                            getColor(from: salvadanaio.color).opacity(0.1)
-                        ]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                animateProgress = true
-                animateGlow = true
-                animateFloating = true
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
             }
+        }) {
+            // Long press action
         }
-        .sheet(isPresented: $showTransactionsSheet) {
-            SalvadanaiTransactionsDetailView(
-                salvadanaio: salvadanaio,
-                transactions: relatedTransactions
-            )
+        .onAppear {
+            // Animazioni con delay casuali
+            let delay = Double.random(in: 0.2...0.6)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animateAmount = true
+                }
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    animateGlow = true
+                }
+                withAnimation(.easeInOut(duration: 1.5)) {
+                    animateIcon = true
+                }
+                withAnimation(.easeInOut(duration: 2.0)) {
+                    animateCoins = true
+                }
+                withAnimation(.easeOut(duration: 1.5).delay(0.3)) {
+                    animateProgress = true
+                }
+            }
         }
     }
 }
