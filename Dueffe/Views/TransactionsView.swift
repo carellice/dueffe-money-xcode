@@ -322,6 +322,7 @@ struct TransactionSectionHeaderView: View {
 }
 
 // MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
+// MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
 struct TransactionRowView: View {
     let transaction: TransactionModel
     @State private var animateAmount = false
@@ -556,6 +557,22 @@ struct TransactionRowView: View {
                                             .font(.subheadline)
                                             .fontWeight(.semibold)
                                             .foregroundColor(.white)
+                                    }
+                                    
+                                    // Conto utilizzato (solo per spese, entrate e stipendi)
+                                    if !transaction.accountName.isEmpty && (transaction.type == "expense" || transaction.type == "income" || transaction.type == "salary") {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: "building.columns")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .frame(width: 20)
+                                            
+                                            Text("Conto: \(transaction.accountName)")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            Spacer()
+                                        }
                                     }
                                     
                                     // Tipo transazione
