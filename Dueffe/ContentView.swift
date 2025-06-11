@@ -1896,10 +1896,14 @@ struct FloatingActionButton: View {
     }
 }
 
-// MARK: - Beautiful Simple Salvadanaio Card
-// MARK: - Beautiful Simple Salvadanaio Card
+// MARK: - Enhanced Home Salvadanaio Card - Accattivante e Animata
 struct ImprovedSalvadanaiHomeCard: View {
     let salvadanaio: SalvadanaiModel
+    @State private var animateProgress = false
+    @State private var animateGlow = false
+    @State private var animateIcon = false
+    @State private var animateAmount = false
+    @State private var isPressed = false
     
     private var progress: Double {
         // Per glass: currentAmount / monthlyRefill
@@ -1942,88 +1946,331 @@ struct ImprovedSalvadanaiHomeCard: View {
         case "teal": return .teal
         case "cyan": return .cyan
         case "brown": return .brown
-        default: return .blue // Default fallback
+        default: return .blue
+        }
+    }
+    
+    private var cardGradient: LinearGradient {
+        let baseColor = getColor(from: salvadanaio.color)
+        
+        if salvadanaio.currentAmount < 0 {
+            // Gradiente rosso per saldi negativi
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.red.opacity(0.8),
+                    Color.orange.opacity(0.7),
+                    Color.pink.opacity(0.6)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if progress >= 1.0 && !salvadanaio.isInfinite {
+            // Gradiente dorato per obiettivi completati
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.yellow.opacity(0.8),
+                    Color.orange.opacity(0.7),
+                    baseColor.opacity(0.6)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            // Gradiente normale con il colore del salvadanaio
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    baseColor.opacity(0.8),
+                    baseColor.opacity(0.6),
+                    baseColor.opacity(0.7)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    private var statusInfo: (String, String, Color) {
+        if salvadanaio.currentAmount < 0 {
+            return ("⚠️", "In Rosso", .red)
+        } else if progress >= 1.0 && !salvadanaio.isInfinite {
+            return ("🎉", "Completato!", .yellow)
+        } else if progress >= 0.8 && !salvadanaio.isInfinite {
+            return ("🔥", "Quasi Fatto!", .orange)
+        } else if salvadanaio.isInfinite {
+            return ("♾️", "Infinito", getColor(from: salvadanaio.color))
+        } else {
+            return ("💪", "In Corso", getColor(from: salvadanaio.color))
         }
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header semplice
-            HStack {
-                Text(salvadanaio.name)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
+        Button(action: {
+            // Azione per aprire dettagli salvadanaio
+        }) {
+            ZStack {
+                // Background card con gradiente animato
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardGradient)
+                    .frame(width: 200, height: 150)
+                    .shadow(
+                        color: getColor(from: salvadanaio.color).opacity(animateGlow ? 0.4 : 0.2),
+                        radius: animateGlow ? 15 : 8,
+                        x: 0,
+                        y: animateGlow ? 8 : 4
+                    )
+                    .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateGlow)
                 
-                Spacer()
+                // Overlay decorativo
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                Color.white.opacity(0.3),
+                                Color.clear,
+                                Color.black.opacity(0.1)
+                            ]),
+                            center: .topTrailing,
+                            startRadius: 10,
+                            endRadius: 100
+                        )
+                    )
+                    .frame(width: 200, height: 150)
                 
-                // Status semplice
-                if salvadanaio.currentAmount < 0 {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.red)
-                } else if progress >= 1.0 {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                } else if salvadanaio.isInfinite {
-                    Image(systemName: "infinity")
-                        .foregroundColor(getColor(from: salvadanaio.color))
+                // Elementi decorativi fluttuanti
+                GeometryReader { geometry in
+                    ZStack {
+                        // Cerchi decorativi
+                        Circle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 40, height: 40)
+                            .position(x: geometry.size.width * 0.8, y: geometry.size.height * 0.25)
+                            .scaleEffect(animateIcon ? 1.2 : 0.8)
+                            .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateIcon)
+                        
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 25, height: 25)
+                            .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.8)
+                            .scaleEffect(animateIcon ? 0.6 : 1.1)
+                            .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateIcon)
+                        
+                        // Stelline decorative
+                        if progress >= 0.8 || salvadanaio.currentAmount < 0 {
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.6))
+                                .position(x: geometry.size.width * 0.25, y: geometry.size.height * 0.3)
+                                .scaleEffect(animateGlow ? 1.3 : 0.7)
+                                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                        }
+                    }
                 }
-            }
-            
-            // Importo grande
-            Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
-            
-            // SEMPRE mostra progress (anche per test)
-            if !salvadanaio.isInfinite {
-                VStack(spacing: 8) {
+                .frame(width: 200, height: 150)
+                
+                // Contenuto principale
+                VStack(spacing: 10) {
+                    // Header con icona e status
                     HStack {
-                        if salvadanaio.type == "objective" {
-                            Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill)) mensili")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        // Icona tipo salvadanaio animata
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.25))
+                                .frame(width: 36, height: 36)
+                                .blur(radius: animateGlow ? 1 : 0)
+                            
+                            Image(systemName: salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "infinity" : "target") : "cup.and.saucer.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                                .scaleEffect(animateIcon ? 1.1 : 1.0)
+                                .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
                         }
                         
                         Spacer()
                         
-                        Text("\(Int(progress * 100))%")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(getColor(from: salvadanaio.color))
+                        // Status badge animato
+                        HStack(spacing: 4) {
+                            Text(statusInfo.0)
+                                .font(.caption)
+                                .scaleEffect(statusInfo.0 == "🎉" ? (animateIcon ? 1.2 : 1.0) : 1.0)
+                                .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateIcon)
+                            
+                            Text(statusInfo.1)
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.2))
+                        )
+                    }
+                    .padding(.top, 4)
+                    
+                    // Nome e importo
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Nome salvadanaio
+                        HStack {
+                            Text(salvadanaio.name)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                            
+                            Spacer()
+                        }
+                        
+                        // Importo con animazione
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("€")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text(String(format: "%.0f", abs(salvadanaio.currentAmount)))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .contentTransition(.numericText())
+                                .scaleEffect(animateAmount ? 1.05 : 1.0)
+                                .shadow(color: .white.opacity(0.5), radius: animateGlow ? 4 : 2)
+                            
+                            Spacer()
+                        }
                     }
                     
-                    // Progress bar che FUNZIONA con colori corretti
-                    ProgressView(value: progress)
-                        .progressViewStyle(LinearProgressViewStyle(tint: getColor(from: salvadanaio.color)))
-                        .scaleEffect(y: 2)
+                    // Progress o info obiettivo
+                    if !salvadanaio.isInfinite && salvadanaio.currentAmount >= 0 {
+                        VStack(spacing: 6) {
+                            // Progress bar migliorata
+                            GeometryReader { geometry in
+                                ZStack(alignment: .leading) {
+                                    // Background
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color.white.opacity(0.2))
+                                        .frame(height: 6)
+                                    
+                                    // Progress fill
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(
+                                            LinearGradient(
+                                                gradient: Gradient(colors: [
+                                                    Color.white.opacity(0.9),
+                                                    Color.white.opacity(0.7),
+                                                    Color.white.opacity(0.9)
+                                                ]),
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: max(0, geometry.size.width * (animateProgress ? progress : 0)), height: 6)
+                                        .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 1)
+                                        .animation(.easeOut(duration: 1.5).delay(0.5), value: animateProgress)
+                                    
+                                    // Shimmer effect
+                                    if progress > 0 {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    gradient: Gradient(colors: [
+                                                        Color.clear,
+                                                        Color.white.opacity(0.8),
+                                                        Color.clear
+                                                    ]),
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: max(0, geometry.size.width * progress), height: 6)
+                                            .opacity(animateGlow ? 0.8 : 0.0)
+                                            .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: animateGlow)
+                                    }
+                                }
+                            }
+                            .frame(height: 6)
+                            
+                            HStack {
+                                Text("\(Int(progress * 100))%")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                                
+                                if progress >= 1.0 {
+                                    Text("🏆 Fatto!")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                } else {
+                                    Text("di €\(String(format: "%.0f", salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill))")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                            }
+                        }
+                        .padding(.bottom, 4)
+                    } else if salvadanaio.isInfinite {
+                        // Info per infiniti
+                        HStack {
+                            Image(systemName: "infinity")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                            Text("Crescita continua")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.9))
+                            Spacer()
+                        }
+                        .padding(.bottom, 4)
+                    } else {
+                        // Info per saldi negativi
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                            Text("Recupera €\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.bottom, 4)
+                    }
                 }
-            } else {
-                // Info per infiniti
-                Text("Obiettivo senza limiti")
-                    .font(.subheadline)
-                    .foregroundColor(getColor(from: salvadanaio.color))
-                    .fontWeight(.medium)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 24)
             }
         }
-        .padding(20)
-        .frame(width: 190, height: 140)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 3)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(getColor(from: salvadanaio.color), lineWidth: 2)
-        )
-        .padding(.vertical, 4)
+        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }) {
+            // Long press action
+        }
+        .onAppear {
+            // Animazioni con delay per effetto staggered
+            let delay = Double.random(in: 0.2...0.6)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    animateAmount = true
+                }
+                withAnimation(.easeInOut(duration: 1.2)) {
+                    animateGlow = true
+                }
+                withAnimation(.easeInOut(duration: 1.5)) {
+                    animateIcon = true
+                }
+                withAnimation(.easeOut(duration: 1.5).delay(0.3)) {
+                    animateProgress = true
+                }
+            }
+        }
     }
 }
 
