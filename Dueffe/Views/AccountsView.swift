@@ -90,6 +90,84 @@ struct AccountsView: View {
     }
 }
 
+// MARK: - Versione alternativa ancora più minimalista
+struct MinimalAccountsStatsHeader: View {
+    let totalBalance: Double
+    let accountCount: Int
+    let accounts: [AccountModel]
+    
+    private var positiveAccounts: Int {
+        accounts.filter { $0.balance > 0 }.count
+    }
+    
+    private var negativeAccounts: Int {
+        accounts.filter { $0.balance < 0 }.count
+    }
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // Solo bilancio - RIMOSSO numero conti
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Bilancio Totale")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("€")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Text(String(format: "%.2f", totalBalance))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(totalBalance >= 0 ? .primary : .red)
+                    }
+                }
+                
+                Spacer()
+                
+                // Solo statistiche positivi/negativi - RIMOSSO contatore totale
+                VStack(alignment: .trailing, spacing: 2) {
+                    if positiveAccounts > 0 && negativeAccounts > 0 {
+                        HStack(spacing: 8) {
+                            Text("\(positiveAccounts)+ ")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                                .fontWeight(.medium)
+                            
+                            Text("\(negativeAccounts)-")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .fontWeight(.medium)
+                        }
+                    } else if positiveAccounts > 0 {
+                        Text("\(positiveAccounts) in positivo")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    } else if negativeAccounts > 0 {
+                        Text("\(negativeAccounts) in rosso")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .fontWeight(.medium)
+                    }
+                    
+                    Text(totalBalance >= 0 ? "Situazione buona" : "Attenzione")
+                        .font(.caption2)
+                        .foregroundColor(totalBalance >= 0 ? .green : .red)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+        )
+    }
+}
+
 // MARK: - Empty State View
 struct EmptyStateView: View {
     let icon: String
@@ -126,93 +204,6 @@ struct EmptyStateView: View {
             }
         }
         .padding(40)
-    }
-}
-
-// MARK: - Accounts Stats Header
-struct AccountsStatsHeader: View {
-    let totalBalance: Double
-    let accountCount: Int
-    let accounts: [AccountModel]
-    
-    private var positiveAccounts: Int {
-        accounts.filter { $0.balance > 0 }.count
-    }
-    
-    private var negativeAccounts: Int {
-        accounts.filter { $0.balance < 0 }.count
-    }
-    
-    private var averageBalance: Double {
-        guard !accounts.isEmpty else { return 0 }
-        return totalBalance / Double(accounts.count)
-    }
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            // Bilancio totale
-            VStack(spacing: 8) {
-                Text("Bilancio Totale")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("€")
-                        .font(.title)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    Text(String(format: "%.2f", totalBalance))
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(totalBalance >= 0 ? .primary : .red)
-                        .contentTransition(.numericText())
-                }
-                
-                Text(totalBalance >= 0 ? "Patrimonio positivo" : "Attenzione al bilancio")
-                    .font(.caption)
-                    .foregroundColor(totalBalance >= 0 ? .green : .red)
-                    .fontWeight(.medium)
-            }
-            
-            // Statistiche dettagliate
-            HStack(spacing: 16) {
-                AccountStatCard(
-                    title: "Conti Totali",
-                    value: "\(accountCount)",
-                    icon: "building.columns.fill",
-                    color: .blue
-                )
-                
-                AccountStatCard(
-                    title: "In Positivo",
-                    value: "\(positiveAccounts)",
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                )
-                
-                AccountStatCard(
-                    title: "Media",
-                    value: "€\(String(format: "%.0f", averageBalance))",
-                    icon: "chart.bar.fill",
-                    color: .orange
-                )
-                
-                if negativeAccounts > 0 {
-                    AccountStatCard(
-                        title: "In Rosso",
-                        value: "\(negativeAccounts)",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .red
-                    )
-                }
-            }
-        }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
-        )
     }
 }
 
@@ -1469,262 +1460,6 @@ struct AccountPreviewCard: View {
                         .stroke(hasChanges ? Color.orange.opacity(0.3) : Color.blue.opacity(0.2), lineWidth: 1)
                 )
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        )
-    }
-}
-
-// MARK: - Compact Accounts Stats Header (MOLTO PIÙ COMPATTO)
-struct CompactAccountsStatsHeader: View {
-    let totalBalance: Double
-    let accountCount: Int
-    let accounts: [AccountModel]
-    
-    private var positiveAccounts: Int {
-        accounts.filter { $0.balance > 0 }.count
-    }
-    
-    private var negativeAccounts: Int {
-        accounts.filter { $0.balance < 0 }.count
-    }
-    
-    private var averageBalance: Double {
-        guard !accounts.isEmpty else { return 0 }
-        return totalBalance / Double(accounts.count)
-    }
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            // Bilancio principale - più compatto
-            VStack(spacing: 6) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("€")
-                        .font(.title3)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    Text(String(format: "%.2f", totalBalance))
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(totalBalance >= 0 ? .primary : .red)
-                        .contentTransition(.numericText())
-                }
-                
-                Text("Bilancio Totale")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Statistiche in una riga orizzontale compatta
-            HStack(spacing: 16) {
-                CompactStatItem(
-                    title: "Conti",
-                    value: "\(accountCount)",
-                    icon: "building.columns.fill",
-                    color: .blue
-                )
-                
-                Divider()
-                    .frame(height: 24)
-                
-                CompactStatItem(
-                    title: "Positivi",
-                    value: "\(positiveAccounts)",
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                )
-                
-                Divider()
-                    .frame(height: 24)
-                
-                CompactStatItem(
-                    title: "Media",
-                    value: "€\(String(format: "%.0f", averageBalance))",
-                    icon: "chart.bar.fill",
-                    color: .orange
-                )
-                
-                if negativeAccounts > 0 {
-                    Divider()
-                        .frame(height: 24)
-                    
-                    CompactStatItem(
-                        title: "In Rosso",
-                        value: "\(negativeAccounts)",
-                        icon: "exclamationmark.triangle.fill",
-                        color: .red
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16) // Ridotto da 24 a 16
-        .background(
-            RoundedRectangle(cornerRadius: 16) // Ridotto da 20 a 16
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4) // Ridotta ombra
-        )
-    }
-}
-
-// MARK: - Compact Stat Item (MOLTO PIÙ PICCOLO)
-struct CompactStatItem: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 4) { // Ridotto da 8 a 4
-            Image(systemName: icon)
-                .font(.subheadline) // Ridotto da .title2 a .subheadline
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.subheadline) // Ridotto da .headline a .subheadline
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            
-            Text(title)
-                .font(.caption2) // Ridotto da .caption a .caption2
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Versione alternativa ancora più minimalista
-struct MinimalAccountsStatsHeader: View {
-    let totalBalance: Double
-    let accountCount: Int
-    let accounts: [AccountModel]
-    
-    private var positiveAccounts: Int {
-        accounts.filter { $0.balance > 0 }.count
-    }
-    
-    private var negativeAccounts: Int {
-        accounts.filter { $0.balance < 0 }.count
-    }
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            // Solo bilancio - RIMOSSO numero conti
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Bilancio Totale")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("€")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Text(String(format: "%.2f", totalBalance))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(totalBalance >= 0 ? .primary : .red)
-                    }
-                }
-                
-                Spacer()
-                
-                // Solo statistiche positivi/negativi - RIMOSSO contatore totale
-                VStack(alignment: .trailing, spacing: 2) {
-                    if positiveAccounts > 0 && negativeAccounts > 0 {
-                        HStack(spacing: 8) {
-                            Text("\(positiveAccounts)+ ")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                                .fontWeight(.medium)
-                            
-                            Text("\(negativeAccounts)-")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .fontWeight(.medium)
-                        }
-                    } else if positiveAccounts > 0 {
-                        Text("\(positiveAccounts) in positivo")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                            .fontWeight(.medium)
-                    } else if negativeAccounts > 0 {
-                        Text("\(negativeAccounts) in rosso")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Text(totalBalance >= 0 ? "Situazione buona" : "Attenzione")
-                        .font(.caption2)
-                        .foregroundColor(totalBalance >= 0 ? .green : .red)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-        )
-    }
-}
-
-// MARK: - Versione ultra-compatta (una sola riga)
-struct UltraCompactAccountsHeader: View {
-    let totalBalance: Double
-    let accountCount: Int
-    let accounts: [AccountModel]
-    
-    private var positiveAccounts: Int {
-        accounts.filter { $0.balance > 0 }.count
-    }
-    
-    var body: some View {
-        HStack {
-            // Bilancio
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text("€")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                Text(String(format: "%.2f", totalBalance))
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(totalBalance >= 0 ? .primary : .red)
-            }
-            
-            Spacer()
-            
-            // Stats compatte
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "building.columns.fill")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                    Text("\(accountCount)")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.blue)
-                }
-                
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    Text("\(positiveAccounts)")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.ultraThinMaterial)
         )
     }
 }

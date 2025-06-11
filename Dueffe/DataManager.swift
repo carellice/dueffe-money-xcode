@@ -636,13 +636,4 @@ extension DataManager {
     var totalSavings: Double {
         salvadanai.reduce(0) { $0 + $1.currentAmount }
     }
-    
-    var availableBalance: Double {
-        let positiveSavings = salvadanai.filter { $0.currentAmount > 0 }.reduce(0) { $0 + $1.currentAmount }
-        return totalBalance + positiveSavings
-    }
-    
-    var recentTransactions: [TransactionModel] {
-        transactions.sorted { $0.date > $1.date }
-    }
 }

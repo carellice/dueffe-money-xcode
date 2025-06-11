@@ -1896,41 +1896,6 @@ struct FloatingActionButton: View {
     }
 }
 
-// MARK: - Balance Breakdown Card
-struct BalanceBreakdownCard: View {
-    let title: String
-    let amount: Double
-    let color: Color
-    let icon: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundColor(color)
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Text("€\(String(format: "%.2f", amount))")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundColor(color)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-}
-
 // MARK: - Beautiful Simple Salvadanaio Card
 // MARK: - Beautiful Simple Salvadanaio Card
 struct ImprovedSalvadanaiHomeCard: View {
@@ -2365,65 +2330,6 @@ struct ImprovedHomeTransactionRow: View {
     }
 }
 
-// MARK: - Improved Quick Action Card
-struct ImprovedQuickActionCard: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let colors: [Color]
-    let action: () -> Void
-    @State private var isPressed = false
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: colors),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 60, height: 60)
-                        .shadow(color: colors.first?.opacity(0.3) ?? .clear, radius: 8, x: 0, y: 4)
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 28))
-                        .foregroundColor(.white)
-                }
-                
-                VStack(spacing: 4) {
-                    Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.center)
-                    
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(24)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-            )
-        }
-        .scaleEffect(isPressed ? 0.95 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            isPressed = pressing
-        }) {
-            // Action eseguita nel button action
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
 // MARK: - Enhanced Wealth Card (MODIFICATA - solo conti)
 struct EnhancedWealthCard: View {
     let totalBalance: Double
@@ -2598,43 +2504,6 @@ struct EnhancedWealthCard: View {
             }
             withAnimation(.easeInOut(duration: 1.2)) {
                 animateGlow = true
-            }
-        }
-    }
-}
-
-// MARK: - Wealth Breakdown Item
-struct WealthBreakdownItem: View {
-    let title: String
-    let amount: Double
-    let icon: String
-    let color: Color
-    let animate: Bool
-    @State private var itemAnimate = false
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(color)
-                .scaleEffect(itemAnimate ? 1.1 : 1.0)
-                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: itemAnimate)
-            
-            Text("€\(String(format: "%.0f", amount))")
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-                .contentTransition(.numericText())
-            
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(color.opacity(0.8))
-        }
-        .frame(maxWidth: .infinity)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                itemAnimate = true
             }
         }
     }

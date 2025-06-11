@@ -208,74 +208,6 @@ struct SettingsStatCard: View {
     }
 }
 
-// MARK: - App Info Card
-struct AppInfoCard: View {
-    @State private var animateIcon = false
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(
-                        gradient: Gradient(colors: [.blue, .purple]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ))
-                    .frame(width: 80, height: 80)
-                    .shadow(color: .blue.opacity(0.3), radius: 15, x: 0, y: 8)
-                    .scaleEffect(animateIcon ? 1.05 : 1.0)
-                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
-                
-                Image(systemName: "app.badge.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.white)
-            }
-            
-            VStack(spacing: 8) {
-                Text("Dueffe")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("La tua app per il risparmio intelligente")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                
-                HStack {
-                    Text("Versione 1.0")
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.blue.opacity(0.1))
-                        )
-                        .foregroundColor(.blue)
-                    
-                    Text("Aggiornata")
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(
-                            Capsule()
-                                .fill(Color.green.opacity(0.1))
-                        )
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
-        )
-        .onAppear {
-            animateIcon = true
-        }
-    }
-}
-
 // MARK: - Section Header
 struct SectionHeader: View {
     let icon: String
@@ -451,42 +383,6 @@ struct AppStatisticsCard: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
-        )
-    }
-}
-
-// MARK: - Stat Card
-struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
         )
     }
 }
