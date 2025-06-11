@@ -232,6 +232,7 @@ struct CategoryFilterButton: View {
 }
 
 // MARK: - Enhanced Salvadanaio Page Card - Accattivante con Gradienti
+// MARK: - Enhanced Salvadanaio Page Card - Accattivante con Gradienti
 struct SalvadanaiCardView: View {
     let salvadanaio: SalvadanaiModel
     @EnvironmentObject var dataManager: DataManager
@@ -469,49 +470,44 @@ struct SalvadanaiCardView: View {
                                     .lineLimit(isExpanded ? 3 : 1)
                                     .fixedSize(horizontal: false, vertical: isExpanded)
                                 
-                                // Status e categoria
-                                HStack(spacing: 8) {
-                                    // Status badge
+                                // Status badge
+                                HStack(spacing: 4) {
+                                    Text(statusInfo.0)
+                                        .font(.caption)
+                                        .scaleEffect(statusInfo.0 == "🎉" ? (animateIcon ? 1.2 : 1.0) : 1.0)
+                                        .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateIcon)
+                                    
+                                    Text(statusInfo.1)
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.2))
+                                )
+                                
+                                // Categoria del salvadanaio (sotto lo status)
+                                if !salvadanaio.category.isEmpty {
                                     HStack(spacing: 4) {
-                                        Text(statusInfo.0)
-                                            .font(.caption)
-                                            .scaleEffect(statusInfo.0 == "🎉" ? (animateIcon ? 1.2 : 1.0) : 1.0)
-                                            .animation(.spring(response: 0.6, dampingFraction: 0.5).repeatForever(autoreverses: true), value: animateIcon)
-                                        
-                                        Text(statusInfo.1)
+                                        Image(systemName: "tag.fill")
                                             .font(.caption2)
-                                            .fontWeight(.semibold)
+                                            .foregroundColor(.white.opacity(0.7))
+                                        
+                                        Text(salvadanaio.category)
+                                            .font(.caption2)
+                                            .fontWeight(.medium)
                                             .foregroundColor(.white.opacity(0.9))
+                                            .lineLimit(1)
                                     }
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
                                     .background(
                                         Capsule()
-                                            .fill(Color.white.opacity(0.2))
+                                            .fill(Color.white.opacity(0.15))
                                     )
-                                    
-                                    // Categoria del salvadanaio
-                                    if !salvadanaio.category.isEmpty {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "tag.fill")
-                                                .font(.caption2)
-                                                .foregroundColor(.white.opacity(0.7))
-                                            
-                                            Text(salvadanaio.category)
-                                                .font(.caption2)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.white.opacity(0.9))
-                                                .lineLimit(1)
-                                        }
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(
-                                            Capsule()
-                                                .fill(Color.white.opacity(0.15))
-                                        )
-                                    }
-                                    
-                                    Spacer()
                                 }
                             }
                             
