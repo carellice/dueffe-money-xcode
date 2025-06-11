@@ -162,7 +162,13 @@ struct SettingsView: View {
             dataManager.accounts.removeAll()
             dataManager.customExpenseCategories.removeAll()
             dataManager.customIncomeCategories.removeAll()
+            dataManager.customSalvadanaiCategories.removeAll()
         }
+        
+        // NUOVO: Reset dei flag di onboarding
+        UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+        UserDefaults.standard.removeObject(forKey: "hasCreatedFirstSalvadanaio")
+        UserDefaults.standard.removeObject(forKey: "hasAddedInitialBalance")
         
         // Mostra feedback di successo
         let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
