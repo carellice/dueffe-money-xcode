@@ -237,21 +237,16 @@ struct AccountStatCard: View {
     }
 }
 
-// MARK: - Enhanced Account Card con Context Menu
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card SENZA Context Menu (Solo Menu Button)
-// MARK: - Enhanced Account Card con UN SOLO Menu Button
-// MARK: - Enhanced Account Card con UN SOLO Menu Button
+// MARK: - Enhanced Account Card con Animazioni e Design Compatto
 struct EnhancedAccountCard: View {
     let account: AccountModel
     @EnvironmentObject var dataManager: DataManager
     @State private var isPressed = false
     @State private var showingDeleteAlert = false
     @State private var showingEditSheet = false
+    @State private var animateBalance = false
+    @State private var animateGlow = false
+    @State private var animateIcon = false
     
     private var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter { $0.accountName == account.name }
@@ -264,152 +259,255 @@ struct EnhancedAccountCard: View {
         } else if name.contains("risparmio") {
             return "dollarsign.circle.fill"
         } else if name.contains("contanti") || name.contains("cash") {
-            return "dollarsign.circle.fill"
+            return "banknote.fill"
         } else {
             return "building.columns.fill"
         }
     }
     
+    private var cardGradient: LinearGradient {
+        if account.balance >= 0 {
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.blue.opacity(0.8),
+                    Color.indigo.opacity(0.9),
+                    Color.purple.opacity(0.7)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.red.opacity(0.8),
+                    Color.orange.opacity(0.9),
+                    Color.pink.opacity(0.7)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    private var statusInfo: (String, Color, String) {
+        if account.balance < 0 {
+            return ("In Rosso", .red, "exclamationmark.triangle.fill")
+        } else if account.balance >= 10000 {
+            return ("Eccellente", .green, "star.fill")
+        } else if account.balance >= 1000 {
+            return ("Buono", .blue, "checkmark.circle.fill")
+        } else {
+            return ("In Crescita", .orange, "arrow.up.circle.fill")
+        }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Header con menu button al posto dello status indicator
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [.blue, .indigo]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 56, height: 56)
-                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
-                    
-                    Image(systemName: accountIcon)
-                        .font(.title2)
-                        .foregroundColor(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(account.name)
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .lineLimit(2)
-                    
-                    HStack {
-                        Image(systemName: "calendar")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("Creato \(account.createdAt, style: .date)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Spacer()
-                
-                // UN SOLO menu button al posto dello status indicator
-                Menu {
-                    Button(action: {
-                        showingEditSheet = true
-                    }) {
-                        Label("Modifica Conto", systemImage: "pencil")
-                    }
-                    
-                    if relatedTransactions.isEmpty {
-                        Divider()
-                        
-                        Button(role: .destructive, action: {
-                            showingDeleteAlert = true
-                        }) {
-                            Label("Elimina Conto", systemImage: "trash")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.blue)
-                        .frame(width: 44, height: 44)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
+        Button(action: {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                // Azione tap - apri dettagli
             }
-            
-            // Saldo
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("€")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    
-                    Text(String(format: "%.2f", account.balance))
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(account.balance >= 0 ? .primary : .red)
-                        .contentTransition(.numericText())
-                }
+        }) {
+            ZStack {
+                // Background card con gradiente animato
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(cardGradient)
+                    .frame(height: 140)
+                    .shadow(
+                        color: account.balance >= 0 ? .blue.opacity(animateGlow ? 0.4 : 0.2) : .red.opacity(animateGlow ? 0.4 : 0.2),
+                        radius: animateGlow ? 15 : 8,
+                        x: 0,
+                        y: animateGlow ? 8 : 4
+                    )
+                    .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
                 
-                Text("Saldo disponibile")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Informazioni aggiuntive
-            VStack(spacing: 12) {
-                Divider()
+                // Overlay pattern decorativo
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                Color.white.opacity(0.3),
+                                Color.clear,
+                                Color.black.opacity(0.1)
+                            ]),
+                            center: .topTrailing,
+                            startRadius: 20,
+                            endRadius: 150
+                        )
+                    )
+                    .frame(height: 140)
                 
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "list.bullet.circle.fill")
-                            .font(.subheadline)
-                            .foregroundColor(.blue)
+                // Elementi decorativi fluttuanti
+                GeometryReader { geometry in
+                    ZStack {
+                        // Cerchi decorativi piccoli
+                        Circle()
+                            .fill(Color.white.opacity(0.15))
+                            .frame(width: 60, height: 60)
+                            .position(x: geometry.size.width * 0.85, y: geometry.size.height * 0.25)
+                            .scaleEffect(animateBalance ? 1.2 : 0.8)
+                            .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateBalance)
                         
-                        Text("\(relatedTransactions.count)")
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 40, height: 40)
+                            .position(x: geometry.size.width * 0.15, y: geometry.size.height * 0.75)
+                            .scaleEffect(animateBalance ? 0.6 : 1.1)
+                            .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateBalance)
+                        
+                        // Stelline decorative
+                        Image(systemName: "sparkles")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                            .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.3)
+                            .scaleEffect(animateGlow ? 1.3 : 0.7)
+                            .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
+                    }
+                }
+                .frame(height: 140)
+                
+                // Contenuto principale compatto
+                HStack(spacing: 16) {
+                    // Icona account animata
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.25))
+                            .frame(width: 50, height: 50)
+                            .blur(radius: animateGlow ? 1 : 0)
+                            .scaleEffect(animateIcon ? 1.05 : 1.0)
+                        
+                        Image(systemName: accountIcon)
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .rotationEffect(.degrees(animateIcon ? 2 : -2))
+                            .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateIcon)
+                    }
+                    
+                    // Informazioni conto compatte
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Nome conto
+                        Text(account.name)
                             .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.blue)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         
-                        Text(relatedTransactions.count == 1 ? "transazione" : "transazioni")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        // Saldo con animazione
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text("€")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text(String(format: "%.2f", account.balance))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .contentTransition(.numericText())
+                                .scaleEffect(animateBalance ? 1.02 : 1.0)
+                                .shadow(color: .white.opacity(0.5), radius: animateGlow ? 6 : 2)
+                        }
+                        
+                        // Status e transazioni in una riga compatta
+                        HStack(spacing: 12) {
+                            // Status badge
+                            HStack(spacing: 4) {
+                                Image(systemName: statusInfo.2)
+                                    .font(.caption2)
+                                    .foregroundColor(statusInfo.1)
+                                
+                                Text(statusInfo.0)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.2))
+                            )
+                            
+                            // Transazioni count compatto
+                            HStack(spacing: 4) {
+                                Image(systemName: "list.bullet.circle")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.8))
+                                
+                                Text("\(relatedTransactions.count)")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+                        }
                     }
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Creato")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    // Menu compatto e data
+                    VStack(spacing: 8) {
+                        // Menu button compatto
+                        Menu {
+                            Button(action: {
+                                showingEditSheet = true
+                            }) {
+                                Label("Modifica", systemImage: "pencil")
+                            }
+                            
+                            if relatedTransactions.isEmpty {
+                                Divider()
+                                Button(role: .destructive, action: {
+                                    showingDeleteAlert = true
+                                }) {
+                                    Label("Elimina", systemImage: "trash")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white.opacity(0.8))
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white.opacity(0.2))
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                         
-                        Text(account.createdAt, style: .date)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        // Data di creazione compatta
+                        VStack(spacing: 2) {
+                            Text("Creato")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.7))
+                            
+                            Text(account.createdAt, format: .dateTime.day().month(.abbreviated))
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
         }
-        .padding(24)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-                .shadow(color: account.balance < 0 ? .red.opacity(0.2) : .blue.opacity(0.1), radius: 12, x: 0, y: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(account.balance < 0 ? Color.red.opacity(0.3) : Color.blue.opacity(0.2), lineWidth: 1)
-        )
+        .buttonStyle(PlainButtonStyle())
         .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-        .onTapGesture {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                isPressed = true
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }) {
+            // Long press action
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8).delay(0.2)) {
+                animateBalance = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) {
-                    isPressed = false
-                }
+            withAnimation(.easeInOut(duration: 1.2).delay(0.1)) {
+                animateGlow = true
+            }
+            withAnimation(.easeInOut(duration: 1.5).delay(0.3)) {
+                animateIcon = true
             }
         }
         .sheet(isPresented: $showingEditSheet) {
