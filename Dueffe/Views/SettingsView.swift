@@ -49,9 +49,9 @@ struct SettingsView: View {
                     // Dati e Backup
                     Section {
                         SettingsRow(
-                            icon: "square.and.arrow.up.fill",
+                            icon: "document.fill",
                             iconColor: .blue,
-                            title: "Esporta Dati",
+                            title: "Esporta/Importa Dati",
                             subtitle: "Backup dei tuoi dati finanziari",
                             action: { showingExportData = true }
                         )
@@ -1257,55 +1257,424 @@ struct FeatureRow: View {
     }
 }
 
-// MARK: - Export Data View
 struct ExportDataView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
+    @State private var showingShareSheet = false
+    @State private var showingImportPicker = false
+    @State private var showingImportAlert = false
+    @State private var showingExportError = false
+    @State private var importResult = ImportResult(success: false, message: "")
+    @State private var exportFileURL: URL?
+    @State private var isExporting = false
+    @State private var exportErrorMessage = ""
+    
+    var hasData: Bool {
+        !dataManager.accounts.isEmpty || !dataManager.salvadanai.isEmpty || !dataManager.transactions.isEmpty
+    }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 32) {
-                Spacer()
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.purple.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
                 
-                VStack(spacing: 20) {
-                    Image(systemName: "square.and.arrow.up.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.blue)
-                    
-                    VStack(spacing: 8) {
-                        Text("Esporta i tuoi dati")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Header
+                        VStack(spacing: 20) {
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [Color.blue, Color.purple]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: .blue.opacity(0.3), radius: 15, x: 0, y: 8)
+                                
+                                if isExporting {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        .scaleEffect(1.2)
+                                } else {
+                                    Image(systemName: "square.and.arrow.up.fill")
+                                        .font(.system(size: 36))
+                                        .foregroundColor(.white)
+                                }
+                            }
+                            
+                            VStack(spacing: 8) {
+                                Text("Backup e Ripristino")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                
+                                Text(isExporting ? "Creazione backup in corso..." : "Esporta i tuoi dati o ripristina da un backup")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
                         
-                        Text("Funzionalità in arrivo nella prossima versione")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
+                        // Statistiche dati attuali
+                        if hasData {
+                            DataStatsCard(dataManager: dataManager)
+                        }
+                        
+                        // Azioni principali
+                        VStack(spacing: 20) {
+                            // Esporta
+                            if hasData {
+                                ActionCard(
+                                    title: isExporting ? "Creazione backup..." : "Esporta Dati",
+                                    subtitle: "Crea un backup completo dei tuoi dati",
+                                    icon: "square.and.arrow.up.fill",
+                                    color: .blue,
+                                    action: { exportData() },
+                                    isDisabled: isExporting
+                                )
+                            } else {
+                                ActionCard(
+                                    title: "Nessun Dato da Esportare",
+                                    subtitle: "Aggiungi conti e transazioni per creare un backup",
+                                    icon: "exclamationmark.triangle.fill",
+                                    color: .orange,
+                                    action: { },
+                                    isDisabled: true
+                                )
+                            }
+                            
+                            // Importa
+                            ActionCard(
+                                title: "Importa Dati",
+                                subtitle: "Ripristina da un backup precedente",
+                                icon: "square.and.arrow.down.fill",
+                                color: .green,
+                                action: { showingImportPicker = true },
+                                isDisabled: isExporting
+                            )
+                        }
+                        
+                        // Info importante
+                        InfoCard()
                     }
+                    .padding()
                 }
-                
-                Spacer()
-                
-                Button("Ho capito") {
-                    dismiss()
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding()
-            .navigationTitle("Esporta Dati")
+            .navigationTitle("Backup Dati")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Chiudi") {
                         dismiss()
                     }
+                    .disabled(isExporting)
+                }
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = exportFileURL {
+                ShareSheet(activityItems: [url])
+            }
+        }
+        .fileImporter(
+            isPresented: $showingImportPicker,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportResult(result)
+        }
+        .alert("Importazione", isPresented: $showingImportAlert) {
+            Button("OK") { }
+        } message: {
+            Text(importResult.message)
+        }
+        .alert("Errore Esportazione", isPresented: $showingExportError) {
+            Button("OK") { }
+        } message: {
+            Text(exportErrorMessage)
+        }
+    }
+    
+    private func exportData() {
+        // Prevenire export multipli
+        guard !isExporting else { return }
+        
+        isExporting = true
+        exportFileURL = nil
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Genera i dati di export
+            guard let exportData = dataManager.exportData() else {
+                DispatchQueue.main.async {
+                    exportErrorMessage = "Impossibile creare i dati di backup. Riprova."
+                    showingExportError = true
+                    isExporting = false
+                }
+                return
+            }
+            
+            // Crea il nome del file
+            let fileName = dataManager.getExportFileName()
+            
+            // Ottieni il percorso dei documenti temporanei
+            let tempDirectory = FileManager.default.temporaryDirectory
+            let fileURL = tempDirectory.appendingPathComponent(fileName)
+            
+            do {
+                // Scrivi il file
+                try exportData.write(to: fileURL)
+                
+                // Verifica che il file esista e sia leggibile
+                guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                    throw NSError(domain: "FileError", code: 1, userInfo: [NSLocalizedDescriptionKey: "File non creato correttamente"])
+                }
+                
+                DispatchQueue.main.async {
+                    exportFileURL = fileURL
+                    isExporting = false
+                    
+                    // Piccolo delay per assicurarsi che tutto sia pronto
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        showingShareSheet = true
+                    }
+                }
+                
+            } catch {
+                DispatchQueue.main.async {
+                    exportErrorMessage = "Errore nel salvataggio del file: \(error.localizedDescription)"
+                    showingExportError = true
+                    isExporting = false
                 }
             }
         }
     }
+    
+    private func handleImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            
+            // Assicurati di avere accesso al file
+            guard url.startAccessingSecurityScopedResource() else {
+                importResult = ImportResult(success: false, message: "Impossibile accedere al file selezionato")
+                showingImportAlert = true
+                return
+            }
+            
+            defer {
+                url.stopAccessingSecurityScopedResource()
+            }
+            
+            do {
+                let data = try Data(contentsOf: url)
+                importResult = dataManager.importData(from: data)
+                showingImportAlert = true
+                
+                if importResult.success {
+                    // Chiudi la vista dopo un successo
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        dismiss()
+                    }
+                }
+            } catch {
+                importResult = ImportResult(success: false, message: "Impossibile leggere il file selezionato: \(error.localizedDescription)")
+                showingImportAlert = true
+            }
+            
+        case .failure(let error):
+            importResult = ImportResult(success: false, message: "Errore nella selezione del file: \(error.localizedDescription)")
+            showingImportAlert = true
+        }
+    }
 }
+
+struct DataStatsCard: View {
+    let dataManager: DataManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundColor(.blue)
+                Text("Dati Attuali")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
+                StatItem(title: "Conti", value: "\(dataManager.accounts.count)", icon: "building.columns.fill", color: .blue)
+                StatItem(title: "Salvadanai", value: "\(dataManager.salvadanai.count)", icon: "banknote.fill", color: .green)
+                StatItem(title: "Transazioni", value: "\(dataManager.transactions.count)", icon: "creditcard.fill", color: .orange)
+                StatItem(title: "Categorie", value: "\(dataManager.customExpenseCategories.count + dataManager.customIncomeCategories.count + dataManager.customSalvadanaiCategories.count)", icon: "tag.fill", color: .purple)
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+struct StatItem: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            
+            Text(value)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+    }
+}
+
+struct ActionCard: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    let isDisabled: Bool
+    
+    init(title: String, subtitle: String, icon: String, color: Color, action: @escaping () -> Void, isDisabled: Bool = false) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.color = color
+        self.action = action
+        self.isDisabled = isDisabled
+    }
+    
+    var body: some View {
+        Button(action: isDisabled ? {} : action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(isDisabled ? 0.3 : 1.0))
+                        .frame(width: 50, height: 50)
+                        .shadow(color: isDisabled ? .clear : color.opacity(0.3), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isDisabled ? .secondary : .primary)
+                    
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                
+                Spacer()
+                
+                if !isDisabled {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isDisabled ? Color.clear : color.opacity(0.2), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(isDisabled)
+    }
+}
+
+struct InfoCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "info.circle.fill")
+                    .foregroundColor(.blue)
+                Text("Informazioni Importanti")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                InfoRow(icon: "checkmark.circle", text: "I backup sono in formato JSON e compatibili solo con Dueffe")
+                InfoRow(icon: "shield.fill", text: "I tuoi dati rimangono sempre sul tuo dispositivo")
+                InfoRow(icon: "exclamationmark.triangle", text: "L'importazione sostituisce tutti i dati attuali")
+                InfoRow(icon: "icloud", text: "Salva i backup su iCloud o condividili via AirDrop")
+            }
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.blue.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct InfoRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.blue)
+                .frame(width: 16)
+            
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Share Sheet for iOS
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+

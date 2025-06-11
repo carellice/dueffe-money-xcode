@@ -637,3 +637,103 @@ extension DataManager {
         salvadanai.reduce(0) { $0 + $1.currentAmount }
     }
 }
+
+// MARK: - Export/Import Data
+struct ExportData: Codable {
+    let accounts: [AccountModel]
+    let salvadanai: [SalvadanaiModel]
+    let transactions: [TransactionModel]
+    let customExpenseCategories: [String]
+    let customIncomeCategories: [String]
+    let customSalvadanaiCategories: [String]
+    let exportDate: Date
+    let appVersion: String
+    
+    init(dataManager: DataManager) {
+        self.accounts = dataManager.accounts
+        self.salvadanai = dataManager.salvadanai
+        self.transactions = dataManager.transactions
+        self.customExpenseCategories = dataManager.customExpenseCategories
+        self.customIncomeCategories = dataManager.customIncomeCategories
+        self.customSalvadanaiCategories = dataManager.customSalvadanaiCategories
+        self.exportDate = Date()
+        self.appVersion = "1.0"
+    }
+}
+
+extension DataManager {
+    
+    // MARK: - Export Data
+    func exportData() -> Data? {
+        let exportData = ExportData(dataManager: self)
+        
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = .prettyPrinted
+            
+            return try encoder.encode(exportData)
+        } catch {
+            print("Errore nell'esportazione: \(error)")
+            return nil
+        }
+    }
+    
+    func getExportFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd-MM-yy_HH-mm"
+        let dateString = formatter.string(from: Date())
+        return "dueffe\(dateString).json"
+    }
+    
+    // MARK: - Import Data
+    func importData(from data: Data) -> ImportResult {
+        do {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            
+            let importedData = try decoder.decode(ExportData.self, from: data)
+            
+            // Validazione dei dati
+            if importedData.accounts.isEmpty {
+                return ImportResult(success: false, message: "Il file di backup non contiene conti validi")
+            }
+            
+            // Backup dei dati attuali (opzionale)
+            let currentBackup = ExportData(dataManager: self)
+            
+            // Importa i dati
+            withAnimation {
+                self.accounts = importedData.accounts
+                self.salvadanai = importedData.salvadanai
+                self.transactions = importedData.transactions
+                self.customExpenseCategories = importedData.customExpenseCategories
+                self.customIncomeCategories = importedData.customIncomeCategories
+                self.customSalvadanaiCategories = importedData.customSalvadanaiCategories
+            }
+            
+            // Reset onboarding flags poiché ora abbiamo dati completi
+            UserDefaults.standard.set(true, forKey: "hasSeenOnboarding")
+            UserDefaults.standard.set(true, forKey: "hasCreatedFirstSalvadanaio")
+            UserDefaults.standard.set(true, forKey: "hasAddedInitialBalance")
+            
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            let exportDateString = formatter.string(from: importedData.exportDate)
+            
+            return ImportResult(
+                success: true,
+                message: "Dati importati con successo!\n\nBackup del: \(exportDateString)\nConti: \(importedData.accounts.count)\nSalvadanai: \(importedData.salvadanai.count)\nTransazioni: \(importedData.transactions.count)"
+            )
+            
+        } catch {
+            return ImportResult(success: false, message: "Errore nell'importazione: file non valido o corrotto")
+        }
+    }
+}
+
+struct ImportResult {
+    let success: Bool
+    let message: String
+}
