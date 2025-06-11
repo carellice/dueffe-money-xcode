@@ -242,6 +242,7 @@ struct SalvadanaiCardView: View {
     @State private var animateAmount = false
     @State private var animateCoins = false
     @State private var isPressed = false
+    @State private var showingTransactions = false
     
     private var progress: Double {
         // Per glass: currentAmount / monthlyRefill
@@ -468,7 +469,7 @@ struct SalvadanaiCardView: View {
                                     .lineLimit(isExpanded ? 3 : 1)
                                     .fixedSize(horizontal: false, vertical: isExpanded)
                                 
-                                // Status e importo compatti
+                                // Status e categoria
                                 HStack(spacing: 8) {
                                     // Status badge
                                     HStack(spacing: 4) {
@@ -488,6 +489,27 @@ struct SalvadanaiCardView: View {
                                         Capsule()
                                             .fill(Color.white.opacity(0.2))
                                     )
+                                    
+                                    // Categoria del salvadanaio
+                                    if !salvadanaio.category.isEmpty {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "tag.fill")
+                                                .font(.caption2)
+                                                .foregroundColor(.white.opacity(0.7))
+                                            
+                                            Text(salvadanaio.category)
+                                                .font(.caption2)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white.opacity(0.9))
+                                                .lineLimit(1)
+                                        }
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.white.opacity(0.15))
+                                        )
+                                    }
                                     
                                     Spacer()
                                 }
@@ -638,19 +660,28 @@ struct SalvadanaiCardView: View {
                                         Spacer()
                                     }
                                     
-                                    // Transazioni correlate
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "list.bullet")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white.opacity(0.8))
-                                            .frame(width: 20)
-                                        
-                                        Text("\(relatedTransactions.count) transazioni collegate")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white.opacity(0.9))
-                                        
-                                        Spacer()
+                                    // Transazioni correlate (cliccabile)
+                                    Button(action: {
+                                        showingTransactions = true
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "list.bullet.circle.fill")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .frame(width: 20)
+                                            
+                                            Text("\(relatedTransactions.count) transazioni collegate")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.9))
+                                            
+                                            Spacer()
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.6))
+                                        }
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 16)
@@ -691,6 +722,117 @@ struct SalvadanaiCardView: View {
                 }
                 withAnimation(.easeOut(duration: 1.5).delay(0.3)) {
                     animateProgress = true
+                }
+            }
+        }
+        .sheet(isPresented: $showingTransactions) {
+            SalvadanaiTransactionsView(salvadanaio: salvadanaio, transactions: relatedTransactions)
+        }
+    }
+}
+
+// MARK: - Vista Transazioni Salvadanaio
+struct SalvadanaiTransactionsView: View {
+    let salvadanaio: SalvadanaiModel
+    let transactions: [TransactionModel]
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color(.systemBackground),
+                        Color(.systemGray6)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header info salvadanaio
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(salvadanaio.name)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+                                
+                                if !salvadanaio.category.isEmpty {
+                                    Text(salvadanaio.category)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+                                
+                                Text("\(transactions.count) transazioni")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemBackground))
+                            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                    
+                    // Lista transazioni
+                    if transactions.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "tray")
+                                .font(.system(size: 50))
+                                .foregroundColor(.secondary)
+                            
+                            Text("Nessuna transazione")
+                                .font(.title3)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            
+                            Text("Non ci sono ancora transazioni associate a questo salvadanaio")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemBackground))
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(transactions.sorted { $0.date > $1.date }) { transaction in
+                                    TransactionRowView(transaction: transaction)
+                                        .padding(.horizontal, 16)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .background(Color(.systemBackground))
+                    }
+                }
+            }
+            .navigationTitle("Transazioni")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi") {
+                        dismiss()
+                    }
                 }
             }
         }
