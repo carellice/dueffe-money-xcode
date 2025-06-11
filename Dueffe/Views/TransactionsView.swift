@@ -322,7 +322,6 @@ struct TransactionSectionHeaderView: View {
 }
 
 // MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
-// MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
 struct TransactionRowView: View {
     let transaction: TransactionModel
     @State private var animateAmount = false
@@ -472,8 +471,8 @@ struct TransactionRowView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 // Descrizione
                                 Text(transaction.descr)
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
+                                    .font(showDetails ? .headline : .subheadline)
+                                    .fontWeight(showDetails ? .semibold : .medium)
                                     .foregroundColor(.white)
                                     .lineLimit(showDetails ? 3 : 1)
                                     .fixedSize(horizontal: false, vertical: showDetails)
@@ -481,7 +480,7 @@ struct TransactionRowView: View {
                                 // Categoria e orario (sempre visibili)
                                 HStack(spacing: 8) {
                                     Text(cleanCategoryName)
-                                        .font(.subheadline)
+                                        .font(showDetails ? .subheadline : .caption)
                                         .fontWeight(.medium)
                                         .foregroundColor(.white.opacity(0.9))
                                         .lineLimit(showDetails ? nil : 1)
@@ -493,7 +492,7 @@ struct TransactionRowView: View {
                                             .frame(width: 3, height: 3)
                                         
                                         Text(transaction.date, format: .dateTime.hour().minute())
-                                            .font(.subheadline)
+                                            .font(.caption)
                                             .foregroundColor(.white.opacity(0.8))
                                     }
                                 }
@@ -506,12 +505,12 @@ struct TransactionRowView: View {
                                 // Importo
                                 HStack(alignment: .firstTextBaseline, spacing: 2) {
                                     Text(transaction.type == "expense" ? "-" : "+")
-                                        .font(.title3)
+                                        .font(showDetails ? .title3 : .subheadline)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                     
                                     Text("€\(String(format: "%.0f", transaction.amount))")
-                                        .font(.title2)
+                                        .font(showDetails ? .title2 : .callout)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                         .scaleEffect(animateAmount ? 1.02 : 1.0)
