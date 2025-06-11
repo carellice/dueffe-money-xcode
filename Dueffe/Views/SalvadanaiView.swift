@@ -59,11 +59,6 @@ struct SalvadanaiView: View {
                         EmptySalvadanaiView(action: { showingAddSalvadanaio = true })
                     } else {
                         VStack(spacing: 0) {
-                            // Header con statistiche
-                            CompactSalvadanaiStatsView(salvadanai: dataManager.salvadanai)
-                                .padding(.horizontal)
-                                .padding(.bottom, 16)
-                            
                             // NUOVO: Filtri categoria (solo se ci sono categorie)
                             if availableCategories.count > 1 {
                                 ScrollView(.horizontal, showsIndicators: false) {
