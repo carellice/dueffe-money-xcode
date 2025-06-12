@@ -2,22 +2,54 @@ import Foundation
 import SwiftUI
 
 // MARK: - Formatters globali
+import Foundation
+
+import Foundation
+
 extension Double {
     var italianCurrency: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.locale = Locale(identifier: "it_IT")
+        // Determina se mostrare i decimali
+        let hasDecimals = self.truncatingRemainder(dividingBy: 1) != 0
         
-        if var formatted = formatter.string(from: NSNumber(value: self)) {
-            // Rimuove ",00" prima del simbolo €
-            if let range = formatted.range(of: ",00") {
-                formatted.removeSubrange(range)
-            }
-            return formatted
+        // Converti in stringa con o senza decimali
+        let numberString: String
+        if hasDecimals {
+            numberString = String(format: "%.2f", self)
+        } else {
+            numberString = String(format: "%.0f", self)
         }
-        return "€0"
+        
+        // Separa parte intera e decimale
+        let components = numberString.components(separatedBy: ".")
+        let integerPart = components[0]
+        let decimalPart = components.count > 1 ? components[1] : nil
+        
+        // Aggiungi i separatori delle migliaia alla parte intera
+        let formattedInteger = addThousandsSeparator(to: integerPart)
+        
+        // Costruisci il risultato finale
+        if let decimals = decimalPart, hasDecimals {
+            return "\(formattedInteger),\(decimals) €"
+        } else {
+            return "\(formattedInteger) €"
+        }
+    }
+    
+    private func addThousandsSeparator(to numberString: String) -> String {
+        let reversed = String(numberString.reversed())
+        var result = ""
+        
+        for (index, character) in reversed.enumerated() {
+            if index > 0 && index % 3 == 0 {
+                result += "."
+            }
+            result += String(character)
+        }
+        
+        return String(result.reversed())
     }
 }
+
 
 // MARK: - SOSTITUIRE SalvadanaiModel IN DataManager.swift
 struct SalvadanaiModel: Identifiable, Codable {

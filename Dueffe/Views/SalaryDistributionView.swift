@@ -278,7 +278,7 @@ struct SalaryDistributionHeaderView: View {
             // Importo principale
             VStack(spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("€")
+                    Text("")
                         .font(.title)
                         .foregroundColor(.secondary)
                     Text(amount.italianCurrency)
@@ -466,16 +466,16 @@ struct SalvadanaiDistributionRow: View {
                         .foregroundColor(isSelected ? .primary : .secondary)
                     
                     HStack {
-                        Text("Attuale: €\(salvadanaio.currentAmount.italianCurrency)")
+                        Text("Attuale: \(salvadanaio.currentAmount.italianCurrency)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
                         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
-                            Text("• Obiettivo: €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                            Text("• Obiettivo: \(salvadanaio.targetAmount.italianCurrency)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else if salvadanaio.type == "glass" {
-                            Text("• Glass: €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                            Text("• Glass: \(salvadanaio.monthlyRefill.italianCurrency)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -487,7 +487,7 @@ struct SalvadanaiDistributionRow: View {
                 // Campo importo per distribuzione personalizzata
                 if distributionMode == .custom && isSelected {
                     HStack {
-                        Text("€")
+                        Text("")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
@@ -498,7 +498,7 @@ struct SalvadanaiDistributionRow: View {
                     }
                 } else if isSelected && displayAmount > 0 {
                     // Mostra importo per altre modalità
-                    Text("€\(displayAmount.italianCurrency)")
+                    Text("\(displayAmount.italianCurrency)")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)
@@ -524,20 +524,20 @@ struct SalvadanaiDistributionRow: View {
                             if salvadanaio.type == "glass" {
                                 let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
                                 if needed > 0 {
-                                    Text("Ricarica necessaria: €\(needed.italianCurrency)")
+                                    Text("Ricarica necessaria: \(needed.italianCurrency)")
                                         .font(.caption2)
                                         .foregroundColor(.orange)
                                 }
                             } else if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
                                 let needed = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
                                 if needed > 0 {
-                                    Text("Mancano: €\(needed.italianCurrency)")
+                                    Text("Mancano: \(needed.italianCurrency)")
                                         .font(.caption2)
                                         .foregroundColor(.blue)
                                 }
                             }
                             
-                            Text("Saldo dopo: €\((salvadanaio.currentAmount + automaticAmount).italianCurrency)")
+                            Text("Saldo dopo: \((salvadanaio.currentAmount + automaticAmount).italianCurrency)")
                                 .font(.caption2)
                                 .foregroundColor(.green)
                                 .fontWeight(.medium)
@@ -560,13 +560,13 @@ struct CustomDistributionFooterView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Distribuito: €\(totalDistributed.italianCurrency)")
+                Text("Distribuito: \(totalDistributed.italianCurrency)")
                     .font(.caption)
                     .foregroundColor(.green)
                 
                 Spacer()
                 
-                Text("Rimanente: €\(remainingAmount.italianCurrency)")
+                Text("Rimanente: \(remainingAmount.italianCurrency)")
                     .font(.caption)
                     .foregroundColor(remainingAmount > 0.01 ? .orange : .green)
                     .fontWeight(.medium)

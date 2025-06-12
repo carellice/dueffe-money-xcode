@@ -229,7 +229,7 @@ struct TransactionStatCardView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
             } else {
-                Text("€\(amount.italianCurrency)")
+                Text("\(amount.italianCurrency)")
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(color)
@@ -509,7 +509,7 @@ struct TransactionRowView: View {
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                     
-                                    Text("€\(transaction.amount.italianCurrency)")
+                                    Text("\(transaction.amount.italianCurrency)")
                                         .font(showDetails ? .title2 : .callout)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
@@ -1078,7 +1078,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(salvadanaio.name)
                                     Spacer()
-                                    Text("€\(salvadanaio.currentAmount.italianCurrency)")
+                                    Text("\(salvadanaio.currentAmount.italianCurrency)")
                                         .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
                                 }
                                 .tag(salvadanaio.name)
@@ -1092,7 +1092,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(salvadanaio.name)
                                     Spacer()
-                                    Text("€\(salvadanaio.currentAmount.italianCurrency)")
+                                    Text("\(salvadanaio.currentAmount.italianCurrency)")
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(salvadanaio.name)
@@ -1155,7 +1155,7 @@ struct SimpleAddTransactionView: View {
                                     HStack {
                                         Text(salvadanaio.name)
                                         Spacer()
-                                        Text("€\(salvadanaio.currentAmount.italianCurrency)")
+                                        Text("\(salvadanaio.currentAmount.italianCurrency)")
                                             .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
                                     }
                                     .tag(salvadanaio.name)
@@ -1664,7 +1664,7 @@ struct TransferPreviewCard: View {
                     Text(fromName)
                         .fontWeight(.semibold)
                     Spacer()
-                    Text("-€\(amount.italianCurrency)")
+                    Text("-\(amount.italianCurrency)")
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
                 }
@@ -1677,7 +1677,7 @@ struct TransferPreviewCard: View {
                     Text(toName)
                         .fontWeight(.semibold)
                     Spacer()
-                    Text("+€\(amount.italianCurrency)")
+                    Text("+\(amount.italianCurrency)")
                         .fontWeight(.semibold)
                         .foregroundColor(.green)
                 }

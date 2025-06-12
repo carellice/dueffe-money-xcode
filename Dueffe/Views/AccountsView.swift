@@ -114,7 +114,7 @@ struct MinimalAccountsStatsHeader: View {
                         .foregroundColor(.secondary)
                     
                     HStack(alignment: .firstTextBaseline, spacing: 2) {
-                        Text("€")
+                        Text("")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         Text(totalBalance.italianCurrency)
@@ -394,7 +394,7 @@ struct EnhancedAccountCard: View {
                         
                         // Saldo con animazione
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("€")
+                            Text("")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
                             
@@ -850,7 +850,7 @@ struct EnhancedAccountDetailView: View {
                             // Saldo principale
                             VStack(spacing: 8) {
                                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text("€")
+                                    Text("")
                                         .font(.title)
                                         .foregroundColor(.secondary)
                                     Text(account.balance.italianCurrency)
@@ -980,21 +980,21 @@ struct AccountStatisticsCard: View {
                 
                 AccountStatCard(
                     title: "Entrate Totali",
-                    value: "€\(String(format: "%.0f", totalIncome))",
+                    value: "\(totalIncome.italianCurrency)",
                     icon: "plus.circle.fill",
                     color: Color.green
                 )
                 
                 AccountStatCard(
                     title: "Spese Totali",
-                    value: "€\(String(format: "%.0f", totalExpenses))",
+                    value: "\(totalExpenses.italianCurrency)",
                     icon: "minus.circle.fill",
                     color: Color.red
                 )
                 
                 AccountStatCard(
                     title: "Media Trans.",
-                    value: "€\(String(format: "%.0f", averageTransaction))",
+                    value: "\(averageTransaction.italianCurrency)",
                     icon: "chart.line.uptrend.xyaxis.circle.fill",
                     color: Color.orange
                 )
@@ -1198,7 +1198,7 @@ struct CompactTransactionRow: View {
                 
                 Spacer()
                 
-                Text("\(transaction.type == "expense" ? "-" : "+")€\(transaction.amount.italianCurrency)")
+                Text("\(transaction.type == "expense" ? "-" : "+")\(transaction.amount.italianCurrency)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(transactionColor)
@@ -1316,7 +1316,7 @@ struct EditAccountView: View {
                                     
                                     Spacer()
                                     
-                                    Text("\(balanceChange >= 0 ? "+" : "")€\(balanceChange.italianCurrency)")
+                                    Text("\(balanceChange >= 0 ? "+" : "")\(balanceChange.italianCurrency)")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(balanceChange >= 0 ? .green : .red)
@@ -1522,7 +1522,7 @@ struct AccountPreviewCard: View {
                         .lineLimit(2)
                     
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text("€")
+                        Text("")
                             .font(.title3)
                             .foregroundColor(.secondary)
                         
@@ -1538,7 +1538,7 @@ struct AccountPreviewCard: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            Text("\(balanceChange >= 0 ? "+" : "")€\(balanceChange.italianCurrency)")
+                            Text("\(balanceChange >= 0 ? "+" : "")\(balanceChange.italianCurrency)")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(balanceChange >= 0 ? .green : .red)

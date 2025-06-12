@@ -377,7 +377,7 @@ struct AppStatisticsCard: View {
                         
                         Image(systemName: "eurosign.circle")
                             .foregroundColor(.green)
-                        Text("€\(String(format: "%.0f", totalTransactionAmount)) gestiti")
+                        Text("\(totalTransactionAmount.italianCurrency) gestiti")
                             .font(.caption)
                     }
                     .foregroundColor(.secondary)

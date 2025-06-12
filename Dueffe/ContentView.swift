@@ -1547,11 +1547,11 @@ struct CreatedSalvadanaiRow: View {
                     
                     // Dettagli specifici
                     if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
-                        Text("• €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                        Text("• \(salvadanaio.targetAmount.italianCurrency)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else if salvadanaio.type == "glass" {
-                        Text("• €\(String(format: "%.0f", salvadanaio.monthlyRefill))/mese")
+                        Text("• \(salvadanaio.monthlyRefill.italianCurrency)/mese")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -2119,11 +2119,11 @@ struct ImprovedSalvadanaiHomeCard: View {
                         
                         // Importo con animazione
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("€")
+                            Text("")
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
                             
-                            Text(String(format: "%.0f", abs(salvadanaio.currentAmount)))
+                            Text(salvadanaio.currentAmount.italianCurrency)
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -2199,7 +2199,7 @@ struct ImprovedSalvadanaiHomeCard: View {
                                         .fontWeight(.medium)
                                         .foregroundColor(.white)
                                 } else {
-                                    Text("di €\(String(format: "%.0f", salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill))")
+                                    Text("di \(salvadanaio.type == "objective" ? salvadanaio.targetAmount.italianCurrency : salvadanaio.monthlyRefill.italianCurrency)")
                                         .font(.caption)
                                         .foregroundColor(.white.opacity(0.8))
                                 }
@@ -2225,7 +2225,7 @@ struct ImprovedSalvadanaiHomeCard: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.caption)
                                 .foregroundColor(.white)
-                            Text("Recupera €\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                            Text("Recupera \(salvadanaio.currentAmount.italianCurrency)")
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundColor(.white)
@@ -2300,11 +2300,11 @@ struct MinimalSalvadanaiCard: View {
                     .font(.caption2)
                     .foregroundColor(.red)
             } else if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
-                Text("di €\(String(format: "%.0f", salvadanaio.targetAmount))")
+                Text("di \(salvadanaio.targetAmount.italianCurrency)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             } else if salvadanaio.type == "glass" {
-                Text("Glass €\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                Text("Glass \(salvadanaio.monthlyRefill.italianCurrency)")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             } else {
@@ -2405,11 +2405,11 @@ struct CompactStylishSalvadanaiCard: View {
                         Spacer()
                         
                         if salvadanaio.type == "objective" {
-                            Text("€\(String(format: "%.0f", salvadanaio.targetAmount))")
+                            Text("\(salvadanaio.targetAmount.italianCurrency)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         } else {
-                            Text("€\(String(format: "%.0f", salvadanaio.monthlyRefill))")
+                            Text("\(salvadanaio.monthlyRefill.italianCurrency)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -2700,7 +2700,7 @@ struct ImprovedHomeTransactionRow: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                             
-                            Text("€\(String(format: "%.0f", transaction.amount))")
+                            Text("\(transaction.amount.italianCurrency)")
                                 .font(.callout)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -2906,7 +2906,7 @@ struct EnhancedWealthCard: View {
                 // Importo principale con effetto wow - CENTRATO
                 VStack(spacing: 12) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("€")
+                        Text("")
                             .font(.title)
                             .fontWeight(.medium)
                             .foregroundColor(.white.opacity(0.7))

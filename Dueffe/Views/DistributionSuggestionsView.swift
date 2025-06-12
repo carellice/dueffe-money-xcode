@@ -177,12 +177,12 @@ struct SmartDistributionHelper {
         } else if totalDistributed > totalAmount {
             return DistributionValidation(
                 isValid: false,
-                message: "Distribuzione eccessiva di €\(difference.italianCurrency)"
+                message: "Distribuzione eccessiva di \(difference.italianCurrency)"
             )
         } else {
             return DistributionValidation(
                 isValid: false,
-                message: "Rimangono €\(difference.italianCurrency) da distribuire"
+                message: "Rimangono \(difference.italianCurrency) da distribuire"
             )
         }
     }
