@@ -281,7 +281,7 @@ struct SalaryDistributionHeaderView: View {
                     Text("€")
                         .font(.title)
                         .foregroundColor(.secondary)
-                    Text(String(format: "%.2f", amount))
+                    Text(amount.italianCurrency)
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
@@ -340,7 +340,7 @@ struct DistributionStatCard: View {
                 .font(.title2)
                 .foregroundColor(color)
             
-            Text("€\(String(format: "%.2f", amount))")
+            Text(amount.italianCurrency)
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundColor(.primary)
@@ -466,7 +466,7 @@ struct SalvadanaiDistributionRow: View {
                         .foregroundColor(isSelected ? .primary : .secondary)
                     
                     HStack {
-                        Text("Attuale: €\(String(format: "%.2f", salvadanaio.currentAmount))")
+                        Text("Attuale: €\(salvadanaio.currentAmount.italianCurrency)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -498,7 +498,7 @@ struct SalvadanaiDistributionRow: View {
                     }
                 } else if isSelected && displayAmount > 0 {
                     // Mostra importo per altre modalità
-                    Text("€\(String(format: "%.2f", displayAmount))")
+                    Text("€\(displayAmount.italianCurrency)")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.green)
@@ -524,20 +524,20 @@ struct SalvadanaiDistributionRow: View {
                             if salvadanaio.type == "glass" {
                                 let needed = max(0, salvadanaio.monthlyRefill - salvadanaio.currentAmount)
                                 if needed > 0 {
-                                    Text("Ricarica necessaria: €\(String(format: "%.2f", needed))")
+                                    Text("Ricarica necessaria: €\(needed.italianCurrency)")
                                         .font(.caption2)
                                         .foregroundColor(.orange)
                                 }
                             } else if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
                                 let needed = max(0, salvadanaio.targetAmount - salvadanaio.currentAmount)
                                 if needed > 0 {
-                                    Text("Mancano: €\(String(format: "%.2f", needed))")
+                                    Text("Mancano: €\(needed.italianCurrency)")
                                         .font(.caption2)
                                         .foregroundColor(.blue)
                                 }
                             }
                             
-                            Text("Saldo dopo: €\(String(format: "%.2f", salvadanaio.currentAmount + automaticAmount))")
+                            Text("Saldo dopo: €\((salvadanaio.currentAmount + automaticAmount).italianCurrency)")
                                 .font(.caption2)
                                 .foregroundColor(.green)
                                 .fontWeight(.medium)
@@ -560,13 +560,13 @@ struct CustomDistributionFooterView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Distribuito: €\(String(format: "%.2f", totalDistributed))")
+                Text("Distribuito: €\(totalDistributed.italianCurrency)")
                     .font(.caption)
                     .foregroundColor(.green)
                 
                 Spacer()
                 
-                Text("Rimanente: €\(String(format: "%.2f", remainingAmount))")
+                Text("Rimanente: €\(remainingAmount.italianCurrency)")
                     .font(.caption)
                     .foregroundColor(remainingAmount > 0.01 ? .orange : .green)
                     .fontWeight(.medium)

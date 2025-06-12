@@ -77,7 +77,7 @@ struct DistributionSuggestionRow: View {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     
-                    Text("€\(String(format: "%.2f", suggestion.suggestedAmount))")
+                    Text(suggestion.suggestedAmount.italianCurrency)
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(suggestion.priority.color)
@@ -177,12 +177,12 @@ struct SmartDistributionHelper {
         } else if totalDistributed > totalAmount {
             return DistributionValidation(
                 isValid: false,
-                message: "Distribuzione eccessiva di €\(String(format: "%.2f", difference))"
+                message: "Distribuzione eccessiva di €\(difference.italianCurrency)"
             )
         } else {
             return DistributionValidation(
                 isValid: false,
-                message: "Rimangono €\(String(format: "%.2f", difference)) da distribuire"
+                message: "Rimangono €\(difference.italianCurrency) da distribuire"
             )
         }
     }
@@ -304,7 +304,7 @@ struct DistributionSummaryRow: View {
                 .frame(width: 30, alignment: .trailing)
             
             // Importo
-            Text("€\(String(format: "%.2f", amount))")
+            Text(amount.italianCurrency)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)

@@ -117,7 +117,7 @@ struct MinimalAccountsStatsHeader: View {
                         Text("€")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        Text(String(format: "%.2f", totalBalance))
+                        Text(totalBalance.italianCurrency)
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(totalBalance >= 0 ? .primary : .red)
@@ -398,7 +398,7 @@ struct EnhancedAccountCard: View {
                                 .font(.subheadline)
                                 .foregroundColor(.white.opacity(0.8))
                             
-                            Text(String(format: "%.2f", account.balance))
+                            Text(account.balance.italianCurrency)
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -644,7 +644,7 @@ struct EnhancedAddAccountView: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text("€\(String(format: "%.2f", initialBalance))")
+                                Text(initialBalance.italianCurrency)
                                     .font(.headline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(initialBalance >= 0 ? .primary : .red)
@@ -853,7 +853,7 @@ struct EnhancedAccountDetailView: View {
                                     Text("€")
                                         .font(.title)
                                         .foregroundColor(.secondary)
-                                    Text(String(format: "%.2f", account.balance))
+                                    Text(account.balance.italianCurrency)
                                         .font(.largeTitle)
                                         .fontWeight(.bold)
                                         .foregroundColor(account.balance >= 0 ? .primary : .red)
@@ -1198,7 +1198,7 @@ struct CompactTransactionRow: View {
                 
                 Spacer()
                 
-                Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                Text("\(transaction.type == "expense" ? "-" : "+")€\(transaction.amount.italianCurrency)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(transactionColor)
@@ -1316,7 +1316,7 @@ struct EditAccountView: View {
                                     
                                     Spacer()
                                     
-                                    Text("\(balanceChange >= 0 ? "+" : "")€\(String(format: "%.2f", balanceChange))")
+                                    Text("\(balanceChange >= 0 ? "+" : "")€\(balanceChange.italianCurrency)")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(balanceChange >= 0 ? .green : .red)
@@ -1526,7 +1526,7 @@ struct AccountPreviewCard: View {
                             .font(.title3)
                             .foregroundColor(.secondary)
                         
-                        Text(String(format: "%.2f", account.balance))
+                        Text(account.balance.italianCurrency)
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(account.balance >= 0 ? .primary : .red)
@@ -1538,7 +1538,7 @@ struct AccountPreviewCard: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            Text("\(balanceChange >= 0 ? "+" : "")€\(String(format: "%.2f", balanceChange))")
+                            Text("\(balanceChange >= 0 ? "+" : "")€\(balanceChange.italianCurrency)")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(balanceChange >= 0 ? .green : .red)

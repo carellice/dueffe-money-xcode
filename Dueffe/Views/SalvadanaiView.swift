@@ -605,7 +605,7 @@ struct SalvadanaiCardView: View {
                                             .fontWeight(.medium)
                                             .foregroundColor(.white)
                                     } else {
-                                        Text("di €\(String(format: "%.0f", salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill))")
+                                        Text("di \((salvadanaio.type == "objective" ? salvadanaio.targetAmount : salvadanaio.monthlyRefill).italianCurrency)")
                                             .font(.caption)
                                             .foregroundColor(.white.opacity(0.8))
                                     }
@@ -767,7 +767,7 @@ struct SalvadanaiTransactionsView: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 4) {
-                                Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                Text(salvadanaio.currentAmount.italianCurrency)
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.primary)
@@ -981,7 +981,7 @@ struct DetailedTransactionRowView: View {
             Spacer()
             
             // Importo
-            Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+            Text("\(transaction.type == "expense" ? "-" : "+")€\(transaction.amount.italianCurrency)")
                 .font(.headline)
                 .fontWeight(.bold)
                 .foregroundColor(transactionColor)
@@ -1054,7 +1054,7 @@ struct SalvadanaiTransactionsDetailView: View {
                                     .font(.headline)
                                     .fontWeight(.semibold)
                                 
-                                Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                Text("€\(salvadanaio.currentAmount.italianCurrency)")
                                     .font(.subheadline)
                                     .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
                                     .fontWeight(.medium)
@@ -1901,7 +1901,7 @@ struct SimpleSalvadanaiDetailView: View {
                                     
                                     Spacer()
                                     
-                                    Text("\(transaction.type == "expense" ? "-" : "+")€\(String(format: "%.2f", transaction.amount))")
+                                    Text("\(transaction.type == "expense" ? "-" : "+")€\(transaction.amount.italianCurrency)")
                                         .font(.headline)
                                         .fontWeight(.semibold)
                                         .foregroundColor(transaction.type == "expense" ? .red : .green)

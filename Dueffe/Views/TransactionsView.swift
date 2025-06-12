@@ -229,7 +229,7 @@ struct TransactionStatCardView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
             } else {
-                Text("€\(String(format: "%.0f", amount))")
+                Text("€\(amount.italianCurrency)")
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(color)
@@ -509,7 +509,7 @@ struct TransactionRowView: View {
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
                                     
-                                    Text("€\(String(format: "%.0f", transaction.amount))")
+                                    Text("€\(transaction.amount.italianCurrency)")
                                         .font(showDetails ? .title2 : .callout)
                                         .fontWeight(.bold)
                                         .foregroundColor(.white)
@@ -552,7 +552,7 @@ struct TransactionRowView: View {
                                         
                                         Spacer()
                                         
-                                        Text("€\(String(format: "%.2f", transaction.amount))")
+                                        Text(transaction.amount.italianCurrency)
                                             .font(.subheadline)
                                             .fontWeight(.semibold)
                                             .foregroundColor(.white)
@@ -1019,7 +1019,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(account.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
+                                    Text(account.balance.italianCurrency)
                                         .foregroundColor(account.balance >= 0 ? .green : .red)
                                 }
                                 .tag(account.name)
@@ -1033,7 +1033,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(account.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
+                                    Text(account.balance.italianCurrency)
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(account.name)
@@ -1078,7 +1078,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(salvadanaio.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                    Text("€\(salvadanaio.currentAmount.italianCurrency)")
                                         .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
                                 }
                                 .tag(salvadanaio.name)
@@ -1092,7 +1092,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(salvadanaio.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                    Text("€\(salvadanaio.currentAmount.italianCurrency)")
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(salvadanaio.name)
@@ -1155,7 +1155,7 @@ struct SimpleAddTransactionView: View {
                                     HStack {
                                         Text(salvadanaio.name)
                                         Spacer()
-                                        Text("€\(String(format: "%.2f", salvadanaio.currentAmount))")
+                                        Text("€\(salvadanaio.currentAmount.italianCurrency)")
                                             .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
                                     }
                                     .tag(salvadanaio.name)
@@ -1205,7 +1205,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(account.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
+                                    Text(account.balance.italianCurrency)
                                         .foregroundColor(account.balance >= 0 ? .green : .red)
                                 }
                                 .tag(account.name)
@@ -1253,7 +1253,7 @@ struct SimpleAddTransactionView: View {
                                 HStack {
                                     Text(account.name)
                                     Spacer()
-                                    Text("€\(String(format: "%.2f", account.balance))")
+                                    Text(account.balance.italianCurrency)
                                         .foregroundColor(.secondary)
                                 }
                                 .tag(account.name)
@@ -1664,7 +1664,7 @@ struct TransferPreviewCard: View {
                     Text(fromName)
                         .fontWeight(.semibold)
                     Spacer()
-                    Text("-€\(String(format: "%.2f", amount))")
+                    Text("-€\(amount.italianCurrency)")
                         .fontWeight(.semibold)
                         .foregroundColor(.red)
                 }
@@ -1677,7 +1677,7 @@ struct TransferPreviewCard: View {
                     Text(toName)
                         .fontWeight(.semibold)
                     Spacer()
-                    Text("+€\(String(format: "%.2f", amount))")
+                    Text("+€\(amount.italianCurrency)")
                         .fontWeight(.semibold)
                         .foregroundColor(.green)
                 }

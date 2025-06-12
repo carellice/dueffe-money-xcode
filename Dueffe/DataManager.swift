@@ -1,6 +1,24 @@
 import Foundation
 import SwiftUI
 
+// MARK: - Formatters globali
+extension Double {
+    var italianCurrency: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "it_IT")
+        
+        if var formatted = formatter.string(from: NSNumber(value: self)) {
+            // Rimuove ",00" prima del simbolo €
+            if let range = formatted.range(of: ",00") {
+                formatted.removeSubrange(range)
+            }
+            return formatted
+        }
+        return "€0"
+    }
+}
+
 // MARK: - SOSTITUIRE SalvadanaiModel IN DataManager.swift
 struct SalvadanaiModel: Identifiable, Codable {
     let id = UUID()

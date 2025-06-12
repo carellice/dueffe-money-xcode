@@ -2289,7 +2289,7 @@ struct MinimalSalvadanaiCard: View {
             }
             
             // Importo
-            Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+            Text(abs(salvadanaio.currentAmount).italianCurrency)
                 .font(.title3)
                 .fontWeight(.bold)
                 .foregroundColor(salvadanaio.currentAmount < 0 ? .red : .primary)
@@ -2384,7 +2384,7 @@ struct CompactStylishSalvadanaiCard: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
-                Text("€\(String(format: "%.0f", abs(salvadanaio.currentAmount)))")
+                Text(abs(salvadanaio.currentAmount).italianCurrency)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(salvadanaio.currentAmount < 0 ? .red : Color(salvadanaio.color))
@@ -2911,7 +2911,7 @@ struct EnhancedWealthCard: View {
                             .fontWeight(.medium)
                             .foregroundColor(.white.opacity(0.7))
                         
-                        Text(String(format: "%.2f", totalWealth))
+                        Text(totalWealth.italianCurrency)
                             .font(.system(size: 42, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .contentTransition(.numericText())
