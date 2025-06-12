@@ -1205,8 +1205,7 @@ struct EditAccountView: View {
     }
     
     private var hasChanges: Bool {
-        account.name != dataManager.accounts.first(where: { $0.id == account.id })?.name ||
-        account.balance != originalBalance
+        account.name != dataManager.accounts.first(where: { $0.id == account.id })?.name
     }
     
     private var balanceChange: Double {
@@ -1262,58 +1261,6 @@ struct EditAccountView: View {
                             Text("⚠️ Attenzione: modificare il nome influenzerà \(relatedTransactions.count) transazioni associate")
                                 .foregroundColor(.orange)
                         }
-                    }
-                    
-                    // Modifica saldo
-                    Section {
-                        VStack(spacing: 16) {
-                            HStack {
-                                Image(systemName: "eurosign.circle.fill")
-                                    .foregroundColor(.green)
-                                    .frame(width: 24)
-                                
-                                Text("Saldo attuale")
-                                    .font(.headline)
-                                
-                                Spacer()
-                                
-                                TextField("0", value: $account.balance, format: .currency(code: "EUR"))
-                                    .multilineTextAlignment(.trailing)
-                                    .keyboardType(.decimalPad)
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                            }
-                            
-                            // Mostra la differenza se c'è stata una modifica
-                            if abs(balanceChange) > 0.01 {
-                                HStack {
-                                    Text("Modifica:")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    Spacer()
-                                    
-                                    Text("\(balanceChange >= 0 ? "+" : "")\(balanceChange.italianCurrency)")
-                                        .font(.subheadline)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(balanceChange >= 0 ? .green : .red)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill((balanceChange >= 0 ? Color.green : Color.red).opacity(0.1))
-                                )
-                            }
-                        }
-                    } header: {
-                        HStack {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Saldo")
-                        }
-                    } footer: {
-                        Text("Modifica il saldo attuale del conto. Questa modifica influenzerà il bilancio totale e le statistiche dell'app.")
                     }
                     
                     // Informazioni del conto
@@ -1508,19 +1455,10 @@ struct AccountPreviewCard: View {
                             .fontWeight(.bold)
                             .foregroundColor(account.balance >= 0 ? .primary : .red)
                     }
-                    
-                    if abs(balanceChange) > 0.01 {
-                        HStack {
-                            Text("Variazione:")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Text("\(balanceChange >= 0 ? "+" : "")\(balanceChange.italianCurrency)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(balanceChange >= 0 ? .green : .red)
-                        }
-                    }
+
+                    Text("Il saldo viene gestito tramite le transazioni")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Spacer()
