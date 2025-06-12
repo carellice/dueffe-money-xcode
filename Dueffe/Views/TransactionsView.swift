@@ -1799,6 +1799,13 @@ struct ReverseSalaryDistributionView: View {
     @State private var distributionMode: DistributionMode = .equal
     @State private var showingAlert = false
     @State private var alertMessage = ""
+
+    
+    private var totalAvailableFunds: Double {
+        dataManager.salvadanai.reduce(0) { total, salvadanaio in
+            total + max(0, salvadanaio.currentAmount)
+        }
+    }
     
     enum DistributionMode: String, CaseIterable {
         case equal = "Equa"
@@ -1822,18 +1829,60 @@ struct ReverseSalaryDistributionView: View {
     private var totalToRemove: Double {
         switch distributionMode {
         case .equal:
-            return selectedSalvadanai.isEmpty ? 0 : transaction.amount
+            if selectedSalvadanai.isEmpty { return 0 }
+            
+            // NUOVO: Calcola il totale considerando i limiti dei salvadanai
+            var total: Double = 0
+            let equalAmountPerSalvadanaio = transaction.amount / Double(selectedSalvadanai.count)
+            
+            for salvadanaiName in selectedSalvadanai {
+                if let salvadanaio = dataManager.salvadanai.first(where: { $0.name == salvadanaiName }) {
+                    let maxRemovable = max(0, salvadanaio.currentAmount)
+                    let actualAmount = min(equalAmountPerSalvadanaio, maxRemovable)
+                    total += actualAmount
+                }
+            }
+            return total
+            
         case .custom:
-            return customAmounts.values.reduce(0, +)
+            // NUOVO: Assicurati che gli importi personalizzati non superino i limiti
+            var total: Double = 0
+            for (salvadanaiName, amount) in customAmounts {
+                if selectedSalvadanai.contains(salvadanaiName) {
+                    if let salvadanaio = dataManager.salvadanai.first(where: { $0.name == salvadanaiName }) {
+                        let maxRemovable = max(0, salvadanaio.currentAmount)
+                        let actualAmount = min(amount, maxRemovable)
+                        total += actualAmount
+                    }
+                }
+            }
+            return total
         }
     }
+
     
     private var remainingAmount: Double {
         transaction.amount - totalToRemove
     }
     
     private var isDistributionValid: Bool {
-        !selectedSalvadanai.isEmpty && abs(remainingAmount) < 0.01
+        guard !selectedSalvadanai.isEmpty else { return false }
+        
+        // NUOVO: Controlla che tutti i salvadanai selezionati abbiano fondi sufficienti
+        for salvadanaiName in selectedSalvadanai {
+            guard let salvadanaio = dataManager.salvadanai.first(where: { $0.name == salvadanaiName }) else { continue }
+            
+            let maxRemovable = max(0, salvadanaio.currentAmount)
+            if maxRemovable <= 0 { return false }
+            
+            if distributionMode == .custom {
+                let requestedAmount = customAmounts[salvadanaiName] ?? 0
+                if requestedAmount > maxRemovable { return false }
+            }
+        }
+        
+        // Verifica che il totale sia uguale all'importo della transazione
+        return abs(remainingAmount) < 0.01
     }
     
     var body: some View {
@@ -1856,6 +1905,15 @@ struct ReverseSalaryDistributionView: View {
                     )
                     .padding(.horizontal)
                     .padding(.bottom, 16)
+                    
+                    if totalAvailableFunds < transaction.amount {
+                        InsufficientFundsWarningCard(
+                            transaction: transaction,
+                            availableFunds: totalAvailableFunds
+                        )
+                        .padding(.horizontal)
+                        .padding(.bottom, 16)
+                    }
                     
                     Form {
                         // Modalità di distribuzione
@@ -1962,11 +2020,18 @@ struct ReverseSalaryDistributionView: View {
     }
     
     private func setupInitialSelection() {
-        // Seleziona automaticamente tutti i salvadanai se ce ne sono pochi
-        if dataManager.salvadanai.count <= 3 {
-            selectedSalvadanai = Set(dataManager.salvadanai.map(\.name))
+        // NUOVO: Seleziona automaticamente solo i salvadanai che hanno fondi
+        let salvadanaiWithFunds = dataManager.salvadanai.filter { $0.currentAmount > 0 }
+        
+        if salvadanaiWithFunds.count <= 3 {
+            selectedSalvadanai = Set(salvadanaiWithFunds.map(\.name))
+        } else {
+            // Se ci sono molti salvadanai con fondi, seleziona i primi 3
+            let firstThree = Array(salvadanaiWithFunds.prefix(3))
+            selectedSalvadanai = Set(firstThree.map(\.name))
         }
     }
+
     
     private func toggleSalvadanaio(_ name: String) {
         if selectedSalvadanai.contains(name) {
@@ -1982,7 +2047,7 @@ struct ReverseSalaryDistributionView: View {
     
     private func performReverseDistribution() {
         guard isDistributionValid else {
-            alertMessage = "La rimozione non è valida. Assicurati che l'importo totale rimosso sia uguale all'importo della transazione."
+            alertMessage = "La rimozione non è valida. Verifica che tutti i salvadanai abbiano fondi sufficienti e che l'importo totale sia corretto."
             showingAlert = true
             return
         }
@@ -1991,10 +2056,42 @@ struct ReverseSalaryDistributionView: View {
         
         switch distributionMode {
         case .equal:
-            let perSalvadanaio = transaction.amount / Double(selectedSalvadanai.count)
-            finalAmounts = Dictionary(uniqueKeysWithValues: selectedSalvadanai.map { ($0, perSalvadanaio) })
+            let equalAmountPerSalvadanaio = transaction.amount / Double(selectedSalvadanai.count)
+            var tempAmounts: [String: Double] = [:]
+            
+            for salvadanaiName in selectedSalvadanai {
+                if let salvadanaio = dataManager.salvadanai.first(where: { $0.name == salvadanaiName }) {
+                    let maxRemovable = max(0, salvadanaio.currentAmount)
+                    let actualAmount = min(equalAmountPerSalvadanaio, maxRemovable)
+                    if actualAmount > 0 {
+                        tempAmounts[salvadanaiName] = actualAmount
+                    }
+                }
+            }
+            finalAmounts = tempAmounts
+            
         case .custom:
-            finalAmounts = customAmounts.filter { selectedSalvadanai.contains($0.key) && $0.value > 0 }
+            var tempAmounts: [String: Double] = [:]
+            for (salvadanaiName, amount) in customAmounts {
+                if selectedSalvadanai.contains(salvadanaiName) && amount > 0 {
+                    if let salvadanaio = dataManager.salvadanai.first(where: { $0.name == salvadanaiName }) {
+                        let maxRemovable = max(0, salvadanaio.currentAmount)
+                        let actualAmount = min(amount, maxRemovable)
+                        if actualAmount > 0 {
+                            tempAmounts[salvadanaiName] = actualAmount
+                        }
+                    }
+                }
+            }
+            finalAmounts = tempAmounts
+        }
+        
+        // Verifica finale che il totale corrisponda
+        let totalFinalAmount = finalAmounts.values.reduce(0, +)
+        guard abs(transaction.amount - totalFinalAmount) < 0.01 else {
+            alertMessage = "Errore: non è possibile rimuovere l'importo completo dai salvadanai selezionati. Alcuni salvadanai non hanno fondi sufficienti."
+            showingAlert = true
+            return
         }
         
         // Rimuovi dai salvadanai
@@ -2004,7 +2101,7 @@ struct ReverseSalaryDistributionView: View {
             }
         }
         
-        // Rimuovi dai conti (se necessario)
+        // Rimuovi dai conti
         if !transaction.accountName.isEmpty {
             dataManager.updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
         }
@@ -2013,6 +2110,7 @@ struct ReverseSalaryDistributionView: View {
         onComplete()
         dismiss()
     }
+
 }
 
 // MARK: - Reverse Distribution Header View
@@ -2158,7 +2256,7 @@ struct ReverseSalvadanaiDistributionRow: View {
     let isSelected: Bool
     let distributionMode: ReverseSalaryDistributionView.DistributionMode
     let equalAmount: Double
-    let customAmount: Binding<Double>
+    @Binding var customAmount: Double // Cambiato da let a @Binding
     let onToggle: () -> Void
     
     private func getColor(from colorString: String) -> Color {
@@ -2179,42 +2277,79 @@ struct ReverseSalvadanaiDistributionRow: View {
         }
     }
     
+    // NUOVO: Calcola l'importo massimo che può essere rimosso
+    private var maxRemovableAmount: Double {
+        max(0, salvadanaio.currentAmount)
+    }
+    
+    // NUOVO: Calcola l'importo sicuro per la distribuzione equa
+    private var safeEqualAmount: Double {
+        min(equalAmount, maxRemovableAmount)
+    }
+    
     private var displayAmount: Double {
         switch distributionMode {
         case .equal:
-            return isSelected ? equalAmount : 0
+            return isSelected ? safeEqualAmount : 0
         case .custom:
-            return customAmount.wrappedValue
+            return min(customAmount, maxRemovableAmount)
         }
+    }
+    
+    // NUOVO: Indica se l'importo è valido (non supera il saldo disponibile)
+    private var isAmountValid: Bool {
+        displayAmount <= maxRemovableAmount
     }
     
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 16) {
-                // Checkbox
-                Button(action: onToggle) {
+                // Checkbox - MODIFICATO: disabilitato se il salvadanaio non ha fondi
+                Button(action: {
+                    if maxRemovableAmount > 0 {
+                        onToggle()
+                    }
+                }) {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.title2)
-                        .foregroundColor(isSelected ? .red : .secondary)
+                        .foregroundColor(
+                            maxRemovableAmount > 0 ?
+                            (isSelected ? .red : .secondary) :
+                            .gray.opacity(0.5)
+                        )
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(maxRemovableAmount <= 0)
                 
                 // Icona salvadanaio
                 Circle()
                     .fill(getColor(from: salvadanaio.color))
                     .frame(width: 12, height: 12)
+                    .opacity(maxRemovableAmount > 0 ? 1.0 : 0.5)
                 
                 // Info salvadanaio
                 VStack(alignment: .leading, spacing: 4) {
                     Text(salvadanaio.name)
                         .font(.headline)
                         .fontWeight(.medium)
-                        .foregroundColor(isSelected ? .primary : .secondary)
+                        .foregroundColor(
+                            maxRemovableAmount > 0 ?
+                            (isSelected ? .primary : .secondary) :
+                            .gray
+                        )
                     
                     HStack {
+                        // MODIFICATO: Mostra disponibile e massimo removibile
                         Text("Disponibile: \(salvadanaio.currentAmount.italianCurrency)")
                             .font(.caption)
                             .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
+                        
+                        if maxRemovableAmount > 0 {
+                            Text("• Max: \(maxRemovableAmount.italianCurrency)")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .fontWeight(.medium)
+                        }
                         
                         if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
                             Text("• Obiettivo: \(salvadanaio.targetAmount.italianCurrency)")
@@ -2231,81 +2366,103 @@ struct ReverseSalvadanaiDistributionRow: View {
                 Spacer()
                 
                 // Campo importo per distribuzione personalizzata
-                if distributionMode == .custom && isSelected {
-                    HStack {
-                        Text("-")
-                            .font(.subheadline)
-                            .foregroundColor(.red)
-                        
-                        TextField("0", value: customAmount, format: .currency(code: "EUR"))
+                if distributionMode == .custom && isSelected && maxRemovableAmount > 0 {
+                    VStack(spacing: 4) {
+                        HStack {
+                            Text("-")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                            
+                            // MODIFICATO: TextField con validazione
+                            TextField("0", value: Binding(
+                                get: { customAmount },
+                                set: { newValue in
+                                    // NUOVO: Limita l'importo al massimo removibile
+                                    customAmount = min(max(0, newValue), maxRemovableAmount)
+                                }
+                            ), format: .currency(code: "EUR"))
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .frame(width: 80)
                             .keyboardType(.decimalPad)
+                            .foregroundColor(isAmountValid ? .primary : .red)
+                        }
+                        
+                        // NUOVO: Indicatore di validità
+                        if !isAmountValid {
+                            Text("Max: \(maxRemovableAmount.italianCurrency)")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                        }
                     }
                 } else if isSelected && displayAmount > 0 {
                     // Mostra importo per modalità equa
-                    Text("-\(displayAmount.italianCurrency)")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.red)
+                    VStack(spacing: 4) {
+                        Text("-\(displayAmount.italianCurrency)")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(isAmountValid ? .red : .orange)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill((isAmountValid ? Color.red : Color.orange).opacity(0.1))
+                            )
+                        
+                        // NUOVO: Avviso se l'importo equo supera il disponibile
+                        if distributionMode == .equal && equalAmount > maxRemovableAmount {
+                            Text("Limitato a \(maxRemovableAmount.italianCurrency)")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                } else if maxRemovableAmount <= 0 {
+                    // NUOVO: Indicatore per salvadanai senza fondi
+                    Text("Nessun fondo")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(
                             Capsule()
-                                .fill(Color.red.opacity(0.1))
+                                .fill(Color.gray.opacity(0.1))
                         )
                 }
             }
             .padding(.vertical, 12)
             
-            // Warning se i fondi non sono sufficienti
+            // Info saldo dopo rimozione
             if isSelected && displayAmount > 0 {
                 let newBalance = salvadanaio.currentAmount - displayAmount
-                if newBalance < 0 {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Divider()
-                            .padding(.leading, 60)
-                        
-                        HStack {
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                HStack {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.caption2)
-                                        .foregroundColor(.orange)
-                                    Text("Saldo diventerà negativo")
-                                        .font(.caption2)
-                                        .foregroundColor(.orange)
-                                        .fontWeight(.medium)
-                                }
-                                
-                                Text("Nuovo saldo: \(newBalance.italianCurrency)")
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            // MODIFICATO: Sempre positivo o zero
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.green)
+                                Text("Saldo sicuro")
+                                    .font(.caption2)
+                                    .foregroundColor(.green)
                                     .fontWeight(.medium)
                             }
-                        }
-                        .padding(.leading, 60)
-                        .padding(.bottom, 8)
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Divider()
-                            .padding(.leading, 60)
-                        
-                        HStack {
-                            Spacer()
+                            
                             Text("Nuovo saldo: \(newBalance.italianCurrency)")
                                 .font(.caption2)
                                 .foregroundColor(.green)
                                 .fontWeight(.medium)
                         }
-                        .padding(.leading, 60)
-                        .padding(.bottom, 8)
                     }
+                    .padding(.leading, 60)
+                    .padding(.bottom, 8)
                 }
             }
         }
+        .opacity(maxRemovableAmount > 0 ? 1.0 : 0.6) // NUOVO: Opacità ridotta per salvadanai senza fondi
     }
 }
 
@@ -2392,5 +2549,66 @@ struct ReverseCustomDistributionQuickActionsView: View {
                 Spacer()
             }
         }
+    }
+}
+
+// MARK: - Insufficient Funds Warning Card
+struct InsufficientFundsWarningCard: View {
+    let transaction: TransactionModel
+    let availableFunds: Double
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text("Fondi Insufficienti")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Importo da rimuovere:")
+                    Spacer()
+                    Text(transaction.amount.italianCurrency)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+                }
+                
+                HStack {
+                    Text("Fondi disponibili:")
+                    Spacer()
+                    Text(availableFunds.italianCurrency)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                }
+                
+                Divider()
+                
+                HStack {
+                    Text("Mancano:")
+                    Spacer()
+                    Text((transaction.amount - availableFunds).italianCurrency)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                }
+            }
+            
+            Text("⚠️ Non è possibile eliminare questa transazione perché i salvadanai non hanno fondi sufficienti per coprire l'importo da rimuovere.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.top, 8)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.orange.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 }
