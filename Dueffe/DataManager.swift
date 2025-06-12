@@ -11,12 +11,15 @@ extension Double {
         // Determina se mostrare i decimali
         let hasDecimals = self.truncatingRemainder(dividingBy: 1) != 0
         
+        // Usa sempre il valore assoluto per la formattazione
+        let absValue = abs(self)
+        
         // Converti in stringa con o senza decimali
         let numberString: String
         if hasDecimals {
-            numberString = String(format: "%.2f", self)
+            numberString = String(format: "%.2f", absValue)
         } else {
-            numberString = String(format: "%.0f", self)
+            numberString = String(format: "%.0f", absValue)
         }
         
         // Separa parte intera e decimale
@@ -28,11 +31,15 @@ extension Double {
         let formattedInteger = addThousandsSeparator(to: integerPart)
         
         // Costruisci il risultato finale
+        let formattedNumber: String
         if let decimals = decimalPart, hasDecimals {
-            return "\(formattedInteger),\(decimals) €"
+            formattedNumber = "\(formattedInteger),\(decimals) €"
         } else {
-            return "\(formattedInteger) €"
+            formattedNumber = "\(formattedInteger) €"
         }
+        
+        // Aggiungi il segno meno se necessario
+        return self < 0 ? "-\(formattedNumber)" : formattedNumber
     }
     
     private func addThousandsSeparator(to numberString: String) -> String {
