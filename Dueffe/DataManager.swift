@@ -230,16 +230,16 @@ class DataManager: ObservableObject {
     
     // Categorie complete (predefinite + personalizzate)
     var expenseCategories: [String] {
-        return defaultExpenseCategories + customExpenseCategories.sorted()
+        return sortCategoriesAlphabetically(defaultExpenseCategories + customExpenseCategories)
     }
     
     var incomeCategories: [String] {
-        return defaultIncomeCategories + customIncomeCategories.sorted()
+        return sortCategoriesAlphabetically(defaultIncomeCategories + customIncomeCategories)
     }
     
     // NUOVO: Tutte le categorie salvadanai (predefinite + personalizzate)
     var allSalvadanaiCategories: [String] {
-        return defaultSalvadanaiCategories + customSalvadanaiCategories.sorted()
+        return sortCategoriesAlphabetically(defaultSalvadanaiCategories + customSalvadanaiCategories)
     }
     
     // Colori predefiniti per i salvadanai
@@ -409,7 +409,17 @@ class DataManager: ObservableObject {
     
     var usedSalvadanaiCategories: [String] {
         let used = Set(salvadanai.map { $0.category })
-        return Array(used).sorted()
+        return sortCategoriesAlphabetically(Array(used))
+    }
+    
+    /// Salvadanai ordinati alfabeticamente per nome
+    var sortedSalvadanai: [SalvadanaiModel] {
+        return sortedSalvadanai(self.salvadanai)
+    }
+
+    /// Account ordinati alfabeticamente per nome
+    var sortedAccounts: [AccountModel] {
+        return sortedAccounts(self.accounts)
     }
     
     func addTransaction(amount: Double, descr: String, category: String, type: String, accountName: String? = nil, salvadanaiName: String? = nil) {
@@ -711,6 +721,41 @@ struct ExportData: Codable {
     }
 }
 
+// MARK: - Funzioni di Ordinamento Centralizzate
+extension DataManager {
+    
+    /// Ordina le categorie alfabeticamente, ignorando gli emoji iniziali
+    private func sortCategoriesAlphabetically(_ categories: [String]) -> [String] {
+        return categories.sorted { category1, category2 in
+            let name1 = extractCategoryName(from: category1)
+            let name2 = extractCategoryName(from: category2)
+            return name1.localizedCaseInsensitiveCompare(name2) == .orderedAscending
+        }
+    }
+    
+    /// Estrae il nome della categoria rimuovendo l'emoji iniziale se presente
+    private func extractCategoryName(from category: String) -> String {
+        if let firstChar = category.first, firstChar.isEmoji {
+            return String(category.dropFirst()).trimmingCharacters(in: .whitespaces)
+        }
+        return category
+    }
+    
+    /// Ordina un array di salvadanai per nome alfabeticamente
+    func sortedSalvadanai(_ salvadanai: [SalvadanaiModel]) -> [SalvadanaiModel] {
+        return salvadanai.sorted { salvadanaio1, salvadanaio2 in
+            salvadanaio1.name.localizedCaseInsensitiveCompare(salvadanaio2.name) == .orderedAscending
+        }
+    }
+    
+    /// Ordina un array di account per nome alfabeticamente
+    func sortedAccounts(_ accounts: [AccountModel]) -> [AccountModel] {
+        return accounts.sorted { account1, account2 in
+            account1.name.localizedCaseInsensitiveCompare(account2.name) == .orderedAscending
+        }
+    }
+}
+
 extension DataManager {
     
     // MARK: - Export Data
@@ -786,4 +831,11 @@ extension DataManager {
 struct ImportResult {
     let success: Bool
     let message: String
+}
+
+extension Character {
+    var isEmoji: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return scalar.properties.isEmoji && (scalar.value >= 0x238d || unicodeScalars.count > 1)
+    }
 }

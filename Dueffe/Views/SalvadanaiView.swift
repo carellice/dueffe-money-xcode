@@ -119,7 +119,7 @@ struct SalvadanaiView: View {
                                     .padding(40)
                                 } else {
                                     LazyVStack(spacing: 16) {
-                                        ForEach(filteredSalvadanai, id: \.id) { salvadanaio in
+                                        ForEach(dataManager.sortedSalvadanai(filteredSalvadanai), id: \.id) { salvadanaio in
                                             SalvadanaiCardView(salvadanaio: salvadanaio)
                                                 .onTapGesture {
                                                     selectedSalvadanaio = salvadanaio

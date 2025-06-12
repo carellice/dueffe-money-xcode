@@ -54,7 +54,7 @@ struct AccountsView: View {
                             // Lista conti
                             ScrollView {
                                 LazyVStack(spacing: 16) {
-                                    ForEach(filteredAccounts, id: \.id) { account in
+                                    ForEach(dataManager.sortedAccounts(filteredAccounts), id: \.id) { account in
                                         // MODIFICATO: Usa la nuova card con menu button, rimuovi onTapGesture per i dettagli
                                         EnhancedAccountCard(account: account)
                                             .onTapGesture {

@@ -806,14 +806,6 @@ struct NoAccountsTransactionsView: View {
     }
 }
 
-// MARK: - Extensions
-extension Character {
-    var isEmoji: Bool {
-        guard let scalar = unicodeScalars.first else { return false }
-        return scalar.properties.isEmoji && (scalar.value >= 0x238d || unicodeScalars.count > 1)
-    }
-}
-
 struct SimpleAddTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
@@ -1151,7 +1143,7 @@ struct SimpleAddTransactionView: View {
                                 Text("Seleziona salvadanaio")
                                     .tag("")
                                     .foregroundColor(.secondary)
-                                ForEach(dataManager.salvadanai, id: \.name) { salvadanaio in
+                                ForEach(dataManager.sortedSalvadanai, id: \.name) { salvadanaio in
                                     HStack {
                                         Text(salvadanaio.name)
                                         Spacer()
@@ -1201,7 +1193,7 @@ struct SimpleAddTransactionView: View {
                     Section {
                         Picker("Da quale conto", selection: $selectedAccount) {
                             Text("Seleziona conto").tag("")
-                            ForEach(dataManager.accounts, id: \.name) { account in
+                            ForEach(dataManager.sortedAccounts, id: \.name) { account in
                                 HStack {
                                     Text(account.name)
                                     Spacer()
@@ -1249,7 +1241,7 @@ struct SimpleAddTransactionView: View {
                     Section {
                         Picker("A quale conto", selection: $selectedAccount) {
                             Text("Seleziona conto").tag("")
-                            ForEach(dataManager.accounts, id: \.name) { account in
+                            ForEach(dataManager.sortedAccounts, id: \.name) { account in
                                 HStack {
                                     Text(account.name)
                                     Spacer()
