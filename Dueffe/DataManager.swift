@@ -549,6 +549,54 @@ class DataManager: ObservableObject {
         )
     }
     
+    /// Filtra e ordina le categorie spese
+    func filteredAndSortedExpenseCategories(searchText: String) -> (custom: [String], predefined: [String]) {
+        let customFiltered = searchText.isEmpty ?
+            customExpenseCategories :
+            customExpenseCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        let predefinedFiltered = searchText.isEmpty ?
+            defaultExpenseCategories :
+            defaultExpenseCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        return (
+            custom: sortCategoriesAlphabetically(customFiltered),
+            predefined: sortCategoriesAlphabetically(predefinedFiltered)
+        )
+    }
+
+    /// Filtra e ordina le categorie entrate
+    func filteredAndSortedIncomeCategories(searchText: String) -> (custom: [String], predefined: [String]) {
+        let customFiltered = searchText.isEmpty ?
+            customIncomeCategories :
+            customIncomeCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        let predefinedFiltered = searchText.isEmpty ?
+            defaultIncomeCategories :
+            defaultIncomeCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        return (
+            custom: sortCategoriesAlphabetically(customFiltered),
+            predefined: sortCategoriesAlphabetically(predefinedFiltered)
+        )
+    }
+
+    /// Filtra e ordina le categorie salvadanai
+    func filteredAndSortedSalvadanaiCategories(searchText: String) -> (custom: [String], predefined: [String]) {
+        let customFiltered = searchText.isEmpty ?
+            customSalvadanaiCategories :
+            customSalvadanaiCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        let predefinedFiltered = searchText.isEmpty ?
+            defaultSalvadanaiCategories :
+            defaultSalvadanaiCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        
+        return (
+            custom: sortCategoriesAlphabetically(customFiltered),
+            predefined: sortCategoriesAlphabetically(predefinedFiltered)
+        )
+    }
+    
     private func addDistributionTransaction(amount: Double, fromAccount: String, toSalvadanaio: String, description: String) {
         let distributionTransaction = TransactionModel(
             amount: amount,

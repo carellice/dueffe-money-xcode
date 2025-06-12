@@ -407,28 +407,16 @@ struct EnhancedCategoriesManagementView: View {
     @State private var searchText = ""
     
     var filteredExpenseCategories: [String] {
-        if searchText.isEmpty {
-            return dataManager.customExpenseCategories.sorted()
-        } else {
-            return dataManager.customExpenseCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }.sorted()
-        }
+        return dataManager.filteredAndSortedExpenseCategories(searchText: searchText).custom
     }
     
     var filteredIncomeCategories: [String] {
-        if searchText.isEmpty {
-            return dataManager.customIncomeCategories.sorted()
-        } else {
-            return dataManager.customIncomeCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }.sorted()
-        }
+        return dataManager.filteredAndSortedIncomeCategories(searchText: searchText).custom
     }
     
     // NUOVO: Filtro per categorie salvadanai
     var filteredSalvadanaiCategories: [String] {
-        if searchText.isEmpty {
-            return dataManager.customSalvadanaiCategories.sorted()
-        } else {
-            return dataManager.customSalvadanaiCategories.filter { $0.localizedCaseInsensitiveContains(searchText) }.sorted()
-        }
+        return dataManager.filteredAndSortedSalvadanaiCategories(searchText: searchText).custom
     }
     
     var body: some View {
@@ -468,8 +456,7 @@ struct EnhancedCategoriesManagementView: View {
                         if selectedTab == 0 {
                             // Expense Categories (INVARIATO)
                             Section {
-                                ForEach(dataManager.defaultExpenseCategories, id: \.self) { category in
-                                    CategoryRow(
+                                ForEach(dataManager.filteredAndSortedExpenseCategories(searchText: searchText).predefined, id: \.self) { category in                                    CategoryRow(
                                         category: category,
                                         isDefault: true,
                                         color: .red,
@@ -516,7 +503,7 @@ struct EnhancedCategoriesManagementView: View {
                         } else if selectedTab == 1 {
                             // Income Categories (INVARIATO)
                             Section {
-                                ForEach(dataManager.defaultIncomeCategories, id: \.self) { category in
+                                ForEach(dataManager.filteredAndSortedIncomeCategories(searchText: searchText).predefined, id: \.self) { category in
                                     CategoryRow(
                                         category: category,
                                         isDefault: true,
@@ -564,7 +551,7 @@ struct EnhancedCategoriesManagementView: View {
                         } else {
                             // NUOVO: Salvadanai Categories
                             Section {
-                                ForEach(dataManager.defaultSalvadanaiCategories, id: \.self) { category in
+                                ForEach(dataManager.filteredAndSortedSalvadanaiCategories(searchText: searchText).predefined, id: \.self) { category in
                                     CategoryRow(
                                         category: category,
                                         isDefault: true,
