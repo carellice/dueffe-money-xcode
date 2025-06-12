@@ -102,7 +102,7 @@ struct SettingsView: View {
                     // Footer con versione
                     Section {
                         VStack(spacing: 12) {
-                            Text("Dueffe Money v1.0")
+                            Text("Dueffe Money")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
