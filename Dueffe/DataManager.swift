@@ -826,7 +826,7 @@ extension DataManager {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd-MM-yy_HH-mm"
         let dateString = formatter.string(from: Date())
-        return "dueffe\(dateString).json"
+        return "dueffe_money\(dateString).json"
     }
     
     // MARK: - Import Data

@@ -134,7 +134,7 @@ struct AnimatedSplashScreen: View {
                     
                     // Titolo app
                     VStack(spacing: 16) {
-                        Text("Dueffe")
+                        Text("Dueffe Money")
                             .font(.system(size: 48, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)

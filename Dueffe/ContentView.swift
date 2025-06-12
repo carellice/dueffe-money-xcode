@@ -49,7 +49,7 @@ struct AppOnboardingView: View {
     
     let onboardingPages = [
         OnboardingPage(
-            title: "Benvenuto in Dueffe! 👋",
+            title: "Benvenuto in Dueffe Money! 👋",
             subtitle: "La tua app per il risparmio intelligente",
             description: "Gestisci i tuoi soldi, crea salvadanai e raggiungi i tuoi obiettivi finanziari con facilità",
             icon: "star.fill",
@@ -76,7 +76,7 @@ struct AppOnboardingView: View {
         OnboardingPage(
             title: "Salvadanai Intelligenti 🎯",
             subtitle: "Raggiungi i tuoi obiettivi",
-            description: "Crea salvadanai per ogni tuo obiettivo: vacanze, casa, emergenze... Dueffe ti aiuta a risparmiare!",
+            description: "Crea salvadanai per ogni tuo obiettivo: vacanze, casa, emergenze... Dueffe Money ti aiuta a risparmiare!",
             icon: "target",
             color: .green,
             features: [

@@ -102,7 +102,7 @@ struct SettingsView: View {
                     // Footer con versione
                     Section {
                         VStack(spacing: 12) {
-                            Text("Dueffe v1.0")
+                            Text("Dueffe Money v1.0")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -1150,7 +1150,7 @@ struct AboutAppView: View {
                         }
                         
                         VStack(spacing: 8) {
-                            Text("Dueffe")
+                            Text("Dueffe Money")
                                 .font(.largeTitle)
                                 .fontWeight(.bold)
                             
@@ -1168,7 +1168,7 @@ struct AboutAppView: View {
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
                         
-                        Text("Dueffe ti aiuta a gestire i tuoi salvadanai e a raggiungere i tuoi obiettivi finanziari con facilità e stile.")
+                        Text("Dueffe Money ti aiuta a gestire i tuoi salvadanai e a raggiungere i tuoi obiettivi finanziari con facilità e stile.")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -1195,7 +1195,7 @@ struct AboutAppView: View {
                             .font(.headline)
                             .fontWeight(.semibold)
                         
-                        Text("© 2025 Dueffe. Tutti i diritti riservati.")
+                        Text("© 2025 Dueffe Money. Tutti i diritti riservati.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -1615,7 +1615,7 @@ struct InfoCard: View {
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                InfoRow(icon: "checkmark.circle", text: "I backup sono in formato JSON e compatibili solo con Dueffe")
+                InfoRow(icon: "checkmark.circle", text: "I backup sono in formato JSON e compatibili solo con Dueffe Money")
                 InfoRow(icon: "shield.fill", text: "I tuoi dati rimangono sempre sul tuo dispositivo")
                 InfoRow(icon: "exclamationmark.triangle", text: "L'importazione sostituisce tutti i dati attuali")
                 InfoRow(icon: "icloud", text: "Salva i backup su iCloud o condividili via AirDrop")
