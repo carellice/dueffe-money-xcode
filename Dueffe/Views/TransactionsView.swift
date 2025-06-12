@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - TransactionsView completamente riscritta
+// MARK: - TransactionsView - MODIFICATA per nascondere le distribuzioni
 struct TransactionsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddTransaction = false
@@ -9,18 +9,20 @@ struct TransactionsView: View {
     @State private var showingDeleteConfirmation = false
     @State private var transactionToDelete: TransactionModel?
     
-    // MARK: - AGGIORNARE IN TransactionsView.swift
-
+    // MODIFICATO: Filtro che esclude le distribuzioni
     private var availableFilterOptions: [(String, String, String)] {
         var filters: [(String, String, String)] = []
         
-        // Sempre mostra "Tutte" se ci sono transazioni
-        if !dataManager.transactions.isEmpty {
+        // Filtra le transazioni escludendo le distribuzioni
+        let filteredTransactions = dataManager.transactions.filter { $0.type != "distribution" }
+        
+        // Sempre mostra "Tutte" se ci sono transazioni (escludendo distribuzioni)
+        if !filteredTransactions.isEmpty {
             filters.append(("all", "Tutte", "list.bullet"))
         }
         
-        // Controllo per ogni tipo di transazione
-        let transactionTypes = Set(dataManager.transactions.map { $0.type })
+        // Controllo per ogni tipo di transazione (escludendo distribuzioni)
+        let transactionTypes = Set(filteredTransactions.map { $0.type })
         
         if transactionTypes.contains("expense") {
             filters.append(("expense", "Spese", "minus.circle"))
@@ -38,20 +40,19 @@ struct TransactionsView: View {
             filters.append(("transfer", "Trasf. Conti", "arrow.left.arrow.right.circle"))
         }
 
-        // NUOVO: Filtro per trasferimenti tra salvadanai
         if transactionTypes.contains("transfer_salvadanai") {
             filters.append(("transfer_salvadanai", "Trasf. Salvadanai", "arrow.left.arrow.right.circle"))
         }
-
-        if transactionTypes.contains("distribution") {
-            filters.append(("distribution", "Distribuzioni", "arrow.branch.circle"))
-        }
+        
+        // RIMOSSO: Filtro per distribuzioni non più disponibile
         
         return filters
     }
     
+    // MODIFICATO: Filtro che esclude sempre le distribuzioni
     var filteredTransactions: [TransactionModel] {
-        var transactions = dataManager.transactions
+        // Prima filtra le distribuzioni, poi applica gli altri filtri
+        var transactions = dataManager.transactions.filter { $0.type != "distribution" }
         
         if selectedFilter != "all" {
             transactions = transactions.filter { $0.type == selectedFilter }
@@ -67,6 +68,7 @@ struct TransactionsView: View {
         return transactions.sorted { $0.date > $1.date }
     }
     
+    // Il resto del codice rimane uguale...
     var body: some View {
         NavigationView {
             ZStack {
@@ -81,7 +83,7 @@ struct TransactionsView: View {
                 VStack {
                     if dataManager.accounts.isEmpty {
                         NoAccountsTransactionsView()
-                    } else if dataManager.transactions.isEmpty {
+                    } else if dataManager.transactions.filter({ $0.type != "distribution" }).isEmpty { // MODIFICATO: Controlla se ci sono transazioni non-distribuzione
                         EmptyTransactionsView(action: { showingAddTransaction = true })
                     } else {
                         VStack(spacing: 0) {
@@ -111,7 +113,7 @@ struct TransactionsView: View {
                                     Section {
                                         ForEach(transactions, id: \.id) { transaction in
                                             TransactionRowView(transaction: transaction)
-                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) { // Cambiato a false per evitare eliminazione accidentale
+                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                                     Button(role: .destructive, action: {
                                                         transactionToDelete = transaction
                                                         showingDeleteConfirmation = true
@@ -144,7 +146,7 @@ struct TransactionsView: View {
                             .font(.title2)
                             .foregroundColor(.purple)
                     }
-                    .disabled(dataManager.accounts.isEmpty) // Non serve cambiare qui perché controlleremo nel sheet
+                    .disabled(dataManager.accounts.isEmpty)
                 }
             }
             .alert("Elimina Transazione", isPresented: $showingDeleteConfirmation) {
@@ -192,11 +194,14 @@ struct TransactionsView: View {
         return grouped.sorted { $0.key > $1.key }
     }
     
+    // MODIFICATO: Conteggio che esclude le distribuzioni
     private func getFilterCount(_ filter: String) -> Int {
+        let nonDistributionTransactions = dataManager.transactions.filter { $0.type != "distribution" }
+        
         if filter == "all" {
-            return dataManager.transactions.count
+            return nonDistributionTransactions.count
         } else {
-            return dataManager.transactions.filter { $0.type == filter }.count
+            return nonDistributionTransactions.filter { $0.type == filter }.count
         }
     }
 }
