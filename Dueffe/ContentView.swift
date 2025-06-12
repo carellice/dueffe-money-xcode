@@ -1620,7 +1620,10 @@ struct HomeView: View {
     }
     
     var recentTransactions: [TransactionModel] {
-        Array(dataManager.transactions.sorted { $0.date > $1.date }.prefix(5))
+        Array(dataManager.transactions
+            .filter { $0.type != "distribution" } // NUOVO: Esclude le distribuzioni
+            .sorted { $0.date > $1.date }
+            .prefix(5))
     }
     
     var body: some View {

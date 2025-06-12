@@ -345,7 +345,8 @@ struct SalvadanaiCardView: View {
     
     private var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter { transaction in
-            transaction.salvadanaiName == salvadanaio.name
+            transaction.salvadanaiName == salvadanaio.name &&
+            transaction.type != "distribution" // NUOVO: Esclude le distribuzioni
         }
     }
     
@@ -1869,7 +1870,10 @@ struct SimpleSalvadanaiDetailView: View {
     @State private var showingDeleteAlert = false
     
     var relatedTransactions: [TransactionModel] {
-        dataManager.transactions.filter { $0.salvadanaiName == salvadanaio.name }
+        dataManager.transactions.filter {
+            $0.salvadanaiName == salvadanaio.name &&
+            $0.type != "distribution" // NUOVO: Esclude le distribuzioni
+        }
     }
     
     var body: some View {
