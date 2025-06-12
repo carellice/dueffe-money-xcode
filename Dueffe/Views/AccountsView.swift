@@ -452,6 +452,7 @@ struct EnhancedAccountCard: View {
                             }) {
                                 Label("Modifica", systemImage: "pencil")
                             }
+                            .tint(.primary)
                             
                             if relatedTransactions.isEmpty {
                                 Divider()
@@ -460,6 +461,7 @@ struct EnhancedAccountCard: View {
                                 }) {
                                     Label("Elimina", systemImage: "trash")
                                 }
+                                .tint(.red)
                             }
                         } label: {
                             Image(systemName: "ellipsis")
