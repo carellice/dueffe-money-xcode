@@ -558,28 +558,6 @@ struct FirstAccountOnboardingView: View {
                                             .fontWeight(.semibold)
                                     }
                                     
-                                    HStack {
-                                        Text("€0,00")
-                                            .font(.title2)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.blue)
-                                        
-                                        Spacer()
-                                        
-                                        Text("(impostato automaticamente)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding()
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(Color.blue.opacity(0.1))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12)
-                                                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                                            )
-                                    )
-                                    
                                     Text("Il saldo verrà impostato dopo aver aggiunto i tuoi salvadanai e il saldo iniziale")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
@@ -1272,10 +1250,6 @@ struct InitialBalanceOnboardingView: View {
                                             .foregroundColor(.orange)
                                         
                                         Spacer()
-                                        
-                                        Text("(impostato automaticamente)")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
                                     }
                                     .padding()
                                     .background(
