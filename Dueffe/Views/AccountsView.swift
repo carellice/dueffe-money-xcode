@@ -601,29 +601,6 @@ struct EnhancedAddAccountView: View {
                         }
                     }
                     
-                    // Saldo iniziale
-                    Section {
-                        HStack {
-                            Image(systemName: "eurosign.circle.fill")
-                                .foregroundColor(.green)
-                                .frame(width: 24)
-                            Text("Saldo iniziale")
-                            Spacer()
-                            TextField("0", value: $initialBalance, format: .currency(code: "EUR"))
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                                .font(.headline)
-                        }
-                    } header: {
-                        HStack {
-                            Image(systemName: "dollarsign.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Saldo")
-                        }
-                    } footer: {
-                        Text("Inserisci il saldo attuale del conto. Puoi inserire un valore negativo se il conto è in rosso.")
-                    }
-                    
                     // Anteprima
                     Section {
                         HStack {
@@ -644,12 +621,12 @@ struct EnhancedAddAccountView: View {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text(initialBalance.italianCurrency)
+                                Text("€0,00")
                                     .font(.headline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(initialBalance >= 0 ? .primary : .red)
+                                    .foregroundColor(.primary)
                                 
-                                Text("Saldo")
+                                Text("Saldo iniziale")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -678,7 +655,7 @@ struct EnhancedAddAccountView: View {
                     Button("Salva") {
                         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
                         let finalName = "\(getCurrentAccountType()) - \(trimmedName)"
-                        dataManager.addAccount(name: finalName, initialBalance: initialBalance)
+                        dataManager.addAccount(name: finalName, initialBalance: 0.0)
                         dismiss()
                     }
                     .disabled(!isFormValid)
