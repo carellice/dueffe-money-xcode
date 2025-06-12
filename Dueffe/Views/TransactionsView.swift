@@ -1,12 +1,13 @@
 import SwiftUI
 
-// MARK: - TransactionsView - MODIFICATA per nascondere le distribuzioni
+// MARK: - TransactionsView - VERSIONE COMPLETA MODIFICATA
 struct TransactionsView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var showingAddTransaction = false
     @State private var selectedFilter = "all"
     @State private var searchText = ""
     @State private var showingDeleteConfirmation = false
+    @State private var showingReverseDistribution = false // NUOVO
     @State private var transactionToDelete: TransactionModel?
     
     // MODIFICATO: Filtro che esclude le distribuzioni
@@ -44,8 +45,6 @@ struct TransactionsView: View {
             filters.append(("transfer_salvadanai", "Trasf. Salvadanai", "arrow.left.arrow.right.circle"))
         }
         
-        // RIMOSSO: Filtro per distribuzioni non più disponibile
-        
         return filters
     }
     
@@ -68,7 +67,6 @@ struct TransactionsView: View {
         return transactions.sorted { $0.date > $1.date }
     }
     
-    // Il resto del codice rimane uguale...
     var body: some View {
         NavigationView {
             ZStack {
@@ -83,7 +81,7 @@ struct TransactionsView: View {
                 VStack {
                     if dataManager.accounts.isEmpty {
                         NoAccountsTransactionsView()
-                    } else if dataManager.transactions.filter({ $0.type != "distribution" }).isEmpty { // MODIFICATO: Controlla se ci sono transazioni non-distribuzione
+                    } else if dataManager.transactions.filter({ $0.type != "distribution" }).isEmpty {
                         EmptyTransactionsView(action: { showingAddTransaction = true })
                     } else {
                         VStack(spacing: 0) {
@@ -149,25 +147,6 @@ struct TransactionsView: View {
                     .disabled(dataManager.accounts.isEmpty)
                 }
             }
-            .alert("Elimina Transazione", isPresented: $showingDeleteConfirmation) {
-                Button("Elimina", role: .destructive) {
-                    if let transaction = transactionToDelete {
-                        withAnimation {
-                            dataManager.deleteTransaction(transaction)
-                        }
-                    }
-                    transactionToDelete = nil
-                }
-                Button("Annulla", role: .cancel) {
-                    transactionToDelete = nil
-                }
-            } message: {
-                if let transaction = transactionToDelete {
-                    Text("Sei sicuro di voler eliminare '\(transaction.descr)'?\n\nQuesta azione non può essere annullata.")
-                } else {
-                    Text("Sei sicuro di voler eliminare questa transazione?")
-                }
-            }
         }
         .sheet(isPresented: $showingAddTransaction) {
             if dataManager.accounts.isEmpty {
@@ -178,6 +157,53 @@ struct TransactionsView: View {
                 )
             } else {
                 SimpleAddTransactionView()
+            }
+        }
+        // NUOVO: Sheet per la distribuzione inversa
+        .sheet(isPresented: $showingReverseDistribution) {
+            if let transaction = transactionToDelete {
+                ReverseSalaryDistributionView(
+                    transaction: transaction,
+                    onComplete: {
+                        // Elimina definitivamente la transazione dopo la distribuzione inversa
+                        withAnimation {
+                            dataManager.transactions.removeAll { $0.id == transaction.id }
+                        }
+                        transactionToDelete = nil
+                    }
+                )
+            }
+        }
+        // MODIFICATO: Alert per la conferma eliminazione
+        .alert("Elimina Transazione", isPresented: $showingDeleteConfirmation) {
+            Button("Elimina", role: .destructive) {
+                if let transaction = transactionToDelete {
+                    // NUOVO: Controlla se richiede distribuzione inversa
+                    if dataManager.transactionRequiresReverseDistribution(transaction) {
+                        showingReverseDistribution = true
+                        showingDeleteConfirmation = false
+                    } else {
+                        // Eliminazione normale
+                        withAnimation {
+                            dataManager.deleteTransaction(transaction)
+                        }
+                        transactionToDelete = nil
+                    }
+                }
+            }
+            Button("Annulla", role: .cancel) {
+                transactionToDelete = nil
+            }
+        } message: {
+            if let transaction = transactionToDelete {
+                // NUOVO: Messaggio diverso per transazioni che richiedono distribuzione inversa
+                if dataManager.transactionRequiresReverseDistribution(transaction) {
+                    Text("Eliminando '\(transaction.descr)' dovrai scegliere da quali salvadanai rimuovere \(transaction.amount.italianCurrency).\n\nVuoi continuare?")
+                } else {
+                    Text("Sei sicuro di voler eliminare '\(transaction.descr)'?\n\nQuesta azione non può essere annullata.")
+                }
+            } else {
+                Text("Sei sicuro di voler eliminare questa transazione?")
             }
         }
     }
@@ -327,8 +353,11 @@ struct TransactionSectionHeaderView: View {
 }
 
 // MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
+// SOSTITUISCI LA TransactionRowView ESISTENTE CON QUESTA VERSIONE AGGIORNATA:
+
 struct TransactionRowView: View {
     let transaction: TransactionModel
+    @EnvironmentObject var dataManager: DataManager // AGGIUNTO
     @State private var animateAmount = false
     @State private var animateGlow = false
     @State private var animateIcon = false
@@ -402,15 +431,18 @@ struct TransactionRowView: View {
         }
     }
     
+    // NUOVO: Indica se questa transazione richiede distribuzione inversa
+    private var requiresReverseDistribution: Bool {
+        dataManager.transactionRequiresReverseDistribution(transaction)
+    }
+    
     var body: some View {
         Button(action: {
             if showDetails {
-                // Animazione di chiusura più controllata per evitare overflow
                 withAnimation(.easeOut(duration: 0.35)) {
                     showDetails = false
                 }
             } else {
-                // Animazione di apertura
                 withAnimation(.easeInOut(duration: 0.4)) {
                     showDetails = true
                 }
@@ -469,6 +501,19 @@ struct TransactionRowView: View {
                                         .foregroundColor(.white)
                                         .scaleEffect(animateIcon ? 1.08 : 1.0)
                                         .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateIcon)
+                                }
+                                
+                                // NUOVO: Indicatore per distribuzione inversa
+                                if requiresReverseDistribution {
+                                    Image(systemName: "exclamationmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.yellow)
+                                        .background(
+                                            Circle()
+                                                .fill(Color.white)
+                                                .frame(width: 14, height: 14)
+                                        )
+                                        .offset(x: 16, y: -16)
                                 }
                             }
                             
@@ -563,7 +608,7 @@ struct TransactionRowView: View {
                                             .foregroundColor(.white)
                                     }
                                     
-                                    // Conto utilizzato (solo per spese, entrate e stipendi)
+                                    // Conto utilizzato
                                     if !transaction.accountName.isEmpty && (transaction.type == "expense" || transaction.type == "income" || transaction.type == "salary") {
                                         HStack(spacing: 10) {
                                             Image(systemName: "building.columns")
@@ -611,6 +656,34 @@ struct TransactionRowView: View {
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
+                                
+                                // NUOVO: Avviso per distribuzione inversa
+                                if requiresReverseDistribution {
+                                    VStack(spacing: 0) {
+                                        Rectangle()
+                                            .fill(Color.white.opacity(0.1))
+                                            .frame(height: 1)
+                                            .padding(.horizontal, 16)
+                                        
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "info.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.yellow)
+                                            
+                                            Text("L'eliminazione richiederà distribuzione inversa dai salvadanai")
+                                                .font(.caption2)
+                                                .foregroundColor(.white.opacity(0.9))
+                                                .fontWeight(.medium)
+                                            
+                                            Spacer()
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            Color.yellow.opacity(0.1)
+                                        )
+                                    }
+                                }
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         }
@@ -1710,5 +1783,614 @@ struct TransferPreviewCard: View {
             }
         }
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Reverse Salary Distribution View (Nuova Vista)
+struct ReverseSalaryDistributionView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    
+    let transaction: TransactionModel
+    let onComplete: () -> Void // Callback per eliminare definitivamente la transazione
+    
+    @State private var selectedSalvadanai: Set<String> = []
+    @State private var customAmounts: [String: Double] = [:]
+    @State private var distributionMode: DistributionMode = .equal
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
+    enum DistributionMode: String, CaseIterable {
+        case equal = "Equa"
+        case custom = "Personalizzata"
+        
+        var icon: String {
+            switch self {
+            case .equal: return "equal.circle.fill"
+            case .custom: return "slider.horizontal.3"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .equal: return "Dividi l'importo in parti uguali"
+            case .custom: return "Specifica importi personalizzati"
+            }
+        }
+    }
+    
+    private var totalToRemove: Double {
+        switch distributionMode {
+        case .equal:
+            return selectedSalvadanai.isEmpty ? 0 : transaction.amount
+        case .custom:
+            return customAmounts.values.reduce(0, +)
+        }
+    }
+    
+    private var remainingAmount: Double {
+        transaction.amount - totalToRemove
+    }
+    
+    private var isDistributionValid: Bool {
+        !selectedSalvadanai.isEmpty && abs(remainingAmount) < 0.01
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.red.opacity(0.05), Color.orange.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header con riepilogo
+                    ReverseDistributionHeaderView(
+                        transaction: transaction,
+                        totalToRemove: totalToRemove,
+                        remainingAmount: remainingAmount
+                    )
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
+                    
+                    Form {
+                        // Modalità di distribuzione
+                        Section {
+                            ForEach(DistributionMode.allCases, id: \.self) { mode in
+                                ReverseDistributionModeRow(
+                                    mode: mode,
+                                    isSelected: distributionMode == mode,
+                                    action: {
+                                        withAnimation(.spring()) {
+                                            distributionMode = mode
+                                        }
+                                    }
+                                )
+                            }
+                        } header: {
+                            SectionHeader(icon: "gearshape.fill", title: "Modalità di Rimozione")
+                        }
+                        
+                        // Lista salvadanai
+                        Section {
+                            if dataManager.salvadanai.isEmpty {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Nessun salvadanaio disponibile")
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.vertical, 8)
+                            } else {
+                                ForEach(dataManager.salvadanai, id: \.id) { salvadanaio in
+                                    ReverseSalvadanaiDistributionRow(
+                                        salvadanaio: salvadanaio,
+                                        isSelected: selectedSalvadanai.contains(salvadanaio.name),
+                                        distributionMode: distributionMode,
+                                        equalAmount: selectedSalvadanai.isEmpty ? 0 : transaction.amount / Double(selectedSalvadanai.count),
+                                        customAmount: Binding(
+                                            get: { customAmounts[salvadanaio.name] ?? 0 },
+                                            set: { customAmounts[salvadanaio.name] = $0 }
+                                        ),
+                                        onToggle: {
+                                            toggleSalvadanaio(salvadanaio.name)
+                                        }
+                                    )
+                                }
+                            }
+                        } header: {
+                            SectionHeader(icon: "minus.circle.fill", title: "Seleziona Salvadanai da cui Rimuovere")
+                        } footer: {
+                            if distributionMode == .custom && !selectedSalvadanai.isEmpty {
+                                ReverseCustomDistributionFooterView(
+                                    totalToRemove: totalToRemove,
+                                    remainingAmount: remainingAmount,
+                                    amount: transaction.amount
+                                )
+                            }
+                        }
+                        
+                        // Azioni rapide per distribuzione personalizzata
+                        if distributionMode == .custom && !selectedSalvadanai.isEmpty {
+                            Section {
+                                VStack(spacing: 12) {
+                                    ReverseCustomDistributionQuickActionsView(
+                                        selectedSalvadanai: selectedSalvadanai,
+                                        totalAmount: transaction.amount,
+                                        customAmounts: $customAmounts
+                                    )
+                                }
+                            } header: {
+                                SectionHeader(icon: "bolt.fill", title: "Azioni Rapide")
+                            }
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .navigationTitle("Rimuovi da Salvadanai")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Rimuovi e Elimina") {
+                        performReverseDistribution()
+                    }
+                    .disabled(!isDistributionValid)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDistributionValid ? .red : .secondary)
+                }
+            }
+        }
+        .onAppear {
+            setupInitialSelection()
+        }
+        .alert("Rimozione", isPresented: $showingAlert) {
+            Button("OK") { }
+        } message: {
+            Text(alertMessage)
+        }
+    }
+    
+    private func setupInitialSelection() {
+        // Seleziona automaticamente tutti i salvadanai se ce ne sono pochi
+        if dataManager.salvadanai.count <= 3 {
+            selectedSalvadanai = Set(dataManager.salvadanai.map(\.name))
+        }
+    }
+    
+    private func toggleSalvadanaio(_ name: String) {
+        if selectedSalvadanai.contains(name) {
+            selectedSalvadanai.remove(name)
+            customAmounts[name] = 0
+        } else {
+            selectedSalvadanai.insert(name)
+            if distributionMode == .custom {
+                customAmounts[name] = 0
+            }
+        }
+    }
+    
+    private func performReverseDistribution() {
+        guard isDistributionValid else {
+            alertMessage = "La rimozione non è valida. Assicurati che l'importo totale rimosso sia uguale all'importo della transazione."
+            showingAlert = true
+            return
+        }
+        
+        let finalAmounts: [String: Double]
+        
+        switch distributionMode {
+        case .equal:
+            let perSalvadanaio = transaction.amount / Double(selectedSalvadanai.count)
+            finalAmounts = Dictionary(uniqueKeysWithValues: selectedSalvadanai.map { ($0, perSalvadanaio) })
+        case .custom:
+            finalAmounts = customAmounts.filter { selectedSalvadanai.contains($0.key) && $0.value > 0 }
+        }
+        
+        // Rimuovi dai salvadanai
+        for (salvadanaiName, amount) in finalAmounts {
+            if let index = dataManager.salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
+                dataManager.salvadanai[index].currentAmount -= amount
+            }
+        }
+        
+        // Rimuovi dai conti (se necessario)
+        if !transaction.accountName.isEmpty {
+            dataManager.updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
+        }
+        
+        // Chiama il callback per eliminare definitivamente la transazione
+        onComplete()
+        dismiss()
+    }
+}
+
+// MARK: - Reverse Distribution Header View
+struct ReverseDistributionHeaderView: View {
+    let transaction: TransactionModel
+    let totalToRemove: Double
+    let remainingAmount: Double
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Transazione da eliminare
+            VStack(spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("ELIMINA:")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                    Text(transaction.amount.italianCurrency)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.red)
+                }
+                
+                Text(transaction.descr)
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                
+                HStack {
+                    Image(systemName: "building.columns.fill")
+                        .foregroundColor(.blue)
+                    Text("dal conto \(transaction.accountName)")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+            }
+            
+            // Statistiche rimozione
+            HStack(spacing: 20) {
+                ReverseDistributionStatCard(
+                    title: "Da Rimuovere",
+                    amount: totalToRemove,
+                    icon: "minus.circle.fill",
+                    color: .red
+                )
+                
+                ReverseDistributionStatCard(
+                    title: "Rimanente",
+                    amount: remainingAmount,
+                    icon: remainingAmount > 0.01 ? "exclamationmark.circle.fill" : "checkmark.circle.fill",
+                    color: remainingAmount > 0.01 ? .orange : .green
+                )
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+        )
+    }
+}
+
+// MARK: - Reverse Distribution Stat Card
+struct ReverseDistributionStatCard: View {
+    let title: String
+    let amount: Double
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(amount.italianCurrency)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Reverse Distribution Mode Row
+struct ReverseDistributionModeRow: View {
+    let mode: ReverseSalaryDistributionView.DistributionMode
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ?
+                              LinearGradient(gradient: Gradient(colors: [.red, .orange]), startPoint: .topLeading, endPoint: .bottomTrailing) :
+                              LinearGradient(gradient: Gradient(colors: [Color.gray.opacity(0.1)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .frame(width: 44, height: 44)
+                        .shadow(color: isSelected ? .red.opacity(0.3) : .clear, radius: 6, x: 0, y: 3)
+                    
+                    Image(systemName: mode.icon)
+                        .font(.title3)
+                        .foregroundColor(isSelected ? .white : .secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.rawValue)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isSelected ? .red : .primary)
+                    
+                    Text(mode.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.red)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+    }
+}
+
+// MARK: - Reverse Salvadanai Distribution Row
+struct ReverseSalvadanaiDistributionRow: View {
+    let salvadanaio: SalvadanaiModel
+    let isSelected: Bool
+    let distributionMode: ReverseSalaryDistributionView.DistributionMode
+    let equalAmount: Double
+    let customAmount: Binding<Double>
+    let onToggle: () -> Void
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    private var displayAmount: Double {
+        switch distributionMode {
+        case .equal:
+            return isSelected ? equalAmount : 0
+        case .custom:
+            return customAmount.wrappedValue
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                // Checkbox
+                Button(action: onToggle) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(isSelected ? .red : .secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Icona salvadanaio
+                Circle()
+                    .fill(getColor(from: salvadanaio.color))
+                    .frame(width: 12, height: 12)
+                
+                // Info salvadanaio
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(salvadanaio.name)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(isSelected ? .primary : .secondary)
+                    
+                    HStack {
+                        Text("Disponibile: \(salvadanaio.currentAmount.italianCurrency)")
+                            .font(.caption)
+                            .foregroundColor(salvadanaio.currentAmount >= 0 ? .green : .red)
+                        
+                        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                            Text("• Obiettivo: \(salvadanaio.targetAmount.italianCurrency)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if salvadanaio.type == "glass" {
+                            Text("• Glass: \(salvadanaio.monthlyRefill.italianCurrency)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // Campo importo per distribuzione personalizzata
+                if distributionMode == .custom && isSelected {
+                    HStack {
+                        Text("-")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                        
+                        TextField("0", value: customAmount, format: .currency(code: "EUR"))
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 80)
+                            .keyboardType(.decimalPad)
+                    }
+                } else if isSelected && displayAmount > 0 {
+                    // Mostra importo per modalità equa
+                    Text("-\(displayAmount.italianCurrency)")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.red.opacity(0.1))
+                        )
+                }
+            }
+            .padding(.vertical, 12)
+            
+            // Warning se i fondi non sono sufficienti
+            if isSelected && displayAmount > 0 {
+                let newBalance = salvadanaio.currentAmount - displayAmount
+                if newBalance < 0 {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Divider()
+                            .padding(.leading, 60)
+                        
+                        HStack {
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                    Text("Saldo diventerà negativo")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                        .fontWeight(.medium)
+                                }
+                                
+                                Text("Nuovo saldo: \(newBalance.italianCurrency)")
+                                    .font(.caption2)
+                                    .foregroundColor(.red)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        .padding(.leading, 60)
+                        .padding(.bottom, 8)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Divider()
+                            .padding(.leading, 60)
+                        
+                        HStack {
+                            Spacer()
+                            Text("Nuovo saldo: \(newBalance.italianCurrency)")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.leading, 60)
+                        .padding(.bottom, 8)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Reverse Custom Distribution Footer
+struct ReverseCustomDistributionFooterView: View {
+    let totalToRemove: Double
+    let remainingAmount: Double
+    let amount: Double
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Da rimuovere: \(totalToRemove.italianCurrency)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                
+                Spacer()
+                
+                Text("Rimanente: \(remainingAmount.italianCurrency)")
+                    .font(.caption)
+                    .foregroundColor(remainingAmount > 0.01 ? .orange : .green)
+                    .fontWeight(.medium)
+            }
+            
+            if abs(remainingAmount) > 0.01 {
+                Text("⚠️ Rimozione incompleta. Assicurati che l'importo totale rimosso sia uguale all'importo della transazione.")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            } else {
+                Text("✅ Rimozione completa!")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
+        }
+    }
+}
+
+// MARK: - Reverse Custom Distribution Quick Actions
+struct ReverseCustomDistributionQuickActionsView: View {
+    let selectedSalvadanai: Set<String>
+    let totalAmount: Double
+    @Binding var customAmounts: [String: Double]
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Distribuzione equa
+                Button(action: {
+                    let equalAmount = totalAmount / Double(selectedSalvadanai.count)
+                    for name in selectedSalvadanai {
+                        customAmounts[name] = equalAmount
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "equal.circle.fill")
+                        Text("Equa")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.1))
+                    .foregroundColor(.red)
+                    .clipShape(Capsule())
+                }
+                
+                // Reset
+                Button(action: {
+                    for name in selectedSalvadanai {
+                        customAmounts[name] = 0
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                        Text("Reset")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.1))
+                    .foregroundColor(.orange)
+                    .clipShape(Capsule())
+                }
+                
+                Spacer()
+            }
+        }
     }
 }

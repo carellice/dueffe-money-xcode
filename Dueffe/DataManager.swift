@@ -450,6 +450,15 @@ class DataManager: ObservableObject {
     }
 
     func deleteTransaction(_ transaction: TransactionModel) {
+        // RIMUOVI IL VECCHIO CODICE E SOSTITUISCI CON QUESTO:
+        
+        // Per entrate e stipendi, non fare nulla qui - sarà gestito dalla vista di distribuzione inversa
+        if (transaction.type == "income" || transaction.type == "salary") && !salvadanai.isEmpty {
+            // Non eliminare automaticamente - l'utente deve scegliere la distribuzione inversa
+            return
+        }
+        
+        // Per le altre transazioni, comportamento normale
         transactions.removeAll { $0.id == transaction.id }
         
         if transaction.type == "expense" {
@@ -475,6 +484,7 @@ class DataManager: ObservableObject {
                 updateSalvadanaiBalance(name: toSalvadanaio, amount: -transaction.amount)
             }
         } else {
+            // Per entrate/stipendi senza salvadanai, rimuovi solo dal conto
             if !transaction.accountName.isEmpty {
                 updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
             }
@@ -874,6 +884,41 @@ extension DataManager {
             return ImportResult(success: false, message: "Errore nell'importazione: file non valido o corrotto")
         }
     }
+    
+    // MARK: - NUOVO: Metodo per controllare se una transazione richiede distribuzione inversa
+    func transactionRequiresReverseDistribution(_ transaction: TransactionModel) -> Bool {
+        return (transaction.type == "income" || transaction.type == "salary") && !salvadanai.isEmpty
+    }
+
+    // MARK: - NUOVO: Metodo per eliminazione transazione con distribuzione inversa
+    func deleteTransactionWithReverseDistribution(_ transaction: TransactionModel, salvadanaiAmounts: [String: Double]) {
+        // 1. Rimuovi dai salvadanai le somme specificate
+        for (salvadanaiName, amount) in salvadanaiAmounts {
+            if let index = salvadanai.firstIndex(where: { $0.name == salvadanaiName }) {
+                salvadanai[index].currentAmount -= amount
+            }
+        }
+        
+        // 2. Rimuovi dal conto (già fatto dalla logica esistente, ma per sicurezza)
+        if !transaction.accountName.isEmpty {
+            updateAccountBalance(accountName: transaction.accountName, amount: -transaction.amount)
+        }
+        
+        // 3. Trova e rimuovi le transazioni di distribuzione correlate
+        let relatedDistributionTransactions = transactions.filter {
+            $0.type == "distribution" &&
+            $0.date.timeIntervalSince(transaction.date) < 300 && // Entro 5 minuti dalla transazione originale
+            $0.accountName == transaction.accountName
+        }
+        
+        // Rimuovi le distribuzioni correlate
+        for distributionTransaction in relatedDistributionTransactions {
+            transactions.removeAll { $0.id == distributionTransaction.id }
+        }
+        
+        // 4. Rimuovi la transazione originale
+        transactions.removeAll { $0.id == transaction.id }
+    }
 }
 
 struct ImportResult {
@@ -887,3 +932,4 @@ extension Character {
         return scalar.properties.isEmoji && (scalar.value >= 0x238d || unicodeScalars.count > 1)
     }
 }
+
