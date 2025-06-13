@@ -110,8 +110,20 @@ struct TransactionsView: View {
                                 ForEach(groupedTransactions, id: \.0) { dateString, transactions in
                                     Section {
                                         ForEach(transactions, id: \.id) { transaction in
-                                            TransactionRowView(transaction: transaction)
-                                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            HStack {
+                                                TransactionRowView(transaction: transaction)
+                                                
+                                                // NUOVO: Indicatore lucchetto per transazioni bloccate
+                                                if dataManager.isTransactionLocked(transaction) {
+                                                    Image(systemName: "lock.fill")
+                                                        .font(.caption)
+                                                        .foregroundColor(.orange)
+                                                        .padding(.leading, 8)
+                                                }
+                                            }
+                                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                                // MODIFICATO: Mostra eliminazione solo se la transazione non è bloccata
+                                                if !dataManager.isTransactionLocked(transaction) {
                                                     Button(role: .destructive, action: {
                                                         transactionToDelete = transaction
                                                         showingDeleteConfirmation = true
@@ -119,7 +131,17 @@ struct TransactionsView: View {
                                                         Label("Elimina", systemImage: "trash.fill")
                                                     }
                                                     .tint(.red)
+                                                } else {
+                                                    // Mostra azione bloccata
+                                                    Button(action: {
+                                                        // Non fa nulla - solo feedback visivo
+                                                    }) {
+                                                        Label("Bloccata", systemImage: "lock.fill")
+                                                    }
+                                                    .tint(.orange)
+                                                    .disabled(true)
                                                 }
+                                            }
                                         }
                                     } header: {
                                         TransactionSectionHeaderView(
@@ -353,8 +375,6 @@ struct TransactionSectionHeaderView: View {
 }
 
 // MARK: - Enhanced Transaction Row View - Fluida e Bilanciata
-// SOSTITUISCI LA TransactionRowView ESISTENTE CON QUESTA VERSIONE AGGIORNATA:
-
 struct TransactionRowView: View {
     let transaction: TransactionModel
     @EnvironmentObject var dataManager: DataManager // AGGIUNTO
@@ -363,6 +383,19 @@ struct TransactionRowView: View {
     @State private var animateIcon = false
     @State private var isPressed = false
     @State private var showDetails = false
+    
+    // NUOVO: Verifica se la transazione è bloccata (conto chiuso)
+   private var isTransactionLocked: Bool {
+       dataManager.isTransactionLocked(transaction)
+   }
+   
+   // NUOVO: Messaggio di stato per transazioni bloccate
+   private var lockStatusMessage: String {
+       if isTransactionLocked {
+           return "Transazione bloccata - Conto chiuso"
+       }
+       return ""
+   }
     
     private var transactionColor: Color {
         switch transaction.type {

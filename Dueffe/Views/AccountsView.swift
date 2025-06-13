@@ -237,13 +237,14 @@ struct AccountStatCard: View {
     }
 }
 
-// MARK: - Enhanced Account Card con Animazioni e Design Compatto
+// MARK: - Enhanced Account Card con supporto chiusura
 struct EnhancedAccountCard: View {
     let account: AccountModel
     @EnvironmentObject var dataManager: DataManager
     @State private var isPressed = false
     @State private var showingDeleteAlert = false
     @State private var showingEditSheet = false
+    @State private var showingCloseSheet = false // NUOVO
     @State private var animateBalance = false
     @State private var animateGlow = false
     @State private var animateIcon = false
@@ -266,7 +267,18 @@ struct EnhancedAccountCard: View {
     }
     
     private var cardGradient: LinearGradient {
-        if account.balance >= 0 {
+        if account.isClosed {
+            // Gradiente grigio per conti chiusi
+            return LinearGradient(
+                gradient: Gradient(colors: [
+                    Color.gray.opacity(0.6),
+                    Color.secondary.opacity(0.5),
+                    Color.gray.opacity(0.4)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if account.balance >= 0 {
             return LinearGradient(
                 gradient: Gradient(colors: [
                     Color.blue.opacity(0.8),
@@ -290,7 +302,9 @@ struct EnhancedAccountCard: View {
     }
     
     private var statusInfo: (String, Color, String) {
-        if account.balance < 0 {
+        if account.isClosed {
+            return ("🔒 Chiuso", .gray, "lock.fill")
+        } else if account.balance < 0 {
             return ("In Rosso", .red, "exclamationmark.triangle.fill")
         } else if account.balance >= 10000 {
             return ("Eccellente", .green, "star.fill")
@@ -313,19 +327,20 @@ struct EnhancedAccountCard: View {
                     .fill(cardGradient)
                     .frame(height: 140)
                     .shadow(
-                        color: account.balance >= 0 ? .blue.opacity(animateGlow ? 0.4 : 0.2) : .red.opacity(animateGlow ? 0.4 : 0.2),
-                        radius: animateGlow ? 15 : 8,
+                        color: account.isClosed ? .gray.opacity(0.2) :
+                               (account.balance >= 0 ? .blue.opacity(animateGlow ? 0.4 : 0.2) : .red.opacity(animateGlow ? 0.4 : 0.2)),
+                        radius: animateGlow && !account.isClosed ? 15 : 8,
                         x: 0,
-                        y: animateGlow ? 8 : 4
+                        y: animateGlow && !account.isClosed ? 8 : 4
                     )
-                    .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
+                    .animation(account.isClosed ? .none : .easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateGlow)
                 
                 // Overlay pattern decorativo
                 RoundedRectangle(cornerRadius: 20)
                     .fill(
                         RadialGradient(
                             gradient: Gradient(colors: [
-                                Color.white.opacity(0.3),
+                                Color.white.opacity(account.isClosed ? 0.1 : 0.25),
                                 Color.clear,
                                 Color.black.opacity(0.1)
                             ]),
@@ -336,63 +351,94 @@ struct EnhancedAccountCard: View {
                     )
                     .frame(height: 140)
                 
-                // Elementi decorativi fluttuanti
-                GeometryReader { geometry in
-                    ZStack {
-                        // Cerchi decorativi piccoli
-                        Circle()
-                            .fill(Color.white.opacity(0.15))
-                            .frame(width: 60, height: 60)
-                            .position(x: geometry.size.width * 0.85, y: geometry.size.height * 0.25)
-                            .scaleEffect(animateBalance ? 1.2 : 0.8)
-                            .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateBalance)
-                        
-                        Circle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 40, height: 40)
-                            .position(x: geometry.size.width * 0.15, y: geometry.size.height * 0.75)
-                            .scaleEffect(animateBalance ? 0.6 : 1.1)
-                            .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateBalance)
-                        
-                        // Stelline decorative
-                        Image(systemName: "sparkles")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                            .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.3)
-                            .scaleEffect(animateGlow ? 1.3 : 0.7)
-                            .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
+                // NUOVO: Simbolo lucchetto per conti chiusi
+                if account.isClosed {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "lock.fill")
+                                .font(.title)
+                                .foregroundColor(.white.opacity(0.3))
+                                .padding(.top, 16)
+                                .padding(.trailing, 20)
+                        }
+                        Spacer()
                     }
                 }
-                .frame(height: 140)
+                
+                // Elementi decorativi fluttuanti (solo per conti aperti)
+                if !account.isClosed {
+                    GeometryReader { geometry in
+                        ZStack {
+                            // Cerchi decorativi piccoli
+                            Circle()
+                                .fill(Color.white.opacity(0.15))
+                                .frame(width: 60, height: 60)
+                                .position(x: geometry.size.width * 0.85, y: geometry.size.height * 0.25)
+                                .scaleEffect(animateBalance ? 1.2 : 0.8)
+                                .animation(.easeInOut(duration: 4).repeatForever(autoreverses: true), value: animateBalance)
+                            
+                            Circle()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(width: 40, height: 40)
+                                .position(x: geometry.size.width * 0.15, y: geometry.size.height * 0.75)
+                                .scaleEffect(animateBalance ? 0.6 : 1.1)
+                                .animation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true), value: animateBalance)
+                            
+                            // Stelline decorative
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.6))
+                                .position(x: geometry.size.width * 0.2, y: geometry.size.height * 0.3)
+                                .scaleEffect(animateGlow ? 1.3 : 0.7)
+                                .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: animateGlow)
+                        }
+                    }
+                    .frame(height: 140)
+                }
                 
                 // Contenuto principale compatto
                 HStack(spacing: 16) {
                     // Icona account animata
                     ZStack {
                         Circle()
-                            .fill(Color.white.opacity(0.25))
+                            .fill(Color.white.opacity(account.isClosed ? 0.15 : 0.25))
                             .frame(width: 50, height: 50)
-                            .blur(radius: animateGlow ? 1 : 0)
-                            .scaleEffect(animateIcon ? 1.05 : 1.0)
+                            .blur(radius: animateGlow && !account.isClosed ? 1 : 0)
                         
-                        Image(systemName: accountIcon)
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .rotationEffect(.degrees(animateIcon ? 2 : -2))
-                            .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateIcon)
+                        if account.isClosed {
+                            // Icona lucchetto per conti chiusi
+                            Image(systemName: "lock.fill")
+                                .font(.title3)
+                                .foregroundColor(.white.opacity(0.7))
+                        } else {
+                            Image(systemName: accountIcon)
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .rotationEffect(.degrees(animateIcon ? 2 : -2))
+                                .animation(.easeInOut(duration: 3).repeatForever(autoreverses: true), value: animateIcon)
+                        }
                     }
                     
                     // Informazioni conto compatte
                     VStack(alignment: .leading, spacing: 6) {
-                        // Nome conto
-                        Text(account.name)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                        // Nome conto con possibile indicatore chiuso
+                        HStack {
+                            Text(account.name)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            
+                            if account.isClosed {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                        }
                         
-                        // Saldo con animazione
+                        // Saldo con animazione (solo per conti aperti)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             Text("")
                                 .font(.subheadline)
@@ -403,8 +449,8 @@ struct EnhancedAccountCard: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                                 .contentTransition(.numericText())
-                                .scaleEffect(animateBalance ? 1.02 : 1.0)
-                                .shadow(color: .white.opacity(0.5), radius: animateGlow ? 6 : 2)
+                                .scaleEffect(animateBalance && !account.isClosed ? 1.02 : 1.0)
+                                .shadow(color: .white.opacity(0.5), radius: animateGlow && !account.isClosed ? 6 : 2)
                         }
                         
                         // Status e transazioni in una riga compatta
@@ -413,7 +459,7 @@ struct EnhancedAccountCard: View {
                             HStack(spacing: 4) {
                                 Image(systemName: statusInfo.2)
                                     .font(.caption2)
-                                    .foregroundColor(statusInfo.1)
+                                    .foregroundColor(account.isClosed ? .white.opacity(0.7) : statusInfo.1)
                                 
                                 Text(statusInfo.0)
                                     .font(.caption2)
@@ -424,12 +470,12 @@ struct EnhancedAccountCard: View {
                             .padding(.vertical, 3)
                             .background(
                                 Capsule()
-                                    .fill(Color.white.opacity(0.2))
+                                    .fill(Color.white.opacity(account.isClosed ? 0.1 : 0.2))
                             )
                             
                             // Transazioni count compatto
                             HStack(spacing: 4) {
-                                Image(systemName: "list.bullet.circle")
+                                Image(systemName: account.isClosed ? "lock.circle" : "list.bullet.circle")
                                     .font(.caption2)
                                     .foregroundColor(.white.opacity(0.8))
                                 
@@ -445,23 +491,41 @@ struct EnhancedAccountCard: View {
                     
                     // Menu compatto e data
                     VStack(spacing: 8) {
-                        // Menu button compatto
+                        // Menu button compatto con opzioni diverse per conti chiusi/aperti
                         Menu {
-                            Button(action: {
-                                showingEditSheet = true
-                            }) {
-                                Label("Modifica", systemImage: "pencil")
-                            }
-                            .tint(.primary)
-                            
-                            if relatedTransactions.isEmpty {
-                                Divider()
-                                Button(role: .destructive, action: {
-                                    showingDeleteAlert = true
+                            if !account.isClosed {
+                                // Menu per conti aperti
+                                Button(action: {
+                                    showingEditSheet = true
                                 }) {
-                                    Label("Elimina", systemImage: "trash")
+                                    Label("Modifica", systemImage: "pencil")
                                 }
-                                .tint(.red)
+                                .tint(.primary)
+                                
+                                Button(action: {
+                                    showingCloseSheet = true
+                                }) {
+                                    Label("Chiudi Conto", systemImage: "lock")
+                                }
+                                .tint(.orange)
+                                
+                                if relatedTransactions.isEmpty {
+                                    Divider()
+                                    Button(role: .destructive, action: {
+                                        showingDeleteAlert = true
+                                    }) {
+                                        Label("Elimina", systemImage: "trash")
+                                    }
+                                    .tint(.red)
+                                }
+                            } else {
+                                // Menu per conti chiusi
+                                Button(action: {
+                                    reopenAccount()
+                                }) {
+                                    Label("Riapri Conto", systemImage: "lock.open")
+                                }
+                                .tint(.green)
                             }
                         } label: {
                             Image(systemName: "ellipsis")
@@ -471,7 +535,7 @@ struct EnhancedAccountCard: View {
                                 .frame(width: 32, height: 32)
                                 .background(
                                     Circle()
-                                        .fill(Color.white.opacity(0.2))
+                                        .fill(Color.white.opacity(account.isClosed ? 0.1 : 0.2))
                                 )
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -502,18 +566,23 @@ struct EnhancedAccountCard: View {
             // Long press action
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.8).delay(0.2)) {
-                animateBalance = true
-            }
-            withAnimation(.easeInOut(duration: 1.2).delay(0.1)) {
-                animateGlow = true
-            }
-            withAnimation(.easeInOut(duration: 1.5).delay(0.3)) {
-                animateIcon = true
+            if !account.isClosed {
+                withAnimation(.easeInOut(duration: 0.8).delay(0.2)) {
+                    animateBalance = true
+                }
+                withAnimation(.easeInOut(duration: 1.2).delay(0.1)) {
+                    animateGlow = true
+                }
+                withAnimation(.easeInOut(duration: 1.5).delay(0.3)) {
+                    animateIcon = true
+                }
             }
         }
         .sheet(isPresented: $showingEditSheet) {
             EditAccountView(account: account)
+        }
+        .sheet(isPresented: $showingCloseSheet) {
+            CloseAccountView(account: account)
         }
         .alert("Elimina Conto", isPresented: $showingDeleteAlert) {
             Button("Elimina", role: .destructive) {
@@ -524,6 +593,17 @@ struct EnhancedAccountCard: View {
             Button("Annulla", role: .cancel) { }
         } message: {
             Text("Sei sicuro di voler eliminare il conto '\(account.name)'? Questa azione non può essere annullata.")
+        }
+    }
+    
+    // NUOVO: Funzione per riaprire un conto
+    private func reopenAccount() {
+        withAnimation {
+            let success = dataManager.reopenAccount(account)
+            if !success {
+                // Potresti aggiungere un alert di errore qui se necessario
+                print("Errore nella riapertura del conto")
+            }
         }
     }
 }
@@ -826,7 +906,7 @@ struct EnhancedAccountDetailView: View {
                                 }
                             }
                             
-                            // Saldo principale
+                            // Saldo principale con stato
                             VStack(spacing: 8) {
                                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                                     Text("")
@@ -836,26 +916,42 @@ struct EnhancedAccountDetailView: View {
                                         .font(.largeTitle)
                                         .fontWeight(.bold)
                                         .foregroundColor(account.balance >= 0 ? .primary : .red)
+                                    
+                                    // NUOVO: Indicatore per conto chiuso
+                                    if account.isClosed {
+                                        Image(systemName: "lock.fill")
+                                            .font(.title2)
+                                            .foregroundColor(.orange)
+                                    }
                                 }
                                 
                                 Text("Saldo attuale")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                 
-                                // Status badge
+                                // Status badge aggiornato
                                 HStack {
-                                    Image(systemName: account.balance >= 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                                        .foregroundColor(account.balance >= 0 ? .green : .red)
-                                    Text(account.balance >= 0 ? "Conto in positivo" : "Conto in rosso")
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(account.balance >= 0 ? .green : .red)
+                                    if account.isClosed {
+                                        Image(systemName: "lock.fill")
+                                            .foregroundColor(.orange)
+                                        Text("Conto chiuso")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.orange)
+                                    } else {
+                                        Image(systemName: account.balance >= 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                            .foregroundColor(account.balance >= 0 ? .green : .red)
+                                        Text(account.balance >= 0 ? "Conto in positivo" : "Conto in rosso")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(account.balance >= 0 ? .green : .red)
+                                    }
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(
                                     Capsule()
-                                        .fill((account.balance >= 0 ? Color.green : Color.red).opacity(0.1))
+                                        .fill((account.isClosed ? Color.orange : (account.balance >= 0 ? Color.green : Color.red)).opacity(0.1))
                                 )
                             }
                         }
@@ -1192,30 +1288,31 @@ struct CompactTransactionRow: View {
     }
 }
 
-// MARK: - Edit Account View
+// MARK: - Edit Account View CORRETTA
 struct EditAccountView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var dataManager: DataManager
     
-    @State private var account: AccountModel
+    @State private var currentAccountName: String
     @State private var showingDeleteAlert = false
-    @State private var originalBalance: Double
+    private let account: AccountModel
+    private let originalAccountName: String
     
     init(account: AccountModel) {
-        _account = State(initialValue: account)
-        _originalBalance = State(initialValue: account.balance)
+        self.account = account
+        self.originalAccountName = account.name
+        self._currentAccountName = State(initialValue: account.name)
     }
     
     private var hasChanges: Bool {
-        account.name != dataManager.accounts.first(where: { $0.id == account.id })?.name
-    }
-    
-    private var balanceChange: Double {
-        account.balance - originalBalance
+        currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines) != originalAccountName
     }
     
     private var relatedTransactions: [TransactionModel] {
-        dataManager.transactions.filter { $0.accountName == account.name }
+        dataManager.transactions.filter { transaction in
+            transaction.accountName == originalAccountName ||
+            (transaction.type == "transfer" && transaction.salvadanaiName == originalAccountName)
+        }
     }
     
     var body: some View {
@@ -1232,10 +1329,79 @@ struct EditAccountView: View {
                 Form {
                     // Anteprima del conto
                     Section {
-                        AccountPreviewCard(
-                            account: account,
-                            balanceChange: balanceChange,
-                            hasChanges: hasChanges
+                        VStack(spacing: 20) {
+                            HStack {
+                                Image(systemName: "eye.fill")
+                                    .foregroundColor(.blue)
+                                Text("Anteprima")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                
+                                if hasChanges {
+                                    Text("Modificato")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.orange.opacity(0.1))
+                                        )
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            gradient: Gradient(colors: [.blue, .indigo]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                        .frame(width: 56, height: 56)
+                                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                                    
+                                    Image(systemName: "building.columns.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(currentAccountName.isEmpty ? "Nome del conto" : currentAccountName)
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(currentAccountName.isEmpty ? .secondary : .primary)
+                                        .lineLimit(2)
+                                    
+                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                        Text("")
+                                            .font(.title3)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text(account.balance.italianCurrency)
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(account.balance >= 0 ? .primary : .red)
+                                    }
+
+                                    Text("Il saldo viene gestito tramite le transazioni")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                        }
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(hasChanges ? Color.orange.opacity(0.3) : Color.blue.opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                         )
                     }
                     .listRowBackground(Color.clear)
@@ -1248,7 +1414,7 @@ struct EditAccountView: View {
                                 .foregroundColor(.blue)
                                 .frame(width: 24)
                             
-                            TextField("Nome del conto", text: $account.name)
+                            TextField("Nome del conto", text: $currentAccountName)
                                 .textInputAutocapitalization(.words)
                                 .font(.headline)
                         }
@@ -1260,8 +1426,15 @@ struct EditAccountView: View {
                         }
                     } footer: {
                         if !relatedTransactions.isEmpty {
-                            Text("⚠️ Attenzione: modificare il nome influenzerà \(relatedTransactions.count) transazioni associate")
-                                .foregroundColor(.orange)
+                            VStack(alignment: .leading, spacing: 4) {
+                                if hasChanges {
+                                    Text("✅ Verranno aggiornate automaticamente \(relatedTransactions.count) transazioni associate")
+                                        .foregroundColor(.green)
+                                } else {
+                                    Text("ℹ️ Ci sono \(relatedTransactions.count) transazioni associate a questo conto")
+                                        .foregroundColor(.blue)
+                                }
+                            }
                         }
                     }
                     
@@ -1297,6 +1470,32 @@ struct EditAccountView: View {
                         }
                     }
                     
+                    // Debug info (rimuovere in produzione)
+                    if hasChanges {
+                        Section {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("🔄 Debug Info:")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                
+                                Text("Nome originale: '\(originalAccountName)'")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("Nome nuovo: '\(currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines))'")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("Transazioni da aggiornare: \(relatedTransactions.count)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 8)
+                        } header: {
+                            Text("Debug (solo per test)")
+                        }
+                    }
+                    
                     // Sezione di eliminazione
                     if relatedTransactions.isEmpty {
                         Section {
@@ -1324,22 +1523,6 @@ struct EditAccountView: View {
                         } footer: {
                             Text("Eliminare il conto è un'azione irreversibile.")
                         }
-                    } else {
-                        Section {
-                            HStack {
-                                Image(systemName: "lock.fill")
-                                    .foregroundColor(.orange)
-                                    .frame(width: 24)
-                                
-                                Text("Impossibile eliminare")
-                                    .foregroundColor(.orange)
-                                    .fontWeight(.medium)
-                                
-                                Spacer()
-                            }
-                        } footer: {
-                            Text("Non è possibile eliminare un conto con transazioni associate. Elimina prima tutte le transazioni correlate.")
-                        }
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -1357,9 +1540,9 @@ struct EditAccountView: View {
                     Button("Salva") {
                         saveChanges()
                     }
-                    .disabled(!hasChanges || account.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!hasChanges || currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .fontWeight(.semibold)
-                    .foregroundColor(hasChanges ? .blue : .secondary)
+                    .foregroundColor(hasChanges && !currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .blue : .secondary)
                 }
             }
         }
@@ -1375,9 +1558,21 @@ struct EditAccountView: View {
     }
     
     private func saveChanges() {
-        if let index = dataManager.accounts.firstIndex(where: { $0.id == account.id }) {
-            dataManager.accounts[index] = account
-        }
+        let newName = currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !newName.isEmpty else { return }
+        guard newName != originalAccountName else { return }
+        
+        print("🚀 Avvio salvataggio modifiche conto")
+        print("  - ID: \(account.id)")
+        print("  - Nome originale: '\(originalAccountName)'")
+        print("  - Nuovo nome: '\(newName)'")
+        
+        // Chiama il metodo del DataManager per aggiornare tutto
+        dataManager.updateAccountName(account.id, oldName: originalAccountName, newName: newName)
+        
+        print("✅ Comando di aggiornamento inviato")
+        
         dismiss()
     }
 }
@@ -1476,5 +1671,398 @@ struct AccountPreviewCard: View {
                 )
                 .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
+    }
+}
+
+// MARK: - Close Account View
+struct CloseAccountView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    
+    let account: AccountModel
+    @State private var selectedDestinationAccount: AccountModel?
+    @State private var showingConfirmation = false
+    @State private var showingSuccessAlert = false
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
+    
+    private var availableDestinationAccounts: [AccountModel] {
+        dataManager.openAccounts.filter { $0.id != account.id }
+    }
+    
+    private var canCloseWithoutTransfer: Bool {
+        !account.hasNonZeroBalance
+    }
+    
+    private var relatedTransactions: [TransactionModel] {
+        dataManager.transactions.filter { transaction in
+            transaction.accountName == account.name ||
+            (transaction.type == "transfer" && transaction.salvadanaiName == account.name)
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.orange.opacity(0.05), Color.red.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                Form {
+                    // Account Info
+                    Section {
+                        AccountClosePreviewCard(account: account)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    
+                    // Saldo e trasferimento
+                    if account.hasNonZeroBalance {
+                        Section {
+                            VStack(alignment: .leading, spacing: 16) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("Saldo da trasferire")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.orange)
+                                }
+                                
+                                HStack {
+                                    Text("Saldo attuale:")
+                                    Spacer()
+                                    Text(account.balance.italianCurrency)
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(account.balance >= 0 ? .green : .red)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.orange.opacity(0.1))
+                                )
+                                
+                                Text("Il saldo deve essere trasferito ad un altro conto prima della chiusura.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "eurosign.circle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Trasferimento Obbligatorio")
+                            }
+                        }
+                        
+                        // Selezione conto di destinazione
+                        if !availableDestinationAccounts.isEmpty {
+                            Section {
+                                ForEach(availableDestinationAccounts, id: \.id) { destinationAccount in
+                                    Button(action: {
+                                        selectedDestinationAccount = destinationAccount
+                                    }) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 4) {
+                                                Text(destinationAccount.name)
+                                                    .font(.headline)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(.primary)
+                                                
+                                                Text("Saldo: \(destinationAccount.balance.italianCurrency)")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            if selectedDestinationAccount?.id == destinationAccount.id {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .foregroundColor(.blue)
+                                                    .font(.title2)
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+                            } header: {
+                                HStack {
+                                    Image(systemName: "arrow.right.circle.fill")
+                                        .foregroundColor(.blue)
+                                    Text("Seleziona Conto di Destinazione")
+                                }
+                            } footer: {
+                                if let selected = selectedDestinationAccount {
+                                    Text("Il saldo di \(account.balance.italianCurrency) verrà trasferito a '\(selected.name)'")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                        } else {
+                            Section {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.red)
+                                    Text("Nessun conto disponibile per il trasferimento")
+                                        .foregroundColor(.red)
+                                }
+                                .padding(.vertical, 8)
+                            } footer: {
+                                Text("Devi avere almeno un altro conto aperto per trasferire il saldo.")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    } else {
+                        // Conto con saldo zero
+                        Section {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("Saldo Zero")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.green)
+                                }
+                                
+                                Text("Il conto ha saldo zero e può essere chiuso immediatamente.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Pronto per la Chiusura")
+                            }
+                        }
+                    }
+                    
+                    // Informazioni sulle transazioni
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "lock.fill")
+                                    .foregroundColor(.orange)
+                                Text("Effetti della Chiusura")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                EffectInfoRow(
+                                    icon: "lock.circle.fill",
+                                    text: "Il conto verrà contrassegnato come chiuso",
+                                    color: .orange
+                                )
+                                
+                                EffectInfoRow(
+                                    icon: "creditcard.fill",
+                                    text: "\(relatedTransactions.count) transazioni verranno bloccate",
+                                    color: .red
+                                )
+                                
+                                EffectInfoRow(
+                                    icon: "trash.slash.fill",
+                                    text: "Le transazioni bloccate non potranno essere eliminate",
+                                    color: .red
+                                )
+                                
+                                EffectInfoRow(
+                                    icon: "eye.fill",
+                                    text: "Tutto rimarrà visibile con il simbolo del lucchetto",
+                                    color: .blue
+                                )
+                                
+                                if account.hasNonZeroBalance {
+                                    EffectInfoRow(
+                                        icon: "arrow.right.circle.fill",
+                                        text: "Il saldo verrà trasferito automaticamente",
+                                        color: .green
+                                    )
+                                }
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundColor(.blue)
+                            Text("Cosa Succede")
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Chiudi Conto")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Chiudi Conto") {
+                        showingConfirmation = true
+                    }
+                    .disabled(!canProceedWithClosure)
+                    .fontWeight(.semibold)
+                    .foregroundColor(canProceedWithClosure ? .red : .secondary)
+                }
+            }
+        }
+        .alert("Conferma Chiusura", isPresented: $showingConfirmation) {
+            Button("Chiudi", role: .destructive) {
+                closeAccount()
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            if account.hasNonZeroBalance {
+                Text("Stai per chiudere il conto '\(account.name)' e trasferire \(account.balance.italianCurrency) a '\(selectedDestinationAccount?.name ?? "")'. Questa azione bloccherà \(relatedTransactions.count) transazioni. Vuoi continuare?")
+            } else {
+                Text("Stai per chiudere il conto '\(account.name)'. Questa azione bloccherà \(relatedTransactions.count) transazioni. Vuoi continuare?")
+            }
+        }
+        .alert("Successo", isPresented: $showingSuccessAlert) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text("Il conto '\(account.name)' è stato chiuso con successo.")
+        }
+        .alert("Errore", isPresented: $showingErrorAlert) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
+    }
+    
+    private var canProceedWithClosure: Bool {
+        if account.hasNonZeroBalance {
+            return selectedDestinationAccount != nil && !availableDestinationAccounts.isEmpty
+        } else {
+            return true
+        }
+    }
+    
+    private func closeAccount() {
+        if account.hasNonZeroBalance {
+            guard let destination = selectedDestinationAccount else {
+                errorMessage = "Seleziona un conto di destinazione per il trasferimento"
+                showingErrorAlert = true
+                return
+            }
+            
+            let success = dataManager.closeAccount(account, transferingBalanceTo: destination)
+            if success {
+                showingSuccessAlert = true
+            } else {
+                errorMessage = "Errore durante la chiusura del conto"
+                showingErrorAlert = true
+            }
+        } else {
+            let success = dataManager.closeAccountWithZeroBalance(account)
+            if success {
+                showingSuccessAlert = true
+            } else {
+                errorMessage = "Errore durante la chiusura del conto"
+                showingErrorAlert = true
+            }
+        }
+    }
+}
+
+// MARK: - Account Close Preview Card
+struct AccountClosePreviewCard: View {
+    let account: AccountModel
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            HStack {
+                Image(systemName: "lock.fill")
+                    .foregroundColor(.orange)
+                Text("Chiusura Conto")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+                Spacer()
+            }
+            
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [.orange, .red]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 56, height: 56)
+                        .shadow(color: .orange.opacity(0.3), radius: 8, x: 0, y: 4)
+                    
+                    Image(systemName: "building.columns.fill")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(account.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(account.balance.italianCurrency)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(account.balance >= 0 ? .green : .red)
+                    }
+                    
+                    Text("Creato il \(account.createdAt, style: .date)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        )
+    }
+}
+
+// MARK: - Effect Info Row
+struct EffectInfoRow: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundColor(color)
+                .frame(width: 20)
+            
+            Text(text)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
     }
 }

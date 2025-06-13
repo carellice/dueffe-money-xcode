@@ -137,11 +137,23 @@ struct TransactionModel: Identifiable, Codable {
     }
 }
 
+// SOSTITUIRE AccountModel nel file DataManager.swift
 struct AccountModel: Identifiable, Codable {
     let id = UUID()
     var name: String
     var balance: Double
     var createdAt: Date
+    var isClosed: Bool = false // NUOVO: Indica se il conto è chiuso
+    
+    // NUOVO: Computed property per verificare se il conto può essere chiuso
+    var canBeClosed: Bool {
+        return !isClosed
+    }
+    
+    // NUOVO: Computed property per verificare se il conto ha saldo diverso da zero
+    var hasNonZeroBalance: Bool {
+        return abs(balance) > 0.01 // Tolleranza per errori di arrotondamento
+    }
 }
 
 // MARK: - Distribution Suggestion Model
@@ -763,6 +775,80 @@ extension DataManager {
     }
 }
 
+// MARK: - NUOVO: Metodo per aggiornare il nome di un conto e tutte le transazioni associate
+extension DataManager {
+    
+    /// Aggiorna il nome di un conto e tutte le transazioni associate
+    /// - Parameters:
+    ///   - account: L'account da aggiornare
+    ///   - newName: Il nuovo nome per l'account
+    /// Aggiorna il nome di un conto e tutte le transazioni associate
+    func updateAccountName(_ accountId: UUID, oldName: String, newName: String) {
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewName.isEmpty else { return }
+        
+        print("🔄 Aggiornamento nome conto: '\(oldName)' -> '\(trimmedNewName)'")
+        
+        // 1. Aggiorna l'account
+        if let index = accounts.firstIndex(where: { $0.id == accountId }) {
+            accounts[index].name = trimmedNewName
+            print("✅ Account aggiornato")
+        }
+        
+        // 2. Aggiorna tutte le transazioni associate
+        var updatedCount = 0
+        
+        for index in transactions.indices {
+            var updated = false
+            
+            // Aggiorna il campo accountName
+            if transactions[index].accountName == oldName {
+                transactions[index].accountName = trimmedNewName
+                updated = true
+            }
+            
+            // Aggiorna il campo salvadanaiName per i trasferimenti tra conti
+            if transactions[index].type == "transfer" &&
+               transactions[index].salvadanaiName == oldName {
+                transactions[index].salvadanaiName = trimmedNewName
+                updated = true
+            }
+            
+            if updated {
+                updatedCount += 1
+            }
+        }
+        
+        print("✅ Aggiornate \(updatedCount) transazioni")
+        
+        // Force save to make sure data persists
+        DispatchQueue.main.async {
+            // Il didSet si occuperà di salvare automaticamente
+            self.objectWillChange.send()
+        }
+    }
+    
+    /// Aggiorna il nome dell'account in tutte le transazioni che lo referenziano
+    /// - Parameters:
+    ///   - oldName: Il vecchio nome dell'account
+    ///   - newName: Il nuovo nome dell'account
+    private func updateTransactionsAccountName(from oldName: String, to newName: String) {
+        for index in transactions.indices {
+            // Aggiorna il campo accountName
+            if transactions[index].accountName == oldName {
+                transactions[index].accountName = newName
+            }
+            
+            // Aggiorna il campo salvadanaiName per i trasferimenti tra conti
+            // (dove il conto di destinazione è memorizzato in salvadanaiName)
+            if transactions[index].type == "transfer" &&
+               transactions[index].salvadanaiName == oldName {
+                transactions[index].salvadanaiName = newName
+            }
+        }
+    }
+}
+
 // MARK: - Export/Import Data
 struct ExportData: Codable {
     let accounts: [AccountModel]
@@ -818,6 +904,194 @@ extension DataManager {
         return accounts.sorted { account1, account2 in
             account1.name.localizedCaseInsensitiveCompare(account2.name) == .orderedAscending
         }
+    }
+}
+
+// MARK: - Account Closure Methods
+extension DataManager {
+    
+    /// Chiude un conto trasferendo il saldo ad un altro conto
+    /// - Parameters:
+    ///   - accountToClose: Il conto da chiudere
+    ///   - destinationAccount: Il conto di destinazione per il saldo
+    /// - Returns: True se la chiusura è avvenuta con successo
+    func closeAccount(_ accountToClose: AccountModel, transferingBalanceTo destinationAccount: AccountModel) -> Bool {
+        guard let closeIndex = accounts.firstIndex(where: { $0.id == accountToClose.id }),
+              let destIndex = accounts.firstIndex(where: { $0.id == destinationAccount.id }) else {
+            print("❌ Errore: Impossibile trovare i conti")
+            return false
+        }
+        
+        guard accounts[closeIndex].canBeClosed else {
+            print("❌ Errore: Il conto è già chiuso")
+            return false
+        }
+        
+        guard accountToClose.id != destinationAccount.id else {
+            print("❌ Errore: Non puoi trasferire il saldo allo stesso conto")
+            return false
+        }
+        
+        print("🔒 Chiusura conto '\(accountToClose.name)'")
+        print("  - Saldo da trasferire: \(accountToClose.balance.italianCurrency)")
+        print("  - Verso: '\(destinationAccount.name)'")
+        
+        // 1. Trasferisci il saldo se diverso da zero
+        if accountToClose.hasNonZeroBalance {
+            let transferAmount = accounts[closeIndex].balance
+            
+            // Sottrai dal conto da chiudere
+            accounts[closeIndex].balance = 0.0
+            
+            // Aggiungi al conto di destinazione
+            accounts[destIndex].balance += transferAmount
+            
+            // Registra la transazione di trasferimento
+            let transferDescription = "Trasferimento per chiusura conto '\(accountToClose.name)'"
+            let transferTransaction = TransactionModel(
+                amount: abs(transferAmount),
+                descr: transferDescription,
+                category: "🔒 Chiusura Conto",
+                type: "transfer",
+                date: Date(),
+                accountName: accountToClose.name,
+                salvadanaiName: destinationAccount.name
+            )
+            
+            transactions.append(transferTransaction)
+            print("  ✅ Saldo trasferito: \(transferAmount.italianCurrency)")
+        }
+        
+        // 2. Chiudi il conto
+        accounts[closeIndex].isClosed = true
+        print("  ✅ Conto chiuso")
+        
+        // 3. Marca tutte le transazioni associate come "locked"
+        let relatedTransactionsCount = markTransactionsAsLocked(for: accountToClose.name)
+        print("  ✅ Bloccate \(relatedTransactionsCount) transazioni")
+        
+        return true
+    }
+    
+    /// Chiude un conto senza saldo (solo se il saldo è zero)
+    /// - Parameter accountToClose: Il conto da chiudere
+    /// - Returns: True se la chiusura è avvenuta con successo
+    func closeAccountWithZeroBalance(_ accountToClose: AccountModel) -> Bool {
+        guard let index = accounts.firstIndex(where: { $0.id == accountToClose.id }) else {
+            print("❌ Errore: Impossibile trovare il conto")
+            return false
+        }
+        
+        guard accounts[index].canBeClosed else {
+            print("❌ Errore: Il conto è già chiuso")
+            return false
+        }
+        
+        guard !accounts[index].hasNonZeroBalance else {
+            print("❌ Errore: Il conto ha un saldo diverso da zero")
+            return false
+        }
+        
+        print("🔒 Chiusura conto con saldo zero '\(accountToClose.name)'")
+        
+        // Chiudi il conto
+        accounts[index].isClosed = true
+        
+        // Marca tutte le transazioni associate come "locked"
+        let relatedTransactionsCount = markTransactionsAsLocked(for: accountToClose.name)
+        print("  ✅ Conto chiuso")
+        print("  ✅ Bloccate \(relatedTransactionsCount) transazioni")
+        
+        return true
+    }
+    
+    /// Riapre un conto chiuso
+    /// - Parameter account: Il conto da riaprire
+    /// - Returns: True se la riapertura è avvenuta con successo
+    func reopenAccount(_ account: AccountModel) -> Bool {
+        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
+            print("❌ Errore: Impossibile trovare il conto")
+            return false
+        }
+        
+        guard accounts[index].isClosed else {
+            print("❌ Errore: Il conto non è chiuso")
+            return false
+        }
+        
+        print("🔓 Riapertura conto '\(account.name)'")
+        
+        // Riapri il conto
+        accounts[index].isClosed = false
+        
+        // Sblocca tutte le transazioni associate
+        let unlockedTransactionsCount = unmarkTransactionsAsLocked(for: account.name)
+        print("  ✅ Conto riaperto")
+        print("  ✅ Sbloccate \(unlockedTransactionsCount) transazioni")
+        
+        return true
+    }
+    
+    /// Marca le transazioni di un conto come "bloccate" (non eliminabili)
+    /// - Parameter accountName: Nome del conto
+    /// - Returns: Numero di transazioni bloccate
+    private func markTransactionsAsLocked(for accountName: String) -> Int {
+        var count = 0
+        for index in transactions.indices {
+            if transactions[index].accountName == accountName ||
+               (transactions[index].type == "transfer" && transactions[index].salvadanaiName == accountName) {
+                // Per ora non abbiamo un campo isLocked nel TransactionModel
+                // La logica di blocco sarà gestita dalla UI controllando se l'account è chiuso
+                count += 1
+            }
+        }
+        return count
+    }
+    
+    /// Sblocca le transazioni di un conto
+    /// - Parameter accountName: Nome del conto
+    /// - Returns: Numero di transazioni sbloccate
+    private func unmarkTransactionsAsLocked(for accountName: String) -> Int {
+        var count = 0
+        for index in transactions.indices {
+            if transactions[index].accountName == accountName ||
+               (transactions[index].type == "transfer" && transactions[index].salvadanaiName == accountName) {
+                count += 1
+            }
+        }
+        return count
+    }
+    
+    /// Verifica se una transazione è bloccata (associata a un conto chiuso)
+    /// - Parameter transaction: La transazione da verificare
+    /// - Returns: True se la transazione è bloccata
+    func isTransactionLocked(_ transaction: TransactionModel) -> Bool {
+        // Verifica se il conto principale è chiuso
+        if let account = accounts.first(where: { $0.name == transaction.accountName }) {
+            if account.isClosed {
+                return true
+            }
+        }
+        
+        // Verifica se il conto di destinazione (per i trasferimenti) è chiuso
+        if transaction.type == "transfer",
+           let destinationAccount = accounts.first(where: { $0.name == transaction.salvadanaiName }) {
+            if destinationAccount.isClosed {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    /// Ottiene tutti i conti aperti (non chiusi)
+    var openAccounts: [AccountModel] {
+        return accounts.filter { !$0.isClosed }
+    }
+    
+    /// Ottiene tutti i conti chiusi
+    var closedAccounts: [AccountModel] {
+        return accounts.filter { $0.isClosed }
     }
 }
 
