@@ -500,12 +500,15 @@ struct EnhancedAccountCard: View {
                                 }) {
                                     Label("Modifica", systemImage: "pencil")
                                 }
-                                .tint(.primary)
+                                .tint(.blue)
                                 
                                 Button(action: {
                                     showingCloseSheet = true
                                 }) {
-                                    Label("Chiudi Conto", systemImage: "lock")
+                                    HStack {
+                                        Image(systemName: "lock")
+                                        Text("Chiudi Conto")
+                                    }
                                 }
                                 .tint(.orange)
                                 
