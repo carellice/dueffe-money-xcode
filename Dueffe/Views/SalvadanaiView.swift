@@ -245,6 +245,8 @@ struct SalvadanaiCardView: View {
     @State private var showingTransactions = false
     @State private var showingEditSheet = false // NUOVO: Per la modifica
     @State private var showingDeleteAlert = false // NUOVO: Per l'eliminazione
+    @State private var showingBreakAlert = false // NUOVO
+    @State private var showingBreakSheet = false // NUOVO
     
     private var progress: Double {
         // Per glass: currentAmount / monthlyRefill
@@ -704,7 +706,7 @@ struct SalvadanaiCardView: View {
         }) {
             // Long press action
         }
-        // NUOVO: Context Menu aggiunto qui
+        // NUOVO: Context Menu aggiornato (da sostituire nel file SalvadanaiView.swift)
         .contextMenu {
             // Modifica nome
             Button(action: {
@@ -726,7 +728,15 @@ struct SalvadanaiCardView: View {
             
             Divider()
             
-            // Elimina salvadanaio
+            // NUOVO: Rompi salvadanaio
+            Button(action: {
+                showingBreakAlert = true
+            }) {
+                Label("Rompi Salvadanaio", systemImage: "hammer.fill")
+            }
+            .tint(.orange)
+            
+            // Elimina salvadanaio (metodo soft)
             Button(role: .destructive, action: {
                 showingDeleteAlert = true
             }) {
@@ -762,6 +772,21 @@ struct SalvadanaiCardView: View {
         // NUOVO: Sheet per modifica nome
         .sheet(isPresented: $showingEditSheet) {
             EditSalvadanaiNameView(salvadanaio: salvadanaio)
+        }
+        .sheet(isPresented: $showingBreakSheet) {
+            BreakSalvadanaiView(salvadanaio: salvadanaio)
+        }
+        .alert("Rompi Salvadanaio", isPresented: $showingBreakAlert) {
+            Button("Rompi", role: .destructive) {
+                showingBreakSheet = true
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            if dataManager.canBreakSalvadanaiDirectly(salvadanaio) {
+                Text("Vuoi rompere il salvadanaio '\(salvadanaio.name)'?\n\nIl salvadanaio e tutte le sue transazioni verranno eliminati definitivamente.\n\nQuesta azione non può essere annullata!")
+            } else {
+                Text("Vuoi rompere il salvadanaio '\(salvadanaio.name)'?\n\nDovrai prima trasferire \(salvadanaio.currentAmount.italianCurrency) ad altri salvadanai.\n\nIl salvadanaio e tutte le sue transazioni verranno eliminati definitivamente.")
+            }
         }
         // NUOVO: Alert per eliminazione
         .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
@@ -2424,6 +2449,969 @@ struct SimpleSalvadanaiDetailView: View {
         // NUOVO: Sheet per modifica nome
         .sheet(isPresented: $showingEditSheet) {
             EditSalvadanaiNameView(salvadanaio: salvadanaio)
+        }
+    }
+}
+
+// MARK: - 3. NUOVA VISTA: BreakSalvadanaiView.swift
+struct BreakSalvadanaiView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    
+    let salvadanaio: SalvadanaiModel
+    @State private var selectedDestinations: Set<String> = []
+    @State private var customAmounts: [String: Double] = [:]
+    @State private var distributionMode: DistributionMode = .equal
+    @State private var showingBreakAnimation = false
+    @State private var isBreaking = false
+    @State private var breakCompleted = false
+    
+    enum DistributionMode: String, CaseIterable {
+        case equal = "Equa"
+        case custom = "Personalizzata"
+        
+        var icon: String {
+            switch self {
+            case .equal: return "equal.circle.fill"
+            case .custom: return "slider.horizontal.3"
+            }
+        }
+        
+        var description: String {
+            switch self {
+            case .equal: return "Dividi l'importo in parti uguali"
+            case .custom: return "Specifica importi personalizzati"
+            }
+        }
+    }
+    
+    private var availableDestinations: [SalvadanaiModel] {
+        dataManager.getAvailableSalvadanaiForTransfer(excluding: salvadanaio)
+    }
+    
+    private var totalToTransfer: Double {
+        max(0, salvadanaio.currentAmount)
+    }
+    
+    private var totalDistributed: Double {
+        switch distributionMode {
+        case .equal:
+            return selectedDestinations.isEmpty ? 0 : totalToTransfer
+        case .custom:
+            return customAmounts.values.reduce(0, +)
+        }
+    }
+    
+    private var remainingAmount: Double {
+        totalToTransfer - totalDistributed
+    }
+    
+    private var canBreakDirectly: Bool {
+        dataManager.canBreakSalvadanaiDirectly(salvadanaio)
+    }
+    
+    private var isDistributionValid: Bool {
+        if canBreakDirectly { return true }
+        guard !selectedDestinations.isEmpty else { return false }
+        return abs(remainingAmount) < 0.01
+    }
+    
+    // Funzione per convertire string colore in Color
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.orange.opacity(0.1), Color.red.opacity(0.1)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                if showingBreakAnimation {
+                    BreakAnimationView(
+                        salvadanaio: salvadanaio,
+                        isBreaking: $isBreaking,
+                        breakCompleted: $breakCompleted,
+                        onAnimationComplete: {
+                            dismiss()
+                        }
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        // Header con info salvadanaio
+                        BreakSalvadanaiHeaderView(
+                            salvadanaio: salvadanaio,
+                            totalToTransfer: totalToTransfer,
+                            totalDistributed: totalDistributed,
+                            remainingAmount: remainingAmount,
+                            canBreakDirectly: canBreakDirectly
+                        )
+                        .padding(.horizontal)
+                        .padding(.bottom, 16)
+                        
+                        if canBreakDirectly {
+                            // Vista per rottura diretta (nessun saldo)
+                            DirectBreakView(salvadanaio: salvadanaio)
+                                .padding(.horizontal)
+                        } else {
+                            // Vista per distribuzione fondi
+                            Form {
+                                // Modalità di distribuzione
+                                Section {
+                                    ForEach(DistributionMode.allCases, id: \.self) { mode in
+                                        BreakDistributionModeRow(
+                                            mode: mode,
+                                            isSelected: distributionMode == mode,
+                                            action: {
+                                                withAnimation(.spring()) {
+                                                    distributionMode = mode
+                                                }
+                                            }
+                                        )
+                                    }
+                                } header: {
+                                    SectionHeader(icon: "gearshape.fill", title: "Come Distribuire i Soldi")
+                                }
+                                
+                                // Lista salvadanai destinazione
+                                if !availableDestinations.isEmpty {
+                                    Section {
+                                        ForEach(availableDestinations, id: \.id) { destination in
+                                            BreakDestinationRow(
+                                                destination: destination,
+                                                isSelected: selectedDestinations.contains(destination.name),
+                                                distributionMode: distributionMode,
+                                                equalAmount: selectedDestinations.isEmpty ? 0 : totalToTransfer / Double(selectedDestinations.count),
+                                                customAmount: Binding(
+                                                    get: { customAmounts[destination.name] ?? 0 },
+                                                    set: { customAmounts[destination.name] = $0 }
+                                                ),
+                                                onToggle: {
+                                                    toggleDestination(destination.name)
+                                                }
+                                            )
+                                        }
+                                    } header: {
+                                        SectionHeader(icon: "arrow.right.circle.fill", title: "Dove Spostare i Soldi")
+                                    } footer: {
+                                        if distributionMode == .custom && !selectedDestinations.isEmpty {
+                                            BreakCustomDistributionFooterView(
+                                                totalDistributed: totalDistributed,
+                                                remainingAmount: remainingAmount,
+                                                totalAmount: totalToTransfer
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Section {
+                                        HStack {
+                                            Image(systemName: "exclamationmark.triangle.fill")
+                                                .foregroundColor(.orange)
+                                            Text("Nessun altro salvadanaio disponibile")
+                                                .foregroundColor(.orange)
+                                        }
+                                        .padding(.vertical, 8)
+                                    } footer: {
+                                        Text("Non ci sono altri salvadanai dove trasferire i soldi. Crea almeno un altro salvadanaio prima di rompere questo.")
+                                    }
+                                }
+                                
+                                // Azioni rapide
+                                if distributionMode == .custom && !selectedDestinations.isEmpty {
+                                    Section {
+                                        BreakQuickActionsView(
+                                            selectedDestinations: selectedDestinations,
+                                            totalAmount: totalToTransfer,
+                                            customAmounts: $customAmounts
+                                        )
+                                    } header: {
+                                        SectionHeader(icon: "bolt.fill", title: "Azioni Rapide")
+                                    }
+                                }
+                            }
+                            .scrollContentBackground(.hidden)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("💥 Rompi Salvadanaio")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                    .disabled(isBreaking)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(canBreakDirectly ? "💥 Rompi" : "💥 Rompi e Trasferisci") {
+                        startBreakProcess()
+                    }
+                    .disabled(!isDistributionValid || isBreaking)
+                    .fontWeight(.bold)
+                    .foregroundColor(isDistributionValid ? .red : .secondary)
+                }
+            }
+        }
+        .onAppear {
+            setupInitialSelection()
+        }
+    }
+    
+    private func setupInitialSelection() {
+        if !canBreakDirectly && availableDestinations.count <= 3 {
+            selectedDestinations = Set(availableDestinations.map(\.name))
+        }
+    }
+    
+    private func toggleDestination(_ name: String) {
+        if selectedDestinations.contains(name) {
+            selectedDestinations.remove(name)
+            customAmounts[name] = 0
+        } else {
+            selectedDestinations.insert(name)
+            if distributionMode == .custom {
+                customAmounts[name] = 0
+            }
+        }
+    }
+    
+    private func startBreakProcess() {
+        withAnimation(.easeInOut(duration: 0.5)) {
+            showingBreakAnimation = true
+            isBreaking = true
+        }
+        
+        // Simula il processo di rottura con delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            performBreak()
+        }
+    }
+    
+    private func performBreak() {
+        if canBreakDirectly {
+            // Rottura diretta senza trasferimenti
+            dataManager.breakSalvadanaio(salvadanaio)
+        } else {
+            // Rottura con trasferimenti
+            let finalAmounts: [String: Double]
+            
+            switch distributionMode {
+            case .equal:
+                let perDestination = totalToTransfer / Double(selectedDestinations.count)
+                finalAmounts = Dictionary(uniqueKeysWithValues: selectedDestinations.map { ($0, perDestination) })
+            case .custom:
+                finalAmounts = customAmounts.filter { selectedDestinations.contains($0.key) && $0.value > 0 }
+            }
+            
+            dataManager.breakSalvadanaio(salvadanaio, transferredAmounts: finalAmounts)
+        }
+        
+        // Completa l'animazione
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                breakCompleted = true
+            }
+        }
+    }
+}
+
+// Header View
+struct BreakSalvadanaiHeaderView: View {
+    let salvadanaio: SalvadanaiModel
+    let totalToTransfer: Double
+    let totalDistributed: Double
+    let remainingAmount: Double
+    let canBreakDirectly: Bool
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            // Salvadanaio da rompere
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "hammer.fill")
+                        .foregroundColor(.orange)
+                    Text("Salvadanaio da Rompere")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                    Spacer()
+                }
+                
+                HStack(spacing: 16) {
+                    Circle()
+                        .fill(getColor(from: salvadanaio.color))
+                        .frame(width: 20, height: 20)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(salvadanaio.name)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text(salvadanaio.category)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(salvadanaio.currentAmount.italianCurrency)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(salvadanaio.currentAmount >= 0 ? .primary : .red)
+                        
+                        if canBreakDirectly {
+                            Text("Rottura diretta")
+                                .font(.caption)
+                                .foregroundColor(.green)
+                                .fontWeight(.medium)
+                        } else {
+                            Text("Richiede trasferimento")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .fontWeight(.medium)
+                        }
+                    }
+                }
+            }
+            
+            // Statistiche trasferimento (solo se necessario)
+            if !canBreakDirectly {
+                HStack(spacing: 20) {
+                    BreakStatCard(
+                        title: "Da Trasferire",
+                        amount: totalToTransfer,
+                        icon: "arrow.right.circle.fill",
+                        color: .orange
+                    )
+                    
+                    BreakStatCard(
+                        title: "Distribuito",
+                        amount: totalDistributed,
+                        icon: "checkmark.circle.fill",
+                        color: .green
+                    )
+                    
+                    BreakStatCard(
+                        title: "Rimanente",
+                        amount: remainingAmount,
+                        icon: remainingAmount > 0.01 ? "exclamationmark.circle.fill" : "checkmark.circle.fill",
+                        color: remainingAmount > 0.01 ? .red : .green
+                    )
+                }
+            }
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+        )
+    }
+}
+
+// Stat Card
+struct BreakStatCard: View {
+    let title: String
+    let amount: Double
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            
+            Text(amount.italianCurrency)
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+                .minimumScaleFactor(0.8)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// Vista per rottura diretta
+struct DirectBreakView: View {
+    let salvadanaio: SalvadanaiModel
+    @State private var animateIcon = false
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            Spacer()
+            
+            // Icona animata
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.2))
+                    .frame(width: 120, height: 120)
+                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 1.5).repeatForever(), value: animateIcon)
+                
+                Image(systemName: "hammer.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+                    .rotationEffect(.degrees(animateIcon ? 5 : -5))
+                    .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: animateIcon)
+            }
+            
+            VStack(spacing: 16) {
+                Text("Pronto per la Rottura! 💥")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text(salvadanaio.currentAmount <= 0 ?
+                     "Il salvadanaio non contiene soldi e può essere rotto immediatamente." :
+                     "Il salvadanaio ha un saldo negativo e può essere rotto immediatamente.")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text("Attenzione")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
+                }
+                
+                Text("Rompere il salvadanaio eliminerà definitivamente:\n• Il salvadanaio stesso\n• Tutte le transazioni associate\n\nQuesta azione non può essere annullata!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.red.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
+            Spacer()
+        }
+        .onAppear {
+            animateIcon = true
+        }
+    }
+}
+
+// Distribution Mode Row
+struct BreakDistributionModeRow: View {
+    let mode: BreakSalvadanaiView.DistributionMode
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ?
+                              LinearGradient(gradient: Gradient(colors: [.orange, .red]), startPoint: .topLeading, endPoint: .bottomTrailing) :
+                              LinearGradient(gradient: Gradient(colors: [Color.gray.opacity(0.1)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .frame(width: 44, height: 44)
+                        .shadow(color: isSelected ? .orange.opacity(0.3) : .clear, radius: 6, x: 0, y: 3)
+                    
+                    Image(systemName: mode.icon)
+                        .font(.title3)
+                        .foregroundColor(isSelected ? .white : .secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.rawValue)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isSelected ? .orange : .primary)
+                    
+                    Text(mode.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSelected)
+    }
+}
+
+// Destination Row
+struct BreakDestinationRow: View {
+    let destination: SalvadanaiModel
+    let isSelected: Bool
+    let distributionMode: BreakSalvadanaiView.DistributionMode
+    let equalAmount: Double
+    @Binding var customAmount: Double
+    let onToggle: () -> Void
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    private var displayAmount: Double {
+        switch distributionMode {
+        case .equal:
+            return isSelected ? equalAmount : 0
+        case .custom:
+            return customAmount
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                // Checkbox
+                Button(action: onToggle) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(isSelected ? .orange : .secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Icona salvadanaio
+                Circle()
+                    .fill(getColor(from: destination.color))
+                    .frame(width: 12, height: 12)
+                
+                // Info salvadanaio
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(destination.name)
+                        .font(.headline)
+                        .fontWeight(.medium)
+                        .foregroundColor(isSelected ? .primary : .secondary)
+                    
+                    HStack {
+                        Text("Attuale: \(destination.currentAmount.italianCurrency)")
+                            .font(.caption)
+                            .foregroundColor(destination.currentAmount >= 0 ? .green : .red)
+                        
+                        Text("• \(destination.category)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                // Campo importo per distribuzione personalizzata
+                if distributionMode == .custom && isSelected {
+                    HStack {
+                        Text("+")
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                        
+                        TextField("0", value: $customAmount, format: .currency(code: "EUR"))
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 80)
+                            .keyboardType(.decimalPad)
+                    }
+                } else if isSelected && displayAmount > 0 {
+                    // Mostra importo per modalità equa
+                    Text("+\(displayAmount.italianCurrency)")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.green.opacity(0.1))
+                        )
+                }
+            }
+            .padding(.vertical, 12)
+            
+            // Anteprima saldo dopo trasferimento
+            if isSelected && displayAmount > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Divider()
+                        .padding(.leading, 60)
+                    
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Nuovo saldo: \((destination.currentAmount + displayAmount).italianCurrency)")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                                .fontWeight(.medium)
+                        }
+                    }
+                    .padding(.leading, 60)
+                    .padding(.bottom, 8)
+                }
+            }
+        }
+    }
+}
+
+// Custom Distribution Footer
+struct BreakCustomDistributionFooterView: View {
+    let totalDistributed: Double
+    let remainingAmount: Double
+    let totalAmount: Double
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Distribuito: \(totalDistributed.italianCurrency)")
+                    .font(.caption)
+                    .foregroundColor(.green)
+                
+                Spacer()
+                
+                Text("Rimanente: \(remainingAmount.italianCurrency)")
+                    .font(.caption)
+                    .foregroundColor(remainingAmount > 0.01 ? .orange : .green)
+                    .fontWeight(.medium)
+            }
+            
+            if abs(remainingAmount) > 0.01 {
+                Text("⚠️ Distribuzione incompleta. Assicurati che tutto l'importo sia distribuito.")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+            } else {
+                Text("✅ Distribuzione completa! Pronto per rompere il salvadanaio.")
+                    .font(.caption2)
+                    .foregroundColor(.green)
+            }
+        }
+    }
+}
+
+// Quick Actions
+struct BreakQuickActionsView: View {
+    let selectedDestinations: Set<String>
+    let totalAmount: Double
+    @Binding var customAmounts: [String: Double]
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                // Distribuzione equa
+                Button(action: {
+                    let equalAmount = totalAmount / Double(selectedDestinations.count)
+                    for name in selectedDestinations {
+                        customAmounts[name] = equalAmount
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "equal.circle.fill")
+                        Text("Equa")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.1))
+                    .foregroundColor(.orange)
+                    .clipShape(Capsule())
+                }
+                
+                // Reset
+                Button(action: {
+                    for name in selectedDestinations {
+                        customAmounts[name] = 0
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                        Text("Reset")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.red.opacity(0.1))
+                    .foregroundColor(.red)
+                    .clipShape(Capsule())
+                }
+                
+                Spacer()
+            }
+        }
+    }
+}
+
+// MARK: - 5. ANIMAZIONE ROTTURA SALVADANAIO
+struct BreakAnimationView: View {
+    let salvadanaio: SalvadanaiModel
+    @Binding var isBreaking: Bool
+    @Binding var breakCompleted: Bool
+    let onAnimationComplete: () -> Void
+    
+    @State private var hammerRotation: Double = 0
+    @State private var salvadanaiScale: Double = 1.0
+    @State private var salvadanaiOpacity: Double = 1.0
+    @State private var cracksOpacity: Double = 0.0
+    @State private var explosionScale: Double = 0.0
+    @State private var particlesOpacity: Double = 0.0
+    @State private var showSuccessMessage = false
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            // Background
+            Color.black.opacity(0.8)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Spacer()
+                
+                // Area di animazione
+                ZStack {
+                    // Particelle esplosive
+                    ForEach(0..<8, id: \.self) { index in
+                        Circle()
+                            .fill(getColor(from: salvadanaio.color))
+                            .frame(width: 20, height: 20)
+                            .offset(
+                                x: cos(Double(index) * .pi / 4) * explosionScale * 100,
+                                y: sin(Double(index) * .pi / 4) * explosionScale * 100
+                            )
+                            .opacity(particlesOpacity)
+                            .scaleEffect(explosionScale)
+                    }
+                    
+                    // Salvadanaio con crepe
+                    ZStack {
+                        // Salvadanaio principale
+                        Circle()
+                            .fill(LinearGradient(
+                                gradient: Gradient(colors: [
+                                    getColor(from: salvadanaio.color),
+                                    getColor(from: salvadanaio.color).opacity(0.7)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ))
+                            .frame(width: 120, height: 120)
+                            .scaleEffect(salvadanaiScale)
+                            .opacity(salvadanaiOpacity)
+                        
+                        // Icona salvadanaio
+                        Image(systemName: "banknote.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white)
+                            .scaleEffect(salvadanaiScale)
+                            .opacity(salvadanaiOpacity)
+                        
+                        // Crepe
+                        ZStack {
+                            // Crepa 1
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 2, height: 80)
+                                .rotationEffect(.degrees(45))
+                                .opacity(cracksOpacity)
+                            
+                            // Crepa 2
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 2, height: 60)
+                                .rotationEffect(.degrees(-30))
+                                .opacity(cracksOpacity)
+                            
+                            // Crepa 3
+                            Rectangle()
+                                .fill(Color.black)
+                                .frame(width: 2, height: 70)
+                                .rotationEffect(.degrees(120))
+                                .opacity(cracksOpacity)
+                        }
+                    }
+                    
+                    // Martello
+                    VStack {
+                        Image(systemName: "hammer.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.orange)
+                            .rotationEffect(.degrees(hammerRotation))
+                            .offset(x: -80, y: -80)
+                    }
+                }
+                .frame(width: 300, height: 300)
+                
+                // Messaggio di stato
+                VStack(spacing: 16) {
+                    if breakCompleted {
+                        Text("💥 Salvadanaio Rotto!")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .opacity(showSuccessMessage ? 1.0 : 0.0)
+                        
+                        Text("Il salvadanaio '\(salvadanaio.name)' è stato eliminato definitivamente")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .opacity(showSuccessMessage ? 1.0 : 0.0)
+                    } else {
+                        Text("Rompendo il salvadanaio...")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                    }
+                }
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            startBreakAnimation()
+        }
+        .onChange(of: breakCompleted) { completed in
+            if completed {
+                showSuccessAnimation()
+            }
+        }
+    }
+    
+    private func startBreakAnimation() {
+        // Fase 1: Martello in movimento
+        withAnimation(.easeInOut(duration: 0.5).repeatCount(3, autoreverses: true)) {
+            hammerRotation = -30
+        }
+        
+        // Fase 2: Compaiono le crepe
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeIn(duration: 0.3)) {
+                cracksOpacity = 1.0
+            }
+        }
+        
+        // Fase 3: Salvadanaio trema
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation(.easeInOut(duration: 0.1).repeatCount(6, autoreverses: true)) {
+                salvadanaiScale = 1.1
+            }
+        }
+    }
+    
+    private func showSuccessAnimation() {
+        // Esplosione finale
+        withAnimation(.easeOut(duration: 0.5)) {
+            salvadanaiOpacity = 0.0
+            explosionScale = 1.0
+            particlesOpacity = 1.0
+        }
+        
+        // Particelle svaniscono
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.easeOut(duration: 1.0)) {
+                particlesOpacity = 0.0
+                explosionScale = 2.0
+            }
+        }
+        
+        // Mostra messaggio di successo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            withAnimation(.easeIn(duration: 0.5)) {
+                showSuccessMessage = true
+            }
+        }
+        
+        // Chiudi la vista
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            onAnimationComplete()
         }
     }
 }

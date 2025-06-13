@@ -1257,6 +1257,77 @@ extension DataManager {
     }
 }
 
+extension DataManager {
+    
+    /// Rompe un salvadanaio eliminando sia il salvadanaio che tutte le transazioni associate
+    /// - Parameters:
+    ///   - salvadanaio: Il salvadanaio da eliminare
+    ///   - transferredAmounts: Gli importi trasferiti ad altri salvadanai (se necessario)
+    func breakSalvadanaio(_ salvadanaio: SalvadanaiModel, transferredAmounts: [String: Double] = [:]) {
+        print("💥 Iniziata rottura salvadanaio: '\(salvadanaio.name)'")
+        print("  - Saldo da trasferire: \(salvadanaio.currentAmount.italianCurrency)")
+        print("  - Trasferimenti: \(transferredAmounts)")
+        
+        // 1. Trasferisci i soldi agli altri salvadanai se necessario
+        if salvadanaio.currentAmount > 0 && !transferredAmounts.isEmpty {
+            for (destinationName, amount) in transferredAmounts {
+                if let index = salvadanai.firstIndex(where: { $0.name == destinationName }) {
+                    salvadanai[index].currentAmount += amount
+                    print("  ✅ Trasferiti \(amount.italianCurrency) a '\(destinationName)'")
+                    
+                    // Registra la transazione di trasferimento
+                    let transferTransaction = TransactionModel(
+                        amount: amount,
+                        descr: "Rottura salvadanaio '\(salvadanaio.name)'",
+                        category: "💥 Rottura Salvadanaio",
+                        type: "transfer_salvadanai",
+                        date: Date(),
+                        accountName: salvadanaio.name,
+                        salvadanaiName: destinationName
+                    )
+                    transactions.append(transferTransaction)
+                }
+            }
+        }
+        
+        // 2. Elimina tutte le transazioni associate al salvadanaio
+        let transactionsToDelete = transactions.filter { transaction in
+            transaction.salvadanaiName == salvadanaio.name ||
+            (transaction.type == "transfer_salvadanai" && transaction.accountName == salvadanaio.name)
+        }
+        
+        print("  🗑️ Eliminazione di \(transactionsToDelete.count) transazioni associate")
+        
+        transactions.removeAll { transaction in
+            transaction.salvadanaiName == salvadanaio.name ||
+            (transaction.type == "transfer_salvadanai" && transaction.accountName == salvadanaio.name)
+        }
+        
+        // 3. Elimina il salvadanaio
+        salvadanai.removeAll { $0.id == salvadanaio.id }
+        print("  💥 Salvadanaio '\(salvadanaio.name)' eliminato definitivamente")
+        
+        // 4. Force save to make sure data persists
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
+    }
+    
+    /// Verifica se un salvadanaio può essere rotto senza trasferimenti
+    /// - Parameter salvadanaio: Il salvadanaio da verificare
+    /// - Returns: True se può essere eliminato direttamente (saldo zero o negativo)
+    func canBreakSalvadanaiDirectly(_ salvadanaio: SalvadanaiModel) -> Bool {
+        return salvadanaio.currentAmount <= 0
+    }
+    
+    /// Ottiene la lista di salvadanai disponibili per trasferimento
+    /// - Parameter excludingSalvadanaio: Il salvadanaio da escludere dalla lista
+    /// - Returns: Array di salvadanai disponibili per il trasferimento
+    func getAvailableSalvadanaiForTransfer(excluding salvadanaio: SalvadanaiModel) -> [SalvadanaiModel] {
+        return salvadanai.filter { $0.id != salvadanaio.id }
+    }
+}
+
 struct ImportResult {
     let success: Bool
     let message: String
