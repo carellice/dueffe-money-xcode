@@ -2702,8 +2702,9 @@ struct BreakSalvadanaiView: View {
             isBreaking = true
         }
         
-        // Simula il processo di rottura con delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        // Simula il processo di rottura con delay - Ottimizzato per l'animazione accelerata
+        // L'animazione dura: 0.3s (primo colpo) + 1s + 2s + 0.4s (esplosione) + 1.8s (successo) = ~5.5s
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
             performBreak()
         }
     }
@@ -2727,12 +2728,8 @@ struct BreakSalvadanaiView: View {
             dataManager.breakSalvadanaio(salvadanaio, transferredAmounts: finalAmounts)
         }
         
-        // Completa l'animazione
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            withAnimation(.easeOut(duration: 0.3)) {
-                breakCompleted = true
-            }
-        }
+        // L'animazione ora è gestita internamente da BreakAnimationView
+        // Non impostiamo più breakCompleted qui - viene gestito dall'animazione stessa
     }
 }
 
@@ -3210,20 +3207,319 @@ struct BreakQuickActionsView: View {
     }
 }
 
-// MARK: - 5. ANIMAZIONE ROTTURA SALVADANAIO
+// MARK: - 5. ANIMAZIONE ROTTURA SALVADANAIO MIGLIORATA
 struct BreakAnimationView: View {
     let salvadanaio: SalvadanaiModel
     @Binding var isBreaking: Bool
     @Binding var breakCompleted: Bool
     let onAnimationComplete: () -> Void
     
-    @State private var hammerRotation: Double = 0
+    // Stati per l'animazione del martello
+    @State private var hammerRotation: Double = -45
+    @State private var hammerOffset: CGPoint = CGPoint(x: -120, y: -120)
+    @State private var hammerScale: Double = 1.0
+    @State private var isHammerMoving = false
+    
+    // Stati per il salvadanaio
     @State private var salvadanaiScale: Double = 1.0
     @State private var salvadanaiOpacity: Double = 1.0
-    @State private var cracksOpacity: Double = 0.0
+    @State private var salvadanaiRotation: Double = 0
+    @State private var salvadanaiOffset: CGPoint = .zero
+    
+    // Stati per le crepe progressive
+    @State private var crackPhase1Opacity: Double = 0.0
+    @State private var crackPhase2Opacity: Double = 0.0
+    @State private var crackPhase3Opacity: Double = 0.0
+    @State private var crackPhase4Opacity: Double = 0.0
+    
+    // Stati per l'esplosione e particelle
     @State private var explosionScale: Double = 0.0
     @State private var particlesOpacity: Double = 0.0
+    @State private var fragmentsOpacity: Double = 0.0
+    @State private var coinsOpacity: Double = 0.0
+    @State private var dustOpacity: Double = 0.0
+    @State private var flashOpacity: Double = 0.0
+    
+    // Altri stati
     @State private var showSuccessMessage = false
+    @State private var impactCount = 0
+    @State private var screenShake: Double = 0
+    
+    var body: some View {
+        ZStack {
+            // Background
+            Color.black.opacity(0.9)
+                .ignoresSafeArea()
+            
+            // Flash di luce bianca per l'impatto finale
+            Rectangle()
+                .fill(Color.white)
+                .opacity(flashOpacity)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 40) {
+                Spacer()
+                
+                // Area di animazione principale
+                ZStack {
+                    // Effetti particellari
+                    ParticleEffectsView(
+                        salvadanaio: salvadanaio,
+                        explosionScale: explosionScale,
+                        particlesOpacity: particlesOpacity,
+                        fragmentsOpacity: fragmentsOpacity,
+                        coinsOpacity: coinsOpacity,
+                        dustOpacity: dustOpacity
+                    )
+                    
+                    // Salvadanaio con crepe
+                    PiggyBankView(
+                        salvadanaio: salvadanaio,
+                        salvadanaiScale: salvadanaiScale,
+                        salvadanaiOpacity: salvadanaiOpacity,
+                        salvadanaiRotation: salvadanaiRotation,
+                        salvadanaiOffset: salvadanaiOffset,
+                        crackPhase1Opacity: crackPhase1Opacity,
+                        crackPhase2Opacity: crackPhase2Opacity,
+                        crackPhase3Opacity: crackPhase3Opacity,
+                        crackPhase4Opacity: crackPhase4Opacity
+                    )
+                    
+                    // Martello
+                    HammerView(
+                        rotation: hammerRotation,
+                        offset: hammerOffset,
+                        scale: hammerScale
+                    )
+                }
+                .frame(width: 350, height: 350)
+                .offset(x: screenShake, y: 0)
+                
+                // Messaggio di stato
+                StatusMessageView(
+                    breakCompleted: breakCompleted,
+                    showSuccessMessage: showSuccessMessage,
+                    impactCount: impactCount,
+                    salvadanaiName: salvadanaio.name
+                )
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            startEnhancedBreakAnimation()
+        }
+        .onChange(of: breakCompleted) { completed in
+            // breakCompleted ora viene gestito internamente dall'animazione
+            // Non serve più chiamare showEnhancedSuccessAnimation() qui
+        }
+    }
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    private func startEnhancedBreakAnimation() {
+        // FASE 1: Primo colpo del martello (più veloce)
+        performHammerStrike(delay: 0.3, intensity: 0.3) {
+            impactCount = 1
+            // Prime crepe sottili
+            withAnimation(.easeIn(duration: 0.15)) {
+                crackPhase1Opacity = 1.0
+            }
+            
+            // Leggero tremolio
+            withAnimation(.easeInOut(duration: 0.08).repeatCount(3, autoreverses: true)) {
+                salvadanaiScale = 1.05
+                screenShake = 2
+            }
+        }
+        
+        // FASE 2: Secondo colpo più forte (ridotto da 2.0s a 1.0s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            performHammerStrike(delay: 0.0, intensity: 0.6) {
+                impactCount = 2
+                // Crepe più profonde
+                withAnimation(.easeIn(duration: 0.2)) {
+                    crackPhase2Opacity = 1.0
+                }
+                
+                // Tremolio più intenso
+                withAnimation(.easeInOut(duration: 0.06).repeatCount(5, autoreverses: true)) {
+                    salvadanaiScale = 1.1
+                    salvadanaiRotation = 3
+                    screenShake = 5
+                }
+                
+                // Haptic feedback medio
+                let impactMedium = UIImpactFeedbackGenerator(style: .medium)
+                impactMedium.impactOccurred()
+            }
+        }
+        
+        // FASE 3: Terzo colpo finale e devastante (ridotto da 4.0s a 2.0s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            performHammerStrike(delay: 0.0, intensity: 1.0) {
+                impactCount = 3
+                // Tutte le crepe
+                withAnimation(.easeIn(duration: 0.1)) {
+                    crackPhase3Opacity = 1.0
+                }
+                
+                withAnimation(.easeIn(duration: 0.15).delay(0.05)) {
+                    crackPhase4Opacity = 1.0
+                }
+                
+                // Tremolio finale intenso
+                withAnimation(.easeInOut(duration: 0.04).repeatCount(8, autoreverses: true)) {
+                    salvadanaiScale = 1.15
+                    salvadanaiRotation = 8
+                    screenShake = 10
+                }
+                
+                // Haptic feedback forte
+                let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
+                impactHeavy.impactOccurred()
+                
+                // Avvia esplosione dopo una pausa più breve (ridotto da 0.8s a 0.4s)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    triggerFinalExplosion()
+                    
+                    // Imposta breakCompleted per far sapere al sistema esterno che l'animazione è finita (ridotto da 1.5s a 0.8s)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                        breakCompleted = true
+                    }
+                }
+            }
+        }
+    }
+    
+    private func performHammerStrike(delay: Double, intensity: Double, completion: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // Movimento del martello dall'alto (più veloce)
+            withAnimation(.easeIn(duration: 0.2)) {
+                hammerOffset = CGPoint(x: -40, y: -40)
+                hammerRotation = -10
+                hammerScale = 1.2
+            }
+            
+            // Impatto (ridotto da 0.3s a 0.2s)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // Flash di impatto
+                withAnimation(.easeOut(duration: 0.08)) {
+                    flashOpacity = intensity * 0.3
+                }
+                withAnimation(.easeOut(duration: 0.15).delay(0.08)) {
+                    flashOpacity = 0
+                }
+                
+                // Rimbalzo del martello (più veloce)
+                withAnimation(.easeOut(duration: 0.25)) {
+                    hammerOffset = CGPoint(x: -120, y: -120)
+                    hammerRotation = -45
+                    hammerScale = 1.0
+                }
+                
+                completion()
+                
+                // Haptic feedback leggero
+                let impactLight = UIImpactFeedbackGenerator(style: .light)
+                impactLight.impactOccurred()
+            }
+        }
+    }
+    
+    private func triggerFinalExplosion() {
+        // Flash finale intenso
+        withAnimation(.easeOut(duration: 0.1)) {
+            flashOpacity = 0.8
+        }
+        withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+            flashOpacity = 0
+        }
+        
+        // Esplosione del salvadanaio
+        withAnimation(.easeOut(duration: 0.6)) {
+            salvadanaiOpacity = 0.0
+            explosionScale = 1.0
+            particlesOpacity = 1.0
+            fragmentsOpacity = 1.0
+            coinsOpacity = 1.0
+            dustOpacity = 0.8
+        }
+        
+        // Haptic feedback esplosivo
+        let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
+        impactHeavy.impactOccurred()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let impactHeavy2 = UIImpactFeedbackGenerator(style: .heavy)
+            impactHeavy2.impactOccurred()
+        }
+        
+        // Avvia la sequenza di successo
+        showEnhancedSuccessAnimation()
+    }
+    
+    private func showEnhancedSuccessAnimation() {
+        // Particelle si espandono e svaniscono (più veloce)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.easeOut(duration: 0.8)) {
+                particlesOpacity = 0.0
+                fragmentsOpacity = 0.0
+                explosionScale = 2.5
+            }
+            
+            withAnimation(.easeOut(duration: 1.0)) {
+                coinsOpacity = 0.0
+                dustOpacity = 0.0
+            }
+        }
+        
+        // Mostra messaggio di successo (più veloce)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                showSuccessMessage = true
+            }
+        }
+        
+        // Reset shake screen (più veloce)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.easeOut(duration: 0.3)) {
+                screenShake = 0
+            }
+        }
+        
+        // Chiudi la vista (ridotto da 3.5s a 1.8s)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            onAnimationComplete()
+        }
+    }
+}
+
+// MARK: - Componenti Separati per Evitare Errori di Compilazione
+
+struct ParticleEffectsView: View {
+    let salvadanaio: SalvadanaiModel
+    let explosionScale: Double
+    let particlesOpacity: Double
+    let fragmentsOpacity: Double
+    let coinsOpacity: Double
+    let dustOpacity: Double
     
     private func getColor(from colorString: String) -> Color {
         switch colorString.lowercased() {
@@ -3245,173 +3541,363 @@ struct BreakAnimationView: View {
     
     var body: some View {
         ZStack {
-            // Background
-            Color.black.opacity(0.8)
-                .ignoresSafeArea()
+            // Nuvola di polvere
+            DustCloudView(dustOpacity: dustOpacity, explosionScale: explosionScale)
             
-            VStack(spacing: 40) {
-                Spacer()
-                
-                // Area di animazione
-                ZStack {
-                    // Particelle esplosive
-                    ForEach(0..<8, id: \.self) { index in
-                        Circle()
-                            .fill(getColor(from: salvadanaio.color))
-                            .frame(width: 20, height: 20)
-                            .offset(
-                                x: cos(Double(index) * .pi / 4) * explosionScale * 100,
-                                y: sin(Double(index) * .pi / 4) * explosionScale * 100
-                            )
-                            .opacity(particlesOpacity)
-                            .scaleEffect(explosionScale)
-                    }
-                    
-                    // Salvadanaio con crepe
-                    ZStack {
-                        // Salvadanaio principale
-                        Circle()
-                            .fill(LinearGradient(
-                                gradient: Gradient(colors: [
-                                    getColor(from: salvadanaio.color),
-                                    getColor(from: salvadanaio.color).opacity(0.7)
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ))
+            // Frammenti del salvadanaio
+            FragmentsView(
+                color: getColor(from: salvadanaio.color),
+                fragmentsOpacity: fragmentsOpacity,
+                explosionScale: explosionScale
+            )
+            
+            // Monete che volano via
+            CoinsView(coinsOpacity: coinsOpacity, explosionScale: explosionScale)
+            
+            // Particelle esplosive principali
+            ExplosionParticlesView(
+                color: getColor(from: salvadanaio.color),
+                particlesOpacity: particlesOpacity,
+                explosionScale: explosionScale
+            )
+        }
+    }
+}
+
+struct DustCloudView: View {
+    let dustOpacity: Double
+    let explosionScale: Double
+    
+    var body: some View {
+        ForEach(0..<6, id: \.self) { index in
+            Circle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: CGFloat.random(in: 30...60), height: CGFloat.random(in: 30...60))
+                .offset(
+                    x: CGFloat.random(in: -80...80),
+                    y: CGFloat.random(in: -40...40)
+                )
+                .opacity(dustOpacity)
+                .blur(radius: 8)
+                .scaleEffect(explosionScale * 1.5)
+        }
+    }
+}
+
+struct FragmentsView: View {
+    let color: Color
+    let fragmentsOpacity: Double
+    let explosionScale: Double
+    
+    var body: some View {
+        ForEach(0..<12, id: \.self) { index in
+            let angle = Double(index) * .pi / 6
+            RoundedRectangle(cornerRadius: 3)
+                .fill(color.opacity(0.8))
+                .frame(
+                    width: CGFloat.random(in: 8...20),
+                    height: CGFloat.random(in: 15...35)
+                )
+                .rotationEffect(.degrees(Double.random(in: 0...360)))
+                .offset(
+                    x: cos(angle) * explosionScale * 120,
+                    y: sin(angle) * explosionScale * 120
+                )
+                .opacity(fragmentsOpacity)
+                .scaleEffect(explosionScale)
+        }
+    }
+}
+
+struct CoinsView: View {
+    let coinsOpacity: Double
+    let explosionScale: Double
+    
+    var body: some View {
+        ForEach(0..<8, id: \.self) { index in
+            let angle = Double(index) * .pi / 4
+            Image(systemName: "eurosign.circle.fill")
+                .font(.title2)
+                .foregroundColor(.yellow)
+                .rotationEffect(.degrees(Double(index) * 45 + explosionScale * 180))
+                .offset(
+                    x: cos(angle) * explosionScale * 100,
+                    y: sin(angle) * explosionScale * 80 + explosionScale * 50
+                )
+                .opacity(coinsOpacity)
+                .scaleEffect(0.8 + explosionScale * 0.4)
+        }
+    }
+}
+
+struct ExplosionParticlesView: View {
+    let color: Color
+    let particlesOpacity: Double
+    let explosionScale: Double
+    
+    var body: some View {
+        ForEach(0..<16, id: \.self) { index in
+            let angle = Double(index) * .pi / 8
+            Circle()
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            color,
+                            color.opacity(0.3)
+                        ]),
+                        startPoint: .center,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: CGFloat.random(in: 8...16), height: CGFloat.random(in: 8...16))
+                .offset(
+                    x: cos(angle) * explosionScale * 140,
+                    y: sin(angle) * explosionScale * 140
+                )
+                .opacity(particlesOpacity)
+                .scaleEffect(explosionScale * 0.5)
+        }
+    }
+}
+
+struct PiggyBankView: View {
+    let salvadanaio: SalvadanaiModel
+    let salvadanaiScale: Double
+    let salvadanaiOpacity: Double
+    let salvadanaiRotation: Double
+    let salvadanaiOffset: CGPoint
+    let crackPhase1Opacity: Double
+    let crackPhase2Opacity: Double
+    let crackPhase3Opacity: Double
+    let crackPhase4Opacity: Double
+    
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            // Ombra del salvadanaio
+            Circle()
+                .fill(Color.black.opacity(0.3))
+                .frame(width: 130, height: 130)
+                .offset(x: 5, y: 5)
+                .scaleEffect(salvadanaiScale * 0.95)
+                .opacity(salvadanaiOpacity * 0.5)
+            
+            // Corpo principale del salvadanaio
+            Circle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            getColor(from: salvadanaio.color).opacity(0.9),
+                            getColor(from: salvadanaio.color),
+                            getColor(from: salvadanaio.color).opacity(0.7)
+                        ]),
+                        center: .topLeading,
+                        startRadius: 20,
+                        endRadius: 80
+                    )
+                )
                             .frame(width: 120, height: 120)
+            .scaleEffect(salvadanaiScale)
+            .opacity(salvadanaiOpacity)
+            .rotationEffect(.degrees(salvadanaiRotation))
+            .offset(x: salvadanaiOffset.x, y: salvadanaiOffset.y)
+            
+            // Icona salvadanaio
+            Image(systemName: "banknote.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.white)
                             .scaleEffect(salvadanaiScale)
-                            .opacity(salvadanaiOpacity)
-                        
-                        // Icona salvadanaio
-                        Image(systemName: "banknote.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.white)
-                            .scaleEffect(salvadanaiScale)
-                            .opacity(salvadanaiOpacity)
-                        
-                        // Crepe
-                        ZStack {
-                            // Crepa 1
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(width: 2, height: 80)
-                                .rotationEffect(.degrees(45))
-                                .opacity(cracksOpacity)
-                            
-                            // Crepa 2
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(width: 2, height: 60)
-                                .rotationEffect(.degrees(-30))
-                                .opacity(cracksOpacity)
-                            
-                            // Crepa 3
-                            Rectangle()
-                                .fill(Color.black)
-                                .frame(width: 2, height: 70)
-                                .rotationEffect(.degrees(120))
-                                .opacity(cracksOpacity)
-                        }
-                    }
-                    
-                    // Martello
-                    VStack {
-                        Image(systemName: "hammer.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.orange)
-                            .rotationEffect(.degrees(hammerRotation))
-                            .offset(x: -80, y: -80)
-                    }
-                }
-                .frame(width: 300, height: 300)
-                
-                // Messaggio di stato
-                VStack(spacing: 16) {
-                    if breakCompleted {
-                        Text("💥 Salvadanaio Rotto!")
-                            .font(.title)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .opacity(showSuccessMessage ? 1.0 : 0.0)
-                        
-                        Text("Il salvadanaio '\(salvadanaio.name)' è stato eliminato definitivamente")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                            .opacity(showSuccessMessage ? 1.0 : 0.0)
-                    } else {
-                        Text("Rompendo il salvadanaio...")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                        
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                    }
-                }
-                
-                Spacer()
-            }
-        }
-        .onAppear {
-            startBreakAnimation()
-        }
-        .onChange(of: breakCompleted) { completed in
-            if completed {
-                showSuccessAnimation()
-            }
+            .opacity(salvadanaiOpacity)
+            .rotationEffect(.degrees(salvadanaiRotation))
+            .offset(x: salvadanaiOffset.x, y: salvadanaiOffset.y)
+            .shadow(color: .black.opacity(0.3), radius: 2, x: 1, y: 1)
+            
+            // Sistema di crepe progressive
+            CracksView(
+                crackPhase1Opacity: crackPhase1Opacity,
+                crackPhase2Opacity: crackPhase2Opacity,
+                crackPhase3Opacity: crackPhase3Opacity,
+                crackPhase4Opacity: crackPhase4Opacity,
+                salvadanaiScale: salvadanaiScale,
+                salvadanaiOpacity: salvadanaiOpacity,
+                salvadanaiRotation: salvadanaiRotation,
+                salvadanaiOffset: salvadanaiOffset
+            )
         }
     }
+}
+
+struct CracksView: View {
+    let crackPhase1Opacity: Double
+    let crackPhase2Opacity: Double
+    let crackPhase3Opacity: Double
+    let crackPhase4Opacity: Double
+    let salvadanaiScale: Double
+    let salvadanaiOpacity: Double
+    let salvadanaiRotation: Double
+    let salvadanaiOffset: CGPoint
     
-    private func startBreakAnimation() {
-        // Fase 1: Martello in movimento
-        withAnimation(.easeInOut(duration: 0.5).repeatCount(3, autoreverses: true)) {
-            hammerRotation = -30
-        }
-        
-        // Fase 2: Compaiono le crepe
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation(.easeIn(duration: 0.3)) {
-                cracksOpacity = 1.0
+    var body: some View {
+        ZStack {
+            // Fase 1: Prime crepe sottili
+            Group {
+                Rectangle()
+                    .fill(Color.black.opacity(0.8))
+                    .frame(width: 1.5, height: 60)
+                    .rotationEffect(.degrees(45))
+                
+                Rectangle()
+                    .fill(Color.black.opacity(0.8))
+                    .frame(width: 1.5, height: 40)
+                    .rotationEffect(.degrees(-30))
             }
-        }
-        
-        // Fase 3: Salvadanaio trema
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-            withAnimation(.easeInOut(duration: 0.1).repeatCount(6, autoreverses: true)) {
-                salvadanaiScale = 1.1
+            .opacity(crackPhase1Opacity)
+            
+            // Fase 2: Crepe più profonde
+            Group {
+                Rectangle()
+                    .fill(Color.black.opacity(0.9))
+                    .frame(width: 2.5, height: 80)
+                    .rotationEffect(.degrees(45))
+                
+                Rectangle()
+                    .fill(Color.black.opacity(0.9))
+                    .frame(width: 2.5, height: 55)
+                    .rotationEffect(.degrees(-30))
+                
+                Rectangle()
+                    .fill(Color.black.opacity(0.9))
+                    .frame(width: 2, height: 50)
+                    .rotationEffect(.degrees(120))
             }
+            .opacity(crackPhase2Opacity)
+            
+            // Fase 3: Crepe che si estendono
+            Group {
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 3, height: 100)
+                    .rotationEffect(.degrees(45))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 3, height: 75)
+                    .rotationEffect(.degrees(-30))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 2.5, height: 70)
+                    .rotationEffect(.degrees(120))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 2, height: 60)
+                    .rotationEffect(.degrees(0))
+            }
+            .opacity(crackPhase3Opacity)
+            
+            // Fase 4: Crepe finali prima della rottura
+            Group {
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 4, height: 120)
+                    .rotationEffect(.degrees(45))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 4, height: 95)
+                    .rotationEffect(.degrees(-30))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 3.5, height: 90)
+                    .rotationEffect(.degrees(120))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 3, height: 80)
+                    .rotationEffect(.degrees(0))
+                
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: 2.5, height: 70)
+                    .rotationEffect(.degrees(75))
+            }
+            .opacity(crackPhase4Opacity)
         }
+        .scaleEffect(salvadanaiScale)
+        .opacity(salvadanaiOpacity)
+        .rotationEffect(.degrees(salvadanaiRotation))
+        .offset(x: salvadanaiOffset.x, y: salvadanaiOffset.y)
     }
+}
+
+struct HammerView: View {
+    let rotation: Double
+    let offset: CGPoint
+    let scale: Double
     
-    private func showSuccessAnimation() {
-        // Esplosione finale
-        withAnimation(.easeOut(duration: 0.5)) {
-            salvadanaiOpacity = 0.0
-            explosionScale = 1.0
-            particlesOpacity = 1.0
-        }
-        
-        // Particelle svaniscono
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            withAnimation(.easeOut(duration: 1.0)) {
-                particlesOpacity = 0.0
-                explosionScale = 2.0
+    var body: some View {
+        Image(systemName: "hammer.fill")
+            .font(.system(size: 70))
+            .foregroundColor(.orange)
+                    .rotationEffect(.degrees(rotation))
+        .scaleEffect(scale)
+        .offset(x: offset.x, y: offset.y)
+        .shadow(color: .orange.opacity(0.5), radius: 10, x: 5, y: 5)
+    }
+}
+
+struct StatusMessageView: View {
+    let breakCompleted: Bool
+    let showSuccessMessage: Bool
+    let impactCount: Int
+    let salvadanaiName: String
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            if breakCompleted {
+                Text("💥 Salvadanaio Rotto!")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .opacity(showSuccessMessage ? 1.0 : 0.0)
+                    .scaleEffect(showSuccessMessage ? 1.0 : 0.8)
+                
+                Text("Il salvadanaio '\(salvadanaiName)' è stato eliminato definitivamente")
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .opacity(showSuccessMessage ? 1.0 : 0.0)
+            } else {
+                VStack(spacing: 8) {
+                    Text("Rompendo il salvadanaio...")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
             }
-        }
-        
-        // Mostra messaggio di successo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            withAnimation(.easeIn(duration: 0.5)) {
-                showSuccessMessage = true
-            }
-        }
-        
-        // Chiudi la vista
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            onAnimationComplete()
         }
     }
 }
