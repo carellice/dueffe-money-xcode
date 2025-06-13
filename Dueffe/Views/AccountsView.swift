@@ -736,8 +736,7 @@ struct EnhancedAddAccountView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Salva") {
                         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let finalName = "\(getCurrentAccountType()) - \(trimmedName)"
-                        dataManager.addAccount(name: finalName, initialBalance: 0.0)
+                        dataManager.addAccount(name: trimmedName, initialBalance: 0.0)
                         dismiss()
                     }
                     .disabled(!isFormValid)
