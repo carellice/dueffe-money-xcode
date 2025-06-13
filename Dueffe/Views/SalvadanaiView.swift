@@ -232,7 +232,6 @@ struct CategoryFilterButton: View {
 }
 
 // MARK: - Enhanced Salvadanaio Page Card - Accattivante con Gradienti
-// MARK: - Enhanced Salvadanaio Page Card - Accattivante con Gradienti
 struct SalvadanaiCardView: View {
     let salvadanaio: SalvadanaiModel
     @EnvironmentObject var dataManager: DataManager
@@ -244,6 +243,8 @@ struct SalvadanaiCardView: View {
     @State private var animateCoins = false
     @State private var isPressed = false
     @State private var showingTransactions = false
+    @State private var showingEditSheet = false // NUOVO: Per la modifica
+    @State private var showingDeleteAlert = false // NUOVO: Per l'eliminazione
     
     private var progress: Double {
         // Per glass: currentAmount / monthlyRefill
@@ -345,18 +346,21 @@ struct SalvadanaiCardView: View {
     
     private var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter { transaction in
-            transaction.salvadanaiName == salvadanaio.name &&
+            (transaction.salvadanaiName == salvadanaio.name ||
+             (transaction.type == "transfer_salvadanai" && transaction.accountName == salvadanaio.name)) &&
             transaction.type != "distribution" // NUOVO: Esclude le distribuzioni
         }
     }
     
     var body: some View {
+        // NUOVO: Context Menu aggiunto qui
         Button(action: {
             withAnimation(.easeInOut(duration: 0.4)) {
                 isExpanded.toggle()
             }
         }) {
             VStack(spacing: 0) {
+                // Il contenuto della card rimane identico...
                 ZStack {
                     // Background con gradiente animato
                     RoundedRectangle(cornerRadius: 18)
@@ -567,7 +571,7 @@ struct SalvadanaiCardView: View {
                                             )
                                             .frame(width: max(0, geometry.size.width * (animateProgress ? progress : 0)), height: 6)
                                             .shadow(color: .white.opacity(0.5), radius: 2, x: 0, y: 1)
-                                            .animation(.easeOut(duration: 1.5).delay(0.3), value: animateProgress)
+                                            .animation(.easeOut(duration: 1.5).delay(0.5), value: animateProgress)
                                         
                                         // Shimmer effect
                                         if progress > 0 {
@@ -576,7 +580,7 @@ struct SalvadanaiCardView: View {
                                                     LinearGradient(
                                                         gradient: Gradient(colors: [
                                                             Color.clear,
-                                                            Color.white.opacity(0.6),
+                                                            Color.white.opacity(0.8),
                                                             Color.clear
                                                         ]),
                                                         startPoint: .leading,
@@ -601,7 +605,7 @@ struct SalvadanaiCardView: View {
                                     Spacer()
                                     
                                     if progress >= 1.0 {
-                                        Text("🏆 Completato!")
+                                        Text("🏆 Fatto!")
                                             .font(.caption)
                                             .fontWeight(.medium)
                                             .foregroundColor(.white)
@@ -700,6 +704,36 @@ struct SalvadanaiCardView: View {
         }) {
             // Long press action
         }
+        // NUOVO: Context Menu aggiunto qui
+        .contextMenu {
+            // Modifica nome
+            Button(action: {
+                showingEditSheet = true
+            }) {
+                Label("Modifica Nome", systemImage: "pencil")
+            }
+            .tint(.blue)
+            
+            // Visualizza transazioni
+            if !relatedTransactions.isEmpty {
+                Button(action: {
+                    showingTransactions = true
+                }) {
+                    Label("Transazioni (\(relatedTransactions.count))", systemImage: "list.bullet")
+                }
+                .tint(.purple)
+            }
+            
+            Divider()
+            
+            // Elimina salvadanaio
+            Button(role: .destructive, action: {
+                showingDeleteAlert = true
+            }) {
+                Label("Elimina Salvadanaio", systemImage: "trash")
+            }
+            .tint(.red)
+        }
         .onAppear {
             // Animazioni con delay casuali
             let delay = Double.random(in: 0.2...0.6)
@@ -725,8 +759,425 @@ struct SalvadanaiCardView: View {
         .sheet(isPresented: $showingTransactions) {
             SalvadanaiTransactionsView(salvadanaio: salvadanaio, transactions: relatedTransactions)
         }
+        // NUOVO: Sheet per modifica nome
+        .sheet(isPresented: $showingEditSheet) {
+            EditSalvadanaiNameView(salvadanaio: salvadanaio)
+        }
+        // NUOVO: Alert per eliminazione
+        .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
+            Button("Elimina", role: .destructive) {
+                withAnimation {
+                    dataManager.deleteSalvadanaio(salvadanaio)
+                }
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            if relatedTransactions.isEmpty {
+                Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'? Questa azione non può essere annullata.")
+            } else {
+                Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'?\n\nCi sono \(relatedTransactions.count) transazioni associate che verranno mantenute ma non saranno più collegate a questo salvadanaio.\n\nQuesta azione non può essere annullata.")
+            }
+        }
     }
 }
+
+struct EditSalvadanaiNameView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataManager: DataManager
+    
+    @State private var currentSalvadanaiName: String
+    @State private var showingDeleteAlert = false
+    private let salvadanaio: SalvadanaiModel
+    private let originalSalvadanaiName: String
+    
+    init(salvadanaio: SalvadanaiModel) {
+        self.salvadanaio = salvadanaio
+        self.originalSalvadanaiName = salvadanaio.name
+        self._currentSalvadanaiName = State(initialValue: salvadanaio.name)
+    }
+    
+    private var hasChanges: Bool {
+        currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines) != originalSalvadanaiName
+    }
+    
+    private var relatedTransactions: [TransactionModel] {
+        dataManager.transactions.filter { transaction in
+            (transaction.salvadanaiName == originalSalvadanaiName ||
+             (transaction.type == "transfer_salvadanai" && transaction.accountName == originalSalvadanaiName)) &&
+            transaction.type != "distribution"
+        }
+    }
+    
+    private var isDuplicateName: Bool {
+        let trimmedName = currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedName.isEmpty &&
+               dataManager.salvadanai.contains { $0.name.lowercased() == trimmedName.lowercased() && $0.id != salvadanaio.id }
+    }
+    
+    // Funzione per convertire string colore in Color
+    private func getColor(from colorString: String) -> Color {
+        switch colorString.lowercased() {
+        case "blue": return .blue
+        case "green": return .green
+        case "red": return .red
+        case "orange": return .orange
+        case "purple": return .purple
+        case "pink": return .pink
+        case "yellow": return .yellow
+        case "indigo": return .indigo
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "brown": return .brown
+        default: return .blue
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [getColor(from: salvadanaio.color).opacity(0.05), Color.blue.opacity(0.05)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                Form {
+                    // Anteprima del salvadanaio
+                    Section {
+                        VStack(spacing: 20) {
+                            HStack {
+                                Image(systemName: "eye.fill")
+                                    .foregroundColor(.blue)
+                                Text("Anteprima")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                
+                                if hasChanges {
+                                    Text("Modificato")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.orange.opacity(0.1))
+                                        )
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                            
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            gradient: Gradient(colors: [getColor(from: salvadanaio.color), getColor(from: salvadanaio.color).opacity(0.7)]),
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                        .frame(width: 56, height: 56)
+                                        .shadow(color: getColor(from: salvadanaio.color).opacity(0.3), radius: 8, x: 0, y: 4)
+                                    
+                                    Image(systemName: "banknote.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(currentSalvadanaiName.isEmpty ? "Nome del salvadanaio" : currentSalvadanaiName)
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(currentSalvadanaiName.isEmpty ? .secondary : .primary)
+                                        .lineLimit(2)
+                                    
+                                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                        Text(salvadanaio.currentAmount.italianCurrency)
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(salvadanaio.currentAmount >= 0 ? .primary : .red)
+                                    }
+
+                                    HStack {
+                                        Text(salvadanaio.category)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text("•")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                        
+                                        Text(salvadanaio.type == "objective" ? (salvadanaio.isInfinite ? "Infinito" : "Obiettivo") : "Glass")
+                                            .font(.caption)
+                                            .foregroundColor(getColor(from: salvadanaio.color))
+                                            .fontWeight(.medium)
+                                    }
+                                }
+                                
+                                Spacer()
+                            }
+                        }
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(hasChanges ? Color.orange.opacity(0.3) : getColor(from: salvadanaio.color).opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+                        )
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    
+                    // Modifica nome
+                    Section {
+                        HStack {
+                            Image(systemName: "tag.fill")
+                                .foregroundColor(getColor(from: salvadanaio.color))
+                                .frame(width: 24)
+                            
+                            TextField("Nome del salvadanaio", text: $currentSalvadanaiName)
+                                .textInputAutocapitalization(.words)
+                                .font(.headline)
+                        }
+                        
+                        // Validazione in tempo reale
+                        if !currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            HStack {
+                                Image(systemName: isDuplicateName ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                    .foregroundColor(isDuplicateName ? .red : .green)
+                                
+                                Text(isDuplicateName ? "Nome già esistente" : "Nome disponibile")
+                                    .font(.subheadline)
+                                    .foregroundColor(isDuplicateName ? .red : .green)
+                                    .fontWeight(.medium)
+                                
+                                Spacer()
+                            }
+                            .padding(.top, 8)
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "pencil")
+                                .foregroundColor(.blue)
+                            Text("Nome del Salvadanaio")
+                        }
+                    } footer: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if !relatedTransactions.isEmpty {
+                                if hasChanges {
+                                    Text("✅ Verranno aggiornate automaticamente \(relatedTransactions.count) transazioni associate")
+                                        .foregroundColor(.green)
+                                } else {
+                                    Text("ℹ️ Ci sono \(relatedTransactions.count) transazioni associate a questo salvadanaio")
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            
+                            // Messaggio di errore per duplicati
+                            if isDuplicateName {
+                                Text("⚠️ Questo nome è già utilizzato da un altro salvadanaio")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    
+                    // Informazioni del salvadanaio
+                    Section {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(.secondary)
+                                .frame(width: 24)
+                            
+                            Text("Data di creazione")
+                            Spacer()
+                            Text(salvadanaio.createdAt, style: .date)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "folder.fill")
+                                .foregroundColor(getColor(from: salvadanaio.color))
+                                .frame(width: 24)
+                            
+                            Text("Categoria")
+                            Spacer()
+                            Text(salvadanaio.category)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "paintbrush.fill")
+                                .foregroundColor(getColor(from: salvadanaio.color))
+                                .frame(width: 24)
+                            
+                            Text("Colore")
+                            Spacer()
+                            HStack {
+                                Circle()
+                                    .fill(getColor(from: salvadanaio.color))
+                                    .frame(width: 16, height: 16)
+                                Text(salvadanaio.color.capitalized)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        HStack {
+                            Image(systemName: "list.bullet.circle")
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                            
+                            Text("Transazioni associate")
+                            Spacer()
+                            Text("\(relatedTransactions.count)")
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        if salvadanaio.type == "objective" && !salvadanaio.isInfinite {
+                            HStack {
+                                Image(systemName: "target")
+                                    .foregroundColor(.purple)
+                                    .frame(width: 24)
+                                
+                                Text("Obiettivo")
+                                Spacer()
+                                Text(salvadanaio.targetAmount.italianCurrency)
+                                    .foregroundColor(.purple)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            if let targetDate = salvadanaio.targetDate {
+                                HStack {
+                                    Image(systemName: "calendar.badge.clock")
+                                        .foregroundColor(.orange)
+                                        .frame(width: 24)
+                                    
+                                    Text("Scadenza")
+                                    Spacer()
+                                    Text(targetDate, style: .date)
+                                        .foregroundColor(.orange)
+                                        .fontWeight(.medium)
+                                }
+                            }
+                        } else if salvadanaio.type == "glass" {
+                            HStack {
+                                Image(systemName: "cup.and.saucer.fill")
+                                    .foregroundColor(.cyan)
+                                    .frame(width: 24)
+                                
+                                Text("Ricarica mensile")
+                                Spacer()
+                                Text(salvadanaio.monthlyRefill.italianCurrency)
+                                    .foregroundColor(.cyan)
+                                    .fontWeight(.semibold)
+                            }
+                        } else if salvadanaio.isInfinite {
+                            HStack {
+                                Image(systemName: "infinity")
+                                    .foregroundColor(.mint)
+                                    .frame(width: 24)
+                                
+                                Text("Tipo")
+                                Spacer()
+                                Text("Obiettivo Infinito")
+                                    .foregroundColor(.mint)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    } header: {
+                        HStack {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundColor(.purple)
+                            Text("Informazioni")
+                        }
+                    }
+                    
+                    // Sezione di eliminazione (solo se non ci sono transazioni)
+                    if relatedTransactions.isEmpty {
+                        Section {
+                            Button(action: {
+                                showingDeleteAlert = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "trash.fill")
+                                        .foregroundColor(.red)
+                                        .frame(width: 24)
+                                    
+                                    Text("Elimina Salvadanaio")
+                                        .foregroundColor(.red)
+                                        .fontWeight(.medium)
+                                    
+                                    Spacer()
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                Text("Zona Pericolosa")
+                            }
+                        } footer: {
+                            Text("Eliminare il salvadanaio è un'azione irreversibile.")
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("Modifica Salvadanaio")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Annulla") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Salva") {
+                        saveChanges()
+                    }
+                    .disabled(!hasChanges || currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isDuplicateName)
+                    .fontWeight(.semibold)
+                    .foregroundColor(hasChanges && !currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isDuplicateName ? getColor(from: salvadanaio.color) : .secondary)
+                }
+            }
+        }
+        .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
+            Button("Elimina", role: .destructive) {
+                dataManager.deleteSalvadanaio(salvadanaio)
+                dismiss()
+            }
+            Button("Annulla", role: .cancel) { }
+        } message: {
+            Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'? Questa azione non può essere annullata.")
+        }
+    }
+    
+    private func saveChanges() {
+        let newName = currentSalvadanaiName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !newName.isEmpty else { return }
+        guard newName != originalSalvadanaiName else { return }
+        guard !isDuplicateName else { return }
+        
+        print("🚀 Avvio salvataggio modifiche salvadanaio")
+        print("  - ID: \(salvadanaio.id)")
+        print("  - Nome originale: '\(originalSalvadanaiName)'")
+        print("  - Nuovo nome: '\(newName)'")
+        
+        // Chiama il metodo del DataManager per aggiornare tutto
+        dataManager.updateSalvadanaiName(salvadanaio.id, oldName: originalSalvadanaiName, newName: newName)
+        
+        print("✅ Comando di aggiornamento inviato")
+        
+        dismiss()
+    }
+}
+
 
 // MARK: - Vista Transazioni Salvadanaio
 struct SalvadanaiTransactionsView: View {
@@ -1870,10 +2321,12 @@ struct SimpleSalvadanaiDetailView: View {
     let salvadanaio: SalvadanaiModel
     
     @State private var showingDeleteAlert = false
+    @State private var showingEditSheet = false // NUOVO
     
     var relatedTransactions: [TransactionModel] {
         dataManager.transactions.filter {
-            $0.salvadanaiName == salvadanaio.name &&
+            ($0.salvadanaiName == salvadanaio.name ||
+             ($0.type == "transfer_salvadanai" && $0.accountName == salvadanaio.name)) &&
             $0.type != "distribution" // NUOVO: Esclude le distribuzioni
         }
     }
@@ -1933,17 +2386,22 @@ struct SimpleSalvadanaiDetailView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        // NUOVO: Modifica nome
+                        Button(action: {
+                            showingEditSheet = true
+                        }) {
+                            Label("Modifica Nome", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                        
+                        Divider()
+                        
                         Button(role: .destructive, action: {
                             showingDeleteAlert = true
                         }) {
-                            HStack {
-                                Image(systemName: "trash")
-                                    .tint(.red)
-                                Text("Elimina")
-                                    .tint(.red)
-                            }
+                            Label("Elimina", systemImage: "trash")
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .tint(.red)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -1957,7 +2415,15 @@ struct SimpleSalvadanaiDetailView: View {
             }
             Button("Annulla", role: .cancel) { }
         } message: {
-            Text("Sei sicuro di voler eliminare questo salvadanaio? Questa azione non può essere annullata.")
+            if relatedTransactions.isEmpty {
+                Text("Sei sicuro di voler eliminare questo salvadanaio? Questa azione non può essere annullata.")
+            } else {
+                Text("Sei sicuro di voler eliminare questo salvadanaio?\n\nCi sono \(relatedTransactions.count) transazioni associate che verranno mantenute ma non saranno più collegate a questo salvadanaio.\n\nQuesta azione non può essere annullata.")
+            }
+        }
+        // NUOVO: Sheet per modifica nome
+        .sheet(isPresented: $showingEditSheet) {
+            EditSalvadanaiNameView(salvadanaio: salvadanaio)
         }
     }
 }

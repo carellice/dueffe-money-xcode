@@ -1205,6 +1205,56 @@ extension DataManager {
         // 4. Rimuovi la transazione originale
         transactions.removeAll { $0.id == transaction.id }
     }
+    
+    /// Aggiorna il nome di un salvadanaio e tutte le transazioni associate
+    /// - Parameters:
+    ///   - salvadanaiId: L'ID del salvadanaio da aggiornare
+    ///   - oldName: Il vecchio nome del salvadanaio
+    ///   - newName: Il nuovo nome per il salvadanaio
+    func updateSalvadanaiName(_ salvadanaiId: UUID, oldName: String, newName: String) {
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewName.isEmpty else { return }
+        
+        print("🔄 Aggiornamento nome salvadanaio: '\(oldName)' -> '\(trimmedNewName)'")
+        
+        // 1. Aggiorna il salvadanaio
+        if let index = salvadanai.firstIndex(where: { $0.id == salvadanaiId }) {
+            salvadanai[index].name = trimmedNewName
+            print("✅ Salvadanaio aggiornato")
+        }
+        
+        // 2. Aggiorna tutte le transazioni associate
+        var updatedCount = 0
+        
+        for index in transactions.indices {
+            var updated = false
+            
+            // Aggiorna il campo salvadanaiName per spese, trasferimenti salvadanai e distribuzioni
+            if transactions[index].salvadanaiName == oldName {
+                transactions[index].salvadanaiName = trimmedNewName
+                updated = true
+            }
+            
+            // Aggiorna il campo accountName per i trasferimenti tra salvadanai (dove il salvadanaio di origine è in accountName)
+            if transactions[index].type == "transfer_salvadanai" &&
+               transactions[index].accountName == oldName {
+                transactions[index].accountName = trimmedNewName
+                updated = true
+            }
+            
+            if updated {
+                updatedCount += 1
+            }
+        }
+        
+        print("✅ Aggiornate \(updatedCount) transazioni")
+        
+        // Force save to make sure data persists
+        DispatchQueue.main.async {
+            // Il didSet si occuperà di salvare automaticamente
+            self.objectWillChange.send()
+        }
+    }
 }
 
 struct ImportResult {
