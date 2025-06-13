@@ -1089,6 +1089,11 @@ extension DataManager {
         return accounts.filter { !$0.isClosed }
     }
     
+    /// Ordina un array di account aperti per nome alfabeticamente
+    var sortedOpenAccounts: [AccountModel] {
+        return sortedAccounts(openAccounts)
+    }
+
     /// Ottiene tutti i conti chiusi
     var closedAccounts: [AccountModel] {
         return accounts.filter { $0.isClosed }

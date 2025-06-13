@@ -166,15 +166,15 @@ struct TransactionsView: View {
                             .font(.title2)
                             .foregroundColor(.purple)
                     }
-                    .disabled(dataManager.accounts.isEmpty)
+                    .disabled(dataManager.openAccounts.isEmpty) // MODIFICATO: usa openAccounts invece di accounts
                 }
             }
         }
         .sheet(isPresented: $showingAddTransaction) {
-            if dataManager.accounts.isEmpty {
+            if dataManager.openAccounts.isEmpty { // MODIFICATO: usa openAccounts invece di accounts
                 SimpleModalView(
                     title: "Nessun conto disponibile",
-                    message: "Prima di procedere, devi creare almeno un conto nel tab 'Conti' per poter registrare entrate",
+                    message: "Prima di procedere, devi avere almeno un conto aperto per poter registrare transazioni",
                     buttonText: "Ho capito"
                 )
             } else {
@@ -861,6 +861,7 @@ struct EmptyTransactionsView: View {
 
 // MARK: - No Accounts Transactions View
 struct NoAccountsTransactionsView: View {
+    @EnvironmentObject var dataManager: DataManager // AGGIUNGI
     @State private var animateWarning = false
     
     var body: some View {
@@ -883,7 +884,10 @@ struct NoAccountsTransactionsView: View {
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
                 
-                Text("Prima di registrare una transazione, devi aggiungere almeno un conto nel tab 'Conti'")
+                // MODIFICATO: messaggio più specifico
+                Text(dataManager.accounts.isEmpty ?
+                     "Prima di registrare una transazione, devi aggiungere almeno un conto nel tab 'Conti'" :
+                     "Prima di registrare una transazione, devi avere almeno un conto aperto. Tutti i tuoi conti sono attualmente chiusi.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -894,7 +898,9 @@ struct NoAccountsTransactionsView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.orange)
                 
-                Text("È necessario almeno un conto per utilizzare questa funzione")
+                Text(dataManager.accounts.isEmpty ?
+                     "È necessario almeno un conto per utilizzare questa funzione" :
+                     "È necessario almeno un conto aperto per utilizzare questa funzione")
                     .font(.caption)
                     .foregroundColor(.orange)
                     .fontWeight(.medium)
@@ -962,11 +968,11 @@ struct SimpleAddTransactionView: View {
     }
     
     var availableFromAccounts: [AccountModel] {
-        dataManager.accounts.filter { $0.name != toAccount }
+        dataManager.openAccounts.filter { $0.name != toAccount } // MODIFICATO: usa openAccounts invece di accounts
     }
-    
+
     var availableToAccounts: [AccountModel] {
-        dataManager.accounts.filter { $0.name != fromAccount }
+        dataManager.openAccounts.filter { $0.name != fromAccount } // MODIFICATO: usa openAccounts invece di accounts
     }
     
     // NUOVO: Salvadanai disponibili per trasferimenti
@@ -979,23 +985,33 @@ struct SimpleAddTransactionView: View {
     }
     
     var isFormValid: Bool {
+        // Controllo base: deve esserci almeno un conto aperto per tutte le transazioni che coinvolgono conti
+        let needsAccount = transactionType != "transfer" || (transactionType == "transfer" && transferType == "account")
+        if needsAccount && dataManager.openAccounts.isEmpty {
+            return false
+        }
+        
         if transactionType == "expense" {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedSalvadanaio.isEmpty &&
                    !selectedCategory.isEmpty &&
-                   !selectedAccount.isEmpty
+                   !selectedAccount.isEmpty &&
+                   dataManager.openAccounts.contains { $0.name == selectedAccount } // NUOVO: verifica che il conto sia aperto
         } else if transactionType == "salary" {
             return amount > 0 &&
                    !descr.isEmpty &&
-                   !selectedAccount.isEmpty
+                   !selectedAccount.isEmpty &&
+                   dataManager.openAccounts.contains { $0.name == selectedAccount } // NUOVO: verifica che il conto sia aperto
         } else if transactionType == "transfer" {
             if transferType == "account" {
                 return amount > 0 &&
                        !descr.isEmpty &&
                        !fromAccount.isEmpty &&
                        !toAccount.isEmpty &&
-                       fromAccount != toAccount
+                       fromAccount != toAccount &&
+                       dataManager.openAccounts.contains { $0.name == fromAccount } && // NUOVO: verifica conti aperti
+                       dataManager.openAccounts.contains { $0.name == toAccount }      // NUOVO: verifica conti aperti
             } else { // transferType == "salvadanaio"
                 return amount > 0 &&
                        !descr.isEmpty &&
@@ -1007,10 +1023,11 @@ struct SimpleAddTransactionView: View {
             return amount > 0 &&
                    !descr.isEmpty &&
                    !selectedAccount.isEmpty &&
-                   !selectedCategory.isEmpty
+                   !selectedCategory.isEmpty &&
+                   dataManager.openAccounts.contains { $0.name == selectedAccount } // NUOVO: verifica che il conto sia aperto
         }
     }
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -1300,11 +1317,11 @@ struct SimpleAddTransactionView: View {
                 }
                 
                 // CONTO per spese (DA QUALE CONTO TOGLIERE I SOLDI FISICAMENTE)
-                if transactionType == "expense" && !dataManager.accounts.isEmpty {
+                if transactionType == "expense" && !dataManager.openAccounts.isEmpty { // MODIFICATO: usa openAccounts
                     Section {
                         Picker("Da quale conto", selection: $selectedAccount) {
                             Text("Seleziona conto").tag("")
-                            ForEach(dataManager.sortedAccounts, id: \.name) { account in
+                            ForEach(dataManager.sortedOpenAccounts, id: \.name) { account in // MODIFICATO: usa sortedOpenAccounts
                                 HStack {
                                     Text(account.name)
                                     Spacer()
@@ -1315,9 +1332,9 @@ struct SimpleAddTransactionView: View {
                             }
                         }
                         
-                        // Verifica fondi
+                        // Verifica fondi (resto del codice invariato)
                         if !selectedAccount.isEmpty && amount > 0 {
-                            if let selectedAcc = dataManager.accounts.first(where: { $0.name == selectedAccount }) {
+                            if let selectedAcc = dataManager.openAccounts.first(where: { $0.name == selectedAccount }) { // MODIFICATO: usa openAccounts
                                 HStack {
                                     if selectedAcc.balance >= amount {
                                         Image(systemName: "checkmark.circle.fill")
@@ -1348,11 +1365,11 @@ struct SimpleAddTransactionView: View {
                 }
                 
                 // Account per entrate e stipendi (NON per trasferimenti)
-                if (transactionType == "income" || transactionType == "salary") && !dataManager.accounts.isEmpty {
+                if (transactionType == "income" || transactionType == "salary") && !dataManager.openAccounts.isEmpty { // MODIFICATO: usa openAccounts
                     Section {
                         Picker("A quale conto", selection: $selectedAccount) {
                             Text("Seleziona conto").tag("")
-                            ForEach(dataManager.sortedAccounts, id: \.name) { account in
+                            ForEach(dataManager.sortedOpenAccounts, id: \.name) { account in // MODIFICATO: usa sortedOpenAccounts
                                 HStack {
                                     Text(account.name)
                                     Spacer()
@@ -1584,11 +1601,11 @@ struct SimpleAddTransactionView: View {
         
         // Setup per trasferimenti tra conti
         if transactionType == "transfer" && transferType == "account" {
-            if fromAccount.isEmpty && !dataManager.accounts.isEmpty {
-                fromAccount = dataManager.accounts.first!.name
+            if fromAccount.isEmpty && !dataManager.openAccounts.isEmpty { // MODIFICATO: usa openAccounts
+                fromAccount = dataManager.openAccounts.first!.name
             }
-            if toAccount.isEmpty && dataManager.accounts.count > 1 {
-                toAccount = dataManager.accounts.filter { $0.name != fromAccount }.first?.name ?? ""
+            if toAccount.isEmpty && dataManager.openAccounts.count > 1 { // MODIFICATO: usa openAccounts
+                toAccount = dataManager.openAccounts.filter { $0.name != fromAccount }.first?.name ?? ""
             }
         }
         
@@ -1603,8 +1620,12 @@ struct SimpleAddTransactionView: View {
         }
         
         // Setup default per conto spese
-        if selectedAccount.isEmpty && !dataManager.accounts.isEmpty && transactionType == "expense" {
-            selectedAccount = dataManager.accounts.first!.name
+        if selectedAccount.isEmpty && !dataManager.openAccounts.isEmpty && transactionType == "expense" { // MODIFICATO: usa openAccounts
+            selectedAccount = dataManager.openAccounts.first!.name
+        }
+        
+        if selectedAccount.isEmpty && !dataManager.openAccounts.isEmpty && (transactionType == "income" || transactionType == "salary") { // MODIFICATO: usa openAccounts
+            selectedAccount = dataManager.openAccounts.first!.name
         }
     }
     
