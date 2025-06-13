@@ -625,7 +625,8 @@ struct EnhancedAddAccountView: View {
     ]
     
     var isFormValid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmedName.isEmpty && !dataManager.accounts.contains { $0.name.lowercased() == trimmedName.lowercased() }
     }
     
     var body: some View {
@@ -719,6 +720,37 @@ struct EnhancedAddAccountView: View {
                             Image(systemName: "eye.circle.fill")
                                 .foregroundColor(.purple)
                             Text("Anteprima")
+                        }
+                    }
+                    
+                    // Validazione nome
+                    if !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let isDuplicate = dataManager.accounts.contains { $0.name.lowercased() == trimmedName.lowercased() }
+                        
+                        Section {
+                            HStack {
+                                Image(systemName: isDuplicate ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                    .foregroundColor(isDuplicate ? .red : .green)
+                                
+                                Text(isDuplicate ? "Nome già esistente" : "Nome disponibile")
+                                    .foregroundColor(isDuplicate ? .red : .green)
+                                    .fontWeight(.medium)
+                                
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                        } header: {
+                            HStack {
+                                Image(systemName: "checkmark.shield.fill")
+                                    .foregroundColor(.blue)
+                                Text("Validazione Nome")
+                            }
+                        } footer: {
+                            if isDuplicate {
+                                Text("Scegli un nome diverso per questo conto")
+                                    .foregroundColor(.red)
+                            }
                         }
                     }
                 }
@@ -1417,6 +1449,25 @@ struct EditAccountView: View {
                                 .textInputAutocapitalization(.words)
                                 .font(.headline)
                         }
+                        
+                        // Validazione in tempo reale
+                        if !currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            let trimmedName = currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let isDuplicate = dataManager.accounts.contains { $0.name.lowercased() == trimmedName.lowercased() && $0.id != account.id }
+                            
+                            HStack {
+                                Image(systemName: isDuplicate ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                    .foregroundColor(isDuplicate ? .red : .green)
+                                
+                                Text(isDuplicate ? "Nome già esistente" : "Nome disponibile")
+                                    .font(.subheadline)
+                                    .foregroundColor(isDuplicate ? .red : .green)
+                                    .fontWeight(.medium)
+                                
+                                Spacer()
+                            }
+                            .padding(.top, 8)
+                        }
                     } header: {
                         HStack {
                             Image(systemName: "pencil")
@@ -1424,8 +1475,8 @@ struct EditAccountView: View {
                             Text("Nome del Conto")
                         }
                     } footer: {
-                        if !relatedTransactions.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if !relatedTransactions.isEmpty {
                                 if hasChanges {
                                     Text("✅ Verranno aggiornate automaticamente \(relatedTransactions.count) transazioni associate")
                                         .foregroundColor(.green)
@@ -1433,6 +1484,14 @@ struct EditAccountView: View {
                                     Text("ℹ️ Ci sono \(relatedTransactions.count) transazioni associate a questo conto")
                                         .foregroundColor(.blue)
                                 }
+                            }
+                            
+                            // Messaggio di errore per duplicati
+                            let trimmedName = currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let isDuplicate = !trimmedName.isEmpty && dataManager.accounts.contains { $0.name.lowercased() == trimmedName.lowercased() && $0.id != account.id }
+                            if isDuplicate {
+                                Text("⚠️ Questo nome è già utilizzato da un altro conto")
+                                    .foregroundColor(.red)
                             }
                         }
                     }
@@ -1466,32 +1525,6 @@ struct EditAccountView: View {
                             Image(systemName: "info.circle.fill")
                                 .foregroundColor(.purple)
                             Text("Informazioni")
-                        }
-                    }
-                    
-                    // Debug info (rimuovere in produzione)
-                    if hasChanges {
-                        Section {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("🔄 Debug Info:")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                
-                                Text("Nome originale: '\(originalAccountName)'")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                
-                                Text("Nome nuovo: '\(currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines))'")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                
-                                Text("Transazioni da aggiornare: \(relatedTransactions.count)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 8)
-                        } header: {
-                            Text("Debug (solo per test)")
                         }
                     }
                     
@@ -1539,9 +1572,11 @@ struct EditAccountView: View {
                     Button("Salva") {
                         saveChanges()
                     }
-                    .disabled(!hasChanges || currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!hasChanges || currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              dataManager.accounts.contains { $0.name.lowercased() == currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() && $0.id != account.id })
                     .fontWeight(.semibold)
-                    .foregroundColor(hasChanges && !currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .blue : .secondary)
+                    .foregroundColor(hasChanges && !currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                                     !dataManager.accounts.contains { $0.name.lowercased() == currentAccountName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() && $0.id != account.id } ? .blue : .secondary)
                 }
             }
         }

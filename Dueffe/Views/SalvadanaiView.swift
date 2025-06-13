@@ -1354,8 +1354,10 @@ struct SimpleSalvadanaiFormView: View {
     ]
     
     var isFormValid: Bool {
-        if name.isEmpty { return false }
-        if selectedCategory.isEmpty { return false } // Categoria obbligatoria
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty { return false }
+        if selectedCategory.isEmpty { return false }
+        if dataManager.salvadanai.contains { $0.name.lowercased() == trimmedName.lowercased() } { return false }
         if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
         return true
