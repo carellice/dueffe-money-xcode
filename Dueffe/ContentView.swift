@@ -11,6 +11,7 @@ struct OnboardingWrapperView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("hasCreatedFirstSalvadanaio") private var hasCreatedFirstSalvadanaio = false
     @AppStorage("hasAddedInitialBalance") private var hasAddedInitialBalance = false
+    @AppStorage("hasSetUserName") private var hasSetUserName = false // NUOVO: Flag per il nome utente
     
     var body: some View {
         Group {
@@ -25,18 +26,266 @@ struct OnboardingWrapperView: View {
                 FirstAccountOnboardingView()
                     .environmentObject(dataManager)
             } else if !hasCreatedFirstSalvadanaio {
-                // NUOVO: Mostra creazione primo salvadanaio (STEP 2)
+                // Mostra creazione primo salvadanaio (STEP 2)
                 FirstSalvadanaiOnboardingView()
                     .environmentObject(dataManager)
             } else if !hasAddedInitialBalance {
-                // NUOVO: Mostra aggiunta saldo iniziale (STEP 3)
+                // Mostra aggiunta saldo iniziale (STEP 3)
                 InitialBalanceOnboardingView()
+                    .environmentObject(dataManager)
+            } else if !hasSetUserName {
+                // NUOVO: Mostra inserimento nome utente (STEP 4)
+                UserNameOnboardingView()
                     .environmentObject(dataManager)
             } else {
                 // Mostra app normale
                 MainTabView()
                     .environmentObject(dataManager)
             }
+        }
+    }
+}
+
+// NUOVO: Vista per il quarto step dell'onboarding
+struct UserNameOnboardingView: View {
+    @AppStorage("hasSetUserName") private var hasSetUserName = false
+    @AppStorage("userName") private var userName = "" // NUOVO: Salva il nome dell'utente
+    @State private var currentUserName = ""
+    @State private var animateIcon = false
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 40) {
+                        Spacer(minLength: 60)
+                        
+                        // Header
+                        VStack(spacing: 30) {
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(
+                                        gradient: Gradient(colors: [Color.blue, Color.purple]),
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ))
+                                    .frame(width: 120, height: 120)
+                                    .shadow(color: .blue.opacity(0.3), radius: 20, x: 0, y: 10)
+                                
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.white)
+                                    .scaleEffect(animateIcon ? 1.1 : 1.0)
+                                    .animation(.easeInOut(duration: 2).repeatForever(), value: animateIcon)
+                            }
+                            
+                            VStack(spacing: 16) {
+                                Text("Ultimo Passo! 👋")
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundStyle(LinearGradient(
+                                        gradient: Gradient(colors: [.blue, .purple]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ))
+                                
+                                Text("Come ti chiami?")
+                                    .font(.title3)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        
+                        // Form per il nome
+                        VStack(spacing: 24) {
+                            VStack(spacing: 20) {
+                                // Campo nome utente
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.blue)
+                                        Text("Il tuo nome")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    TextField("es. Marco, Giulia, Francesco...", text: $currentUserName)
+                                        .textFieldStyle(ModernTextFieldStyle())
+                                        .textInputAutocapitalization(.words)
+                                        .autocorrectionDisabled()
+                                }
+                                
+                                // Anteprima
+                                if !currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        HStack {
+                                            Image(systemName: "eye.fill")
+                                                .foregroundColor(.green)
+                                            Text("Anteprima")
+                                                .font(.headline)
+                                                .fontWeight(.semibold)
+                                        }
+                                        
+                                        HStack {
+                                            Text("Ciao \(currentUserName.trimmingCharacters(in: .whitespacesAndNewlines))! 👋")
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.primary)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(Color.green.opacity(0.1))
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 12)
+                                                                .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                                                        )
+                                                )
+                                            
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                                
+                                // Info personalizzazione
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "info.circle.fill")
+                                            .foregroundColor(.blue)
+                                        Text("Personalizzazione")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("•")
+                                                .font(.headline)
+                                                .foregroundColor(.blue)
+                                                .frame(width: 10, alignment: .leading)
+                                            
+                                            Text("Il tuo nome apparirà nella schermata principale")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("•")
+                                                .font(.headline)
+                                                .foregroundColor(.blue)
+                                                .frame(width: 10, alignment: .leading)
+                                            
+                                            Text("Puoi modificarlo in qualsiasi momento dalle impostazioni")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        
+                                        HStack(alignment: .top, spacing: 12) {
+                                            Text("•")
+                                                .font(.headline)
+                                                .foregroundColor(.blue)
+                                                .frame(width: 10, alignment: .leading)
+                                            
+                                            Text("Il nome rimane privato sul tuo dispositivo")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 5)
+                            )
+                        }
+                        
+                        // Progress indicator
+                        VStack(spacing: 16) {
+                            HStack {
+                                Text("Passo 4 di 4")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            
+                            ProgressView(value: 4.0/4.0)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                                .scaleEffect(y: 2)
+                        }
+                        
+                        // Bottone finale
+                        VStack(spacing: 16) {
+                            Button(action: {
+                                saveUserName()
+                            }) {
+                                HStack {
+                                    Text(currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Salta" : "Completato!")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                    
+                                    Image(systemName: currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "arrow.right.circle.fill" : "checkmark.circle.fill")
+                                        .font(.title2)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [.gray, .secondary] : [.blue, .purple]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .shadow(color: currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .clear : .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+                            }
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: currentUserName.isEmpty)
+                            
+                            if currentUserName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text("Puoi sempre aggiungere il tuo nome dopo dalle impostazioni")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            } else {
+                                Text("🎉 Dueffe Money è ora pronto per l'uso!")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                                    .fontWeight(.medium)
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding()
+                }
+            }
+            .navigationBarHidden(true)
+        }
+        .onAppear {
+            animateIcon = true
+        }
+    }
+    
+    private func saveUserName() {
+        let trimmedName = currentUserName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Salva il nome anche se vuoto (l'utente ha scelto di saltare)
+        userName = trimmedName
+        
+        withAnimation(.spring()) {
+            hasSetUserName = true
         }
     }
 }
@@ -593,13 +842,13 @@ struct FirstAccountOnboardingView: View {
                         // Progress indicator
                         VStack(spacing: 16) {
                             HStack {
-                                Text("Passo 1 di 3")
+                                Text("Passo 1 di 4")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
                             
-                            ProgressView(value: 1.0/3.0)
+                            ProgressView(value: 1.0/4.0)
                                 .progressViewStyle(LinearProgressViewStyle(tint: .blue))
                                 .scaleEffect(y: 2)
                         }
@@ -1008,13 +1257,13 @@ struct FirstSalvadanaiOnboardingView: View {
                         // Progress indicator
                         VStack(spacing: 16) {
                             HStack {
-                                Text("Passo 2 di 3")
+                                Text("Passo 2 di 4")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
                             
-                            ProgressView(value: 2.0/3.0)
+                            ProgressView(value: 2.0/4.0)
                                 .progressViewStyle(LinearProgressViewStyle(tint: .green))
                                 .scaleEffect(y: 2)
                         }
@@ -1367,13 +1616,13 @@ struct InitialBalanceOnboardingView: View {
                         // Progress indicator
                         VStack(spacing: 16) {
                             HStack {
-                                Text("Passo 3 di 3")
+                                Text("Passo 3 di 4")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
                             
-                            ProgressView(value: 3.0/3.0)
+                            ProgressView(value: 3.0/4.0)
                                 .progressViewStyle(LinearProgressViewStyle(tint: .orange))
                                 .scaleEffect(y: 2)
                         }
@@ -1607,9 +1856,10 @@ struct ExampleAccountCard: View {
     }
 }
 
-// MARK: - Home View migliorata
+// MARK: - Home View migliorata con nome utente
 struct HomeView: View {
     @EnvironmentObject var dataManager: DataManager
+    @AppStorage("userName") private var userName = "" // NUOVO: Legge il nome dell'utente
     
     var totalBalance: Double {
         dataManager.accounts.reduce(0) { $0 + $1.balance }
@@ -1624,6 +1874,16 @@ struct HomeView: View {
             .filter { $0.type != "distribution" } // NUOVO: Esclude le distribuzioni
             .sorted { $0.date > $1.date }
             .prefix(5))
+    }
+    
+    // NUOVO: Computed property per il titolo personalizzato
+    private var personalizedTitle: String {
+        let trimmedName = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty {
+            return "Ciao! 👋"
+        } else {
+            return "Ciao \(trimmedName)! 👋"
+        }
     }
     
     var body: some View {
@@ -1762,7 +2022,7 @@ struct HomeView: View {
                     .padding(.vertical)
                 }
             }
-            .navigationTitle("Ciao! 👋")
+            .navigationTitle(personalizedTitle) // MODIFICATO: Usa il titolo personalizzato
             .refreshable {
                 // Placeholder per refresh
             }

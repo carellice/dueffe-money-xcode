@@ -169,6 +169,7 @@ struct SettingsView: View {
         UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
         UserDefaults.standard.removeObject(forKey: "hasCreatedFirstSalvadanaio")
         UserDefaults.standard.removeObject(forKey: "hasAddedInitialBalance")
+        UserDefaults.standard.removeObject(forKey: "hasSetUserName")
         
         // Mostra feedback di successo
         let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
