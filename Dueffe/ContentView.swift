@@ -939,6 +939,7 @@ struct FirstSalvadanaiOnboardingView: View {
     @State private var targetDate = Date()
     @State private var monthlyRefill = 50.0
     @State private var selectedColor = "blue"
+    @State private var selectedCategory = "" // NUOVO: Categoria selezionata
     @State private var isInfiniteObjective = false
     @State private var animateIcon = false
     
@@ -965,6 +966,7 @@ struct FirstSalvadanaiOnboardingView: View {
     
     var isFormValid: Bool {
         if name.isEmpty { return false }
+        if selectedCategory.isEmpty { return false } // NUOVO: Verifica categoria
         if selectedType == "objective" && !isInfiniteObjective && targetAmount <= 0 { return false }
         if selectedType == "glass" && monthlyRefill <= 0 { return false }
         return true
@@ -1187,6 +1189,47 @@ struct FirstSalvadanaiOnboardingView: View {
                                     }
                                 }
                                 
+                                // Categoria
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Image(systemName: "folder.fill")
+                                            .foregroundColor(.green)
+                                        Text("Categoria")
+                                            .font(.headline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    
+                                    VStack(spacing: 8) {
+                                        Picker("Categoria", selection: $selectedCategory) {
+                                            Text("Seleziona categoria")
+                                                .tag("")
+                                                .foregroundColor(.secondary)
+                                            ForEach(dataManager.allSalvadanaiCategories, id: \.self) { category in
+                                                Text(category)
+                                                    .tag(category)
+                                            }
+                                        }
+                                        .pickerStyle(MenuPickerStyle())
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding()
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(selectedCategory.isEmpty ? Color.gray.opacity(0.05) : Color.green.opacity(0.05))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .stroke(selectedCategory.isEmpty ? Color.gray.opacity(0.3) : Color.green, lineWidth: 1)
+                                                )
+                                        )
+                                        
+                                        if selectedCategory.isEmpty {
+                                            Text("Organizza i tuoi salvadanai per categoria")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        }
+                                    }
+                                }
+
                                 // Colore
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
@@ -1352,7 +1395,7 @@ struct FirstSalvadanaiOnboardingView: View {
             targetDate: isInfiniteObjective ? nil : (selectedType == "objective" ? targetDate : nil),
             monthlyRefill: selectedType == "glass" ? monthlyRefill : 0,
             color: selectedColor,
-            category: selectedType == "objective" ? "🎯 Obiettivi" : "🥤 Budget Mensili", // NUOVO: Categoria automatica
+            category: selectedCategory, // MODIFICATO: Usa la categoria selezionata
             isInfinite: selectedType == "objective" ? isInfiniteObjective : false
         )
         
@@ -1377,6 +1420,7 @@ struct FirstSalvadanaiOnboardingView: View {
         targetDate = Date()
         monthlyRefill = 50.0
         selectedColor = getNextAvailableColor()
+        selectedCategory = "" // NUOVO: Reset categoria
         isInfiniteObjective = false
     }
     
