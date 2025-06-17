@@ -2022,46 +2022,6 @@ struct HomeView: View {
                             }
                             .padding(.horizontal, 20)
                         }
-                        
-                        // Navigazione rapida alle sezioni
-                        VStack(alignment: .leading, spacing: 20) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Navigazione Rapida")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Text("Accedi velocemente alle funzioni principali")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            VStack(spacing: 12) {
-                                QuickNavigationCard(
-                                    title: "Gestisci Salvadanai",
-                                    subtitle: "Visualizza e modifica i tuoi obiettivi di risparmio",
-                                    icon: "banknote.fill",
-                                    colors: [.green, .mint],
-                                    destination: AnyView(SalvadanaiView())
-                                )
-                                
-                                QuickNavigationCard(
-                                    title: "Tutte le Transazioni",
-                                    subtitle: "Consulta lo storico completo delle operazioni",
-                                    icon: "creditcard.fill",
-                                    colors: [.purple, .blue],
-                                    destination: AnyView(TransactionsView())
-                                )
-                                
-                                QuickNavigationCard(
-                                    title: "Gestisci Conti",
-                                    subtitle: "Visualizza e modifica i tuoi conti correnti",
-                                    icon: "building.columns.fill",
-                                    colors: [.blue, .indigo],
-                                    destination: AnyView(AccountsView())
-                                )
-                            }
-                            .padding(.horizontal, 20)
-                        }
                     }
                     .padding(.vertical)
                 }
