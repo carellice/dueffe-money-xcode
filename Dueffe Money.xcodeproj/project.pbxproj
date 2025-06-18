@@ -24,9 +24,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		90CE977B2DF506C300D1874A /* Dueffe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Dueffe.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		90CE978D2DF506C400D1874A /* DueffeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DueffeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		90CE97972DF506C400D1874A /* DueffeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DueffeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90CE977B2DF506C300D1874A /* Dueffe Money.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Dueffe Money.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		90CE978D2DF506C400D1874A /* Dueffe MoneyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Dueffe MoneyTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		90CE97972DF506C400D1874A /* Dueffe MoneyUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Dueffe MoneyUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -85,9 +85,9 @@
 		90CE977C2DF506C300D1874A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				90CE977B2DF506C300D1874A /* Dueffe.app */,
-				90CE978D2DF506C400D1874A /* DueffeTests.xctest */,
-				90CE97972DF506C400D1874A /* DueffeUITests.xctest */,
+				90CE977B2DF506C300D1874A /* Dueffe Money.app */,
+				90CE978D2DF506C400D1874A /* Dueffe MoneyTests.xctest */,
+				90CE97972DF506C400D1874A /* Dueffe MoneyUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		90CE977A2DF506C300D1874A /* Dueffe */ = {
+		90CE977A2DF506C300D1874A /* Dueffe Money */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 90CE97A12DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe" */;
+			buildConfigurationList = 90CE97A12DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe Money" */;
 			buildPhases = (
 				90CE97772DF506C300D1874A /* Sources */,
 				90CE97782DF506C300D1874A /* Frameworks */,
@@ -110,16 +110,16 @@
 			fileSystemSynchronizedGroups = (
 				90CE977D2DF506C300D1874A /* Dueffe */,
 			);
-			name = Dueffe;
+			name = "Dueffe Money";
 			packageProductDependencies = (
 			);
 			productName = Dueffe;
-			productReference = 90CE977B2DF506C300D1874A /* Dueffe.app */;
+			productReference = 90CE977B2DF506C300D1874A /* Dueffe Money.app */;
 			productType = "com.apple.product-type.application";
 		};
-		90CE978C2DF506C400D1874A /* DueffeTests */ = {
+		90CE978C2DF506C400D1874A /* Dueffe MoneyTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 90CE97A42DF506C400D1874A /* Build configuration list for PBXNativeTarget "DueffeTests" */;
+			buildConfigurationList = 90CE97A42DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe MoneyTests" */;
 			buildPhases = (
 				90CE97892DF506C400D1874A /* Sources */,
 				90CE978A2DF506C400D1874A /* Frameworks */,
@@ -133,16 +133,16 @@
 			fileSystemSynchronizedGroups = (
 				90CE97902DF506C400D1874A /* DueffeTests */,
 			);
-			name = DueffeTests;
+			name = "Dueffe MoneyTests";
 			packageProductDependencies = (
 			);
 			productName = DueffeTests;
-			productReference = 90CE978D2DF506C400D1874A /* DueffeTests.xctest */;
+			productReference = 90CE978D2DF506C400D1874A /* Dueffe MoneyTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		90CE97962DF506C400D1874A /* DueffeUITests */ = {
+		90CE97962DF506C400D1874A /* Dueffe MoneyUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 90CE97A72DF506C400D1874A /* Build configuration list for PBXNativeTarget "DueffeUITests" */;
+			buildConfigurationList = 90CE97A72DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe MoneyUITests" */;
 			buildPhases = (
 				90CE97932DF506C400D1874A /* Sources */,
 				90CE97942DF506C400D1874A /* Frameworks */,
@@ -156,11 +156,11 @@
 			fileSystemSynchronizedGroups = (
 				90CE979A2DF506C400D1874A /* DueffeUITests */,
 			);
-			name = DueffeUITests;
+			name = "Dueffe MoneyUITests";
 			packageProductDependencies = (
 			);
 			productName = DueffeUITests;
-			productReference = 90CE97972DF506C400D1874A /* DueffeUITests.xctest */;
+			productReference = 90CE97972DF506C400D1874A /* Dueffe MoneyUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 90CE97762DF506C300D1874A /* Build configuration list for PBXProject "Dueffe" */;
+			buildConfigurationList = 90CE97762DF506C300D1874A /* Build configuration list for PBXProject "Dueffe Money" */;
 			developmentRegion = it;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				90CE977A2DF506C300D1874A /* Dueffe */,
-				90CE978C2DF506C400D1874A /* DueffeTests */,
-				90CE97962DF506C400D1874A /* DueffeUITests */,
+				90CE977A2DF506C300D1874A /* Dueffe Money */,
+				90CE978C2DF506C400D1874A /* Dueffe MoneyTests */,
+				90CE97962DF506C400D1874A /* Dueffe MoneyUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		90CE978F2DF506C400D1874A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 90CE977A2DF506C300D1874A /* Dueffe */;
+			target = 90CE977A2DF506C300D1874A /* Dueffe Money */;
 			targetProxy = 90CE978E2DF506C400D1874A /* PBXContainerItemProxy */;
 		};
 		90CE97992DF506C400D1874A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 90CE977A2DF506C300D1874A /* Dueffe */;
+			target = 90CE977A2DF506C300D1874A /* Dueffe Money */;
 			targetProxy = 90CE97982DF506C400D1874A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -463,7 +463,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dueffe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dueffe";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dueffe Money.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dueffe Money";
 			};
 			name = Debug;
 		};
@@ -482,7 +482,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dueffe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dueffe";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Dueffe Money.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Dueffe Money";
 			};
 			name = Release;
 		};
@@ -523,7 +523,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		90CE97762DF506C300D1874A /* Build configuration list for PBXProject "Dueffe" */ = {
+		90CE97762DF506C300D1874A /* Build configuration list for PBXProject "Dueffe Money" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90CE979F2DF506C400D1874A /* Debug */,
@@ -532,7 +532,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		90CE97A12DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe" */ = {
+		90CE97A12DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe Money" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90CE97A22DF506C400D1874A /* Debug */,
@@ -541,7 +541,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		90CE97A42DF506C400D1874A /* Build configuration list for PBXNativeTarget "DueffeTests" */ = {
+		90CE97A42DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe MoneyTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90CE97A52DF506C400D1874A /* Debug */,
@@ -550,7 +550,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		90CE97A72DF506C400D1874A /* Build configuration list for PBXNativeTarget "DueffeUITests" */ = {
+		90CE97A72DF506C400D1874A /* Build configuration list for PBXNativeTarget "Dueffe MoneyUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				90CE97A82DF506C400D1874A /* Debug */,
