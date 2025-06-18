@@ -1,14 +1,16 @@
 import SwiftUI
 
-// MARK: - Enhanced Settings View con Cancella Dati
+// MARK: - Enhanced Settings View con Cancella Dati e Sicurezza
 struct SettingsView: View {
     @EnvironmentObject var dataManager: DataManager
+    @StateObject private var biometricAuthManager = BiometricAuthManager()
     @State private var showingCategoriesManagement = false
     @State private var showingAboutApp = false
     @State private var showingExportData = false
     @State private var showingDeleteAllAlert = false
     @State private var showingDeleteConfirmation = false
     @State private var deleteConfirmationText = ""
+    @State private var showingBiometricError = false
     
     var body: some View {
         NavigationView {
@@ -22,6 +24,60 @@ struct SettingsView: View {
                 .ignoresSafeArea()
                 
                 Form {
+                    // Sicurezza e Privacy
+                    Section {
+                        // Toggle per autenticazione biometrica
+                        HStack {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.blue)
+                                        .frame(width: 32, height: 32)
+                                    
+                                    Image(systemName: biometricAuthManager.biometricIcon)
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundColor(.white)
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(biometricAuthManager.biometricTypeName)")
+                                        .font(.body)
+                                        .fontWeight(.medium)
+                                    
+                                    Text(biometricAuthManager.isBiometricAvailable 
+                                         ? "Proteggi l'accesso all'app" 
+                                         : "Non disponibile su questo dispositivo")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Spacer()
+                            
+                            Toggle("", isOn: Binding(
+                                get: { biometricAuthManager.biometricAuthEnabled },
+                                set: { newValue in
+                                    Task {
+                                        let success = await biometricAuthManager.toggleBiometricAuth()
+                                        if !success && newValue {
+                                            showingBiometricError = true
+                                        }
+                                    }
+                                }
+                            ))
+                            .disabled(!biometricAuthManager.isBiometricAvailable)
+                        }
+                        .padding(.vertical, 4)
+                        
+
+                    } header: {
+                        SectionHeader(icon: "shield.fill", title: "Sicurezza e Privacy")
+                    } footer: {
+                        Text(biometricAuthManager.isBiometricAvailable 
+                             ? "L'autenticazione con \(biometricAuthManager.biometricTypeName) sarà richiesta ogni volta che apri l'app per proteggere i tuoi dati finanziari. I dati rimangono sempre sul tuo dispositivo."
+                             : "L'autenticazione biometrica non è disponibile su questo dispositivo.")
+                    }
+                    
                     // Personalizzazione
                     Section {
                         SettingsRow(
@@ -151,6 +207,11 @@ struct SettingsView: View {
             .disabled(deleteConfirmationText.uppercased() != "CANCELLA")
         } message: {
             Text("Per confermare la cancellazione di TUTTI i dati, scrivi 'CANCELLA' nel campo sopra.")
+        }
+        .alert("Errore Autenticazione", isPresented: $showingBiometricError) {
+            Button("OK") { }
+        } message: {
+            Text("Non è stato possibile abilitare l'autenticazione biometrica. Riprova più tardi.")
         }
     }
     
