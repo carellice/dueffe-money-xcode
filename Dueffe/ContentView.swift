@@ -1915,7 +1915,7 @@ struct HomeView: View {
     
     var recentTransactions: [TransactionModel] {
         Array(dataManager.transactions
-            .filter { $0.type != "distribution" } // NUOVO: Esclude le distribuzioni
+            .filter { $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" } // Esclude distribuzioni e trasferimenti
             .sorted { $0.date > $1.date }
             .prefix(5))
     }

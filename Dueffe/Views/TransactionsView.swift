@@ -10,19 +10,21 @@ struct TransactionsView: View {
     @State private var showingReverseDistribution = false // NUOVO
     @State private var transactionToDelete: TransactionModel?
     
-    // MODIFICATO: Filtro che esclude le distribuzioni
+    // MODIFICATO: Filtro che esclude distribuzioni e trasferimenti
     private var availableFilterOptions: [(String, String, String)] {
         var filters: [(String, String, String)] = []
         
-        // Filtra le transazioni escludendo le distribuzioni
-        let filteredTransactions = dataManager.transactions.filter { $0.type != "distribution" }
+        // Filtra le transazioni escludendo distribuzioni e trasferimenti
+        let filteredTransactions = dataManager.transactions.filter { 
+            $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" 
+        }
         
-        // Sempre mostra "Tutte" se ci sono transazioni (escludendo distribuzioni)
+        // Sempre mostra "Tutte" se ci sono transazioni (escludendo distribuzioni e trasferimenti)
         if !filteredTransactions.isEmpty {
             filters.append(("all", "Tutte", "list.bullet"))
         }
         
-        // Controllo per ogni tipo di transazione (escludendo distribuzioni)
+        // Controllo per ogni tipo di transazione (escludendo distribuzioni e trasferimenti)
         let transactionTypes = Set(filteredTransactions.map { $0.type })
         
         if transactionTypes.contains("expense") {
@@ -37,21 +39,15 @@ struct TransactionsView: View {
             filters.append(("salary", "Stipendi", "banknote"))
         }
         
-        if transactionTypes.contains("transfer") {
-            filters.append(("transfer", "Trasf. Conti", "arrow.left.arrow.right.circle"))
-        }
-
-        if transactionTypes.contains("transfer_salvadanai") {
-            filters.append(("transfer_salvadanai", "Trasf. Salvadanai", "arrow.left.arrow.right.circle"))
-        }
-        
         return filters
     }
     
-    // MODIFICATO: Filtro che esclude sempre le distribuzioni
+    // MODIFICATO: Filtro che esclude sempre distribuzioni e trasferimenti
     var filteredTransactions: [TransactionModel] {
-        // Prima filtra le distribuzioni, poi applica gli altri filtri
-        var transactions = dataManager.transactions.filter { $0.type != "distribution" }
+        // Prima filtra distribuzioni e trasferimenti, poi applica gli altri filtri
+        var transactions = dataManager.transactions.filter { 
+            $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" 
+        }
         
         if selectedFilter != "all" {
             transactions = transactions.filter { $0.type == selectedFilter }
@@ -81,7 +77,7 @@ struct TransactionsView: View {
                 VStack {
                     if dataManager.accounts.isEmpty {
                         NoAccountsTransactionsView()
-                    } else if dataManager.transactions.filter({ $0.type != "distribution" }).isEmpty {
+                    } else if dataManager.transactions.filter({ $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" }).isEmpty {
                         EmptyTransactionsView(action: { showingAddTransaction = true })
                     } else {
                         VStack(spacing: 0) {
@@ -242,14 +238,16 @@ struct TransactionsView: View {
         return grouped.sorted { $0.key > $1.key }
     }
     
-    // MODIFICATO: Conteggio che esclude le distribuzioni
+    // MODIFICATO: Conteggio che esclude distribuzioni e trasferimenti
     private func getFilterCount(_ filter: String) -> Int {
-        let nonDistributionTransactions = dataManager.transactions.filter { $0.type != "distribution" }
+        let filteredTransactions = dataManager.transactions.filter { 
+            $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" 
+        }
         
         if filter == "all" {
-            return nonDistributionTransactions.count
+            return filteredTransactions.count
         } else {
-            return nonDistributionTransactions.filter { $0.type == filter }.count
+            return filteredTransactions.filter { $0.type == filter }.count
         }
     }
 }

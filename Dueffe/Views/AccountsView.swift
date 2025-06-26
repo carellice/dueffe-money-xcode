@@ -877,7 +877,7 @@ struct EnhancedAccountDetailView: View {
     
     var accountTransactions: [TransactionModel] {
         dataManager.transactions
-            .filter { $0.accountName == account.name }
+            .filter { $0.accountName == account.name && $0.type != "distribution" && $0.type != "transfer" && $0.type != "transfer_salvadanai" }
             .sorted { $0.date > $1.date }
     }
     
