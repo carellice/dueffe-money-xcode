@@ -1003,32 +1003,7 @@ extension DataManager {
         return true
     }
     
-    /// Riapre un conto chiuso
-    /// - Parameter account: Il conto da riaprire
-    /// - Returns: True se la riapertura è avvenuta con successo
-    func reopenAccount(_ account: AccountModel) -> Bool {
-        guard let index = accounts.firstIndex(where: { $0.id == account.id }) else {
-            print("❌ Errore: Impossibile trovare il conto")
-            return false
-        }
-        
-        guard accounts[index].isClosed else {
-            print("❌ Errore: Il conto non è chiuso")
-            return false
-        }
-        
-        print("🔓 Riapertura conto '\(account.name)'")
-        
-        // Riapri il conto
-        accounts[index].isClosed = false
-        
-        // Sblocca tutte le transazioni associate
-        let unlockedTransactionsCount = unmarkTransactionsAsLocked(for: account.name)
-        print("  ✅ Conto riaperto")
-        print("  ✅ Sbloccate \(unlockedTransactionsCount) transazioni")
-        
-        return true
-    }
+
     
     /// Marca le transazioni di un conto come "bloccate" (non eliminabili)
     /// - Parameter accountName: Nome del conto
@@ -1046,19 +1021,7 @@ extension DataManager {
         return count
     }
     
-    /// Sblocca le transazioni di un conto
-    /// - Parameter accountName: Nome del conto
-    /// - Returns: Numero di transazioni sbloccate
-    private func unmarkTransactionsAsLocked(for accountName: String) -> Int {
-        var count = 0
-        for index in transactions.indices {
-            if transactions[index].accountName == accountName ||
-               (transactions[index].type == "transfer" && transactions[index].salvadanaiName == accountName) {
-                count += 1
-            }
-        }
-        return count
-    }
+
     
     /// Verifica se una transazione è bloccata (associata a un conto chiuso)
     /// - Parameter transaction: La transazione da verificare

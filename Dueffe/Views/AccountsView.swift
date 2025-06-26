@@ -491,9 +491,9 @@ struct EnhancedAccountCard: View {
                     
                     // Menu compatto e data
                     VStack(spacing: 8) {
-                        // Menu button compatto con opzioni diverse per conti chiusi/aperti
-                        Menu {
-                            if !account.isClosed {
+                        // Menu button solo per conti aperti
+                        if !account.isClosed {
+                            Menu {
                                 // Menu per conti aperti
                                 Button(action: {
                                     showingEditSheet = true
@@ -521,27 +521,30 @@ struct EnhancedAccountCard: View {
                                     }
                                     .tint(.red)
                                 }
-                            } else {
-                                // Menu per conti chiusi
-                                Button(action: {
-                                    reopenAccount()
-                                }) {
-                                    Label("Riapri Conto", systemImage: "lock.open")
-                                }
-                                .tint(.green)
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .frame(width: 32, height: 32)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.white.opacity(0.2))
+                                    )
                             }
-                        } label: {
-                            Image(systemName: "ellipsis")
+                            .buttonStyle(PlainButtonStyle())
+                        } else {
+                            // Per i conti chiusi, mostra solo un'icona di lucchetto statica
+                            Image(systemName: "lock.fill")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(.white.opacity(0.6))
                                 .frame(width: 32, height: 32)
                                 .background(
                                     Circle()
-                                        .fill(Color.white.opacity(account.isClosed ? 0.1 : 0.2))
+                                        .fill(Color.white.opacity(0.1))
                                 )
                         }
-                        .buttonStyle(PlainButtonStyle())
                         
                         // Data di creazione compatta
                         VStack(spacing: 2) {
@@ -599,16 +602,7 @@ struct EnhancedAccountCard: View {
         }
     }
     
-    // NUOVO: Funzione per riaprire un conto
-    private func reopenAccount() {
-        withAnimation {
-            let success = dataManager.reopenAccount(account)
-            if !success {
-                // Potresti aggiungere un alert di errore qui se necessario
-                print("Errore nella riapertura del conto")
-            }
-        }
-    }
+
 }
 
 // MARK: - Enhanced Add Account View
