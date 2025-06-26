@@ -414,9 +414,7 @@ class DataManager: ObservableObject {
         }
     }
     
-    func deleteSalvadanaio(_ salvadanaio: SalvadanaiModel) {
-        salvadanai.removeAll { $0.id == salvadanaio.id }
-    }
+
     
     // NUOVO: Metodi per gestione categorie salvadanai
     func getSalvadanaiByCategory(_ category: String) -> [SalvadanaiModel] {

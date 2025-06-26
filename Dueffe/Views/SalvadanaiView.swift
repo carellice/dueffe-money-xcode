@@ -244,7 +244,7 @@ struct SalvadanaiCardView: View {
     @State private var isPressed = false
     @State private var showingTransactions = false
     @State private var showingEditSheet = false // NUOVO: Per la modifica
-    @State private var showingDeleteAlert = false // NUOVO: Per l'eliminazione
+
     @State private var showingBreakAlert = false // NUOVO
     @State private var showingBreakSheet = false // NUOVO
     
@@ -728,21 +728,13 @@ struct SalvadanaiCardView: View {
             
             Divider()
             
-            // NUOVO: Rompi salvadanaio
+            // Rompi salvadanaio
             Button(action: {
                 showingBreakAlert = true
             }) {
                 Label("Rompi Salvadanaio", systemImage: "hammer.fill")
             }
             .tint(.orange)
-            
-            // Elimina salvadanaio (metodo soft)
-            Button(role: .destructive, action: {
-                showingDeleteAlert = true
-            }) {
-                Label("Elimina Salvadanaio", systemImage: "trash")
-            }
-            .tint(.red)
         }
         .onAppear {
             // Animazioni con delay casuali
@@ -788,21 +780,7 @@ struct SalvadanaiCardView: View {
                 Text("Vuoi rompere il salvadanaio '\(salvadanaio.name)'?\n\nDovrai prima trasferire \(salvadanaio.currentAmount.italianCurrency) ad altri salvadanai.\n\nIl salvadanaio e tutte le sue transazioni verranno eliminati definitivamente.")
             }
         }
-        // NUOVO: Alert per eliminazione
-        .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
-            Button("Elimina", role: .destructive) {
-                withAnimation {
-                    dataManager.deleteSalvadanaio(salvadanaio)
-                }
-            }
-            Button("Annulla", role: .cancel) { }
-        } message: {
-            if relatedTransactions.isEmpty {
-                Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'? Questa azione non può essere annullata.")
-            } else {
-                Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'?\n\nCi sono \(relatedTransactions.count) transazioni associate che verranno mantenute ma non saranno più collegate a questo salvadanaio.\n\nQuesta azione non può essere annullata.")
-            }
-        }
+
     }
 }
 
@@ -811,7 +789,7 @@ struct EditSalvadanaiNameView: View {
     @EnvironmentObject var dataManager: DataManager
     
     @State private var currentSalvadanaiName: String
-    @State private var showingDeleteAlert = false
+
     private let salvadanaio: SalvadanaiModel
     private let originalSalvadanaiName: String
     
@@ -1121,34 +1099,7 @@ struct EditSalvadanaiNameView: View {
                         }
                     }
                     
-                    // Sezione di eliminazione (solo se non ci sono transazioni)
-                    if relatedTransactions.isEmpty {
-                        Section {
-                            Button(action: {
-                                showingDeleteAlert = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "trash.fill")
-                                        .foregroundColor(.red)
-                                        .frame(width: 24)
-                                    
-                                    Text("Elimina Salvadanaio")
-                                        .foregroundColor(.red)
-                                        .fontWeight(.medium)
-                                    
-                                    Spacer()
-                                }
-                            }
-                        } header: {
-                            HStack {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundColor(.red)
-                                Text("Zona Pericolosa")
-                            }
-                        } footer: {
-                            Text("Eliminare il salvadanaio è un'azione irreversibile.")
-                        }
-                    }
+
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -1171,15 +1122,7 @@ struct EditSalvadanaiNameView: View {
                 }
             }
         }
-        .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
-            Button("Elimina", role: .destructive) {
-                dataManager.deleteSalvadanaio(salvadanaio)
-                dismiss()
-            }
-            Button("Annulla", role: .cancel) { }
-        } message: {
-            Text("Sei sicuro di voler eliminare il salvadanaio '\(salvadanaio.name)'? Questa azione non può essere annullata.")
-        }
+
     }
     
     private func saveChanges() {
@@ -2345,7 +2288,7 @@ struct SimpleSalvadanaiDetailView: View {
     @EnvironmentObject var dataManager: DataManager
     let salvadanaio: SalvadanaiModel
     
-    @State private var showingDeleteAlert = false
+
     @State private var showingEditSheet = false // NUOVO
     
     var relatedTransactions: [TransactionModel] {
@@ -2421,31 +2364,14 @@ struct SimpleSalvadanaiDetailView: View {
                         
                         Divider()
                         
-                        Button(role: .destructive, action: {
-                            showingDeleteAlert = true
-                        }) {
-                            Label("Elimina", systemImage: "trash")
-                        }
-                        .tint(.red)
+
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
             })
         }
-        .alert("Elimina Salvadanaio", isPresented: $showingDeleteAlert) {
-            Button("Elimina", role: .destructive) {
-                dataManager.deleteSalvadanaio(salvadanaio)
-                dismiss()
-            }
-            Button("Annulla", role: .cancel) { }
-        } message: {
-            if relatedTransactions.isEmpty {
-                Text("Sei sicuro di voler eliminare questo salvadanaio? Questa azione non può essere annullata.")
-            } else {
-                Text("Sei sicuro di voler eliminare questo salvadanaio?\n\nCi sono \(relatedTransactions.count) transazioni associate che verranno mantenute ma non saranno più collegate a questo salvadanaio.\n\nQuesta azione non può essere annullata.")
-            }
-        }
+
         // NUOVO: Sheet per modifica nome
         .sheet(isPresented: $showingEditSheet) {
             EditSalvadanaiNameView(salvadanaio: salvadanaio)
