@@ -512,7 +512,7 @@ struct EnhancedAccountCard: View {
                                 }
                                 .tint(.orange)
                                 
-                                if relatedTransactions.isEmpty {
+                                if relatedTransactions.isEmpty && !account.hasNonZeroBalance {
                                     Divider()
                                     Button(role: .destructive, action: {
                                         showingDeleteAlert = true
@@ -875,6 +875,11 @@ struct EnhancedAccountDetailView: View {
             .sorted { $0.date > $1.date }
     }
     
+    // Tutte le transazioni associate al conto (per verifiche di eliminazione)
+    var allAccountTransactions: [TransactionModel] {
+        dataManager.transactions.filter { $0.accountName == account.name }
+    }
+    
     var accountIcon: String {
         let name = account.name.lowercased()
         if name.contains("carta") || name.contains("prepagata") {
@@ -1019,10 +1024,12 @@ struct EnhancedAccountDetailView: View {
                             showingEditView = true
                         }
                         
-                        Divider()
-                        
-                        Button("Elimina", systemImage: "trash", role: .destructive) {
-                            showingDeleteAlert = true
+                        if allAccountTransactions.isEmpty && !account.hasNonZeroBalance {
+                            Divider()
+                            
+                            Button("Elimina", systemImage: "trash", role: .destructive) {
+                                showingDeleteAlert = true
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -1526,7 +1533,7 @@ struct EditAccountView: View {
                     }
                     
                     // Sezione di eliminazione
-                    if relatedTransactions.isEmpty {
+                    if relatedTransactions.isEmpty && !account.hasNonZeroBalance {
                         Section {
                             Button(action: {
                                 showingDeleteAlert = true
@@ -1550,7 +1557,7 @@ struct EditAccountView: View {
                                 Text("Zona Pericolosa")
                             }
                         } footer: {
-                            Text("Eliminare il conto è un'azione irreversibile.")
+                            Text("Eliminare il conto è un'azione irreversibile. È possibile solo se il saldo è zero e non ci sono transazioni associate.")
                         }
                     }
                 }

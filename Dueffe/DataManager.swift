@@ -525,6 +525,20 @@ class DataManager: ObservableObject {
     }
     
     func deleteAccount(_ account: AccountModel) {
+        // Verifica che il conto abbia saldo zero
+        guard !account.hasNonZeroBalance else {
+            print("Errore: Impossibile eliminare un conto con saldo diverso da zero")
+            return
+        }
+        
+        // Verifica che non ci siano transazioni associate
+        let relatedTransactions = transactions.filter { $0.accountName == account.name }
+        guard relatedTransactions.isEmpty else {
+            print("Errore: Impossibile eliminare un conto con transazioni associate")
+            return
+        }
+        
+        // Se tutte le verifiche passano, procedi con l'eliminazione
         accounts.removeAll { $0.id == account.id }
     }
     
